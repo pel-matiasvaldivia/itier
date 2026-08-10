@@ -1,0 +1,738 @@
+<!doctype html>
+<html lang="es-AR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light">
+<meta name="theme-color" content="#4f46e5">
+<title>iTier — Gestión de IT con inteligencia artificial para tu PyME</title>
+<meta name="description" content="iTier inventaría tus activos, monitorea tu infraestructura 24/7 y resuelve incidentes siguiendo ITIL 4. Todo en tu propia red: tus datos nunca salen de tu empresa.">
+<meta property="og:title" content="iTier — Gestión de IT con IA para tu PyME">
+<meta property="og:description" content="El equipo de IT que tu PyME necesita, potenciado por inteligencia artificial. Inventario, monitoreo y resolución automática, en tu propia infraestructura.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://itier.pymesenlinea.com.ar">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%234f46e5'/%3E%3Cstop offset='1' stop-color='%230ea5e9'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='32' height='32' rx='8' fill='url(%23g)'/%3E%3Cg fill='%23fff'%3E%3Crect x='8' y='19' width='16' height='4' rx='2'/%3E%3Crect x='10' y='13' width='12' height='4' rx='2' opacity='.8'/%3E%3Crect x='12' y='7' width='8' height='4' rx='2' opacity='.6'/%3E%3C/g%3E%3C/svg%3E">
+
+<style>
+  /* ===== Tema CLARO, único y explícito ================================== */
+  :root{
+    --bg:#ffffff;
+    --bg-soft:#f5f7fc;
+    --bg-tint:#eef1ff;
+    --ink:#141a2e;
+    --ink-soft:#4b5268;
+    --ink-muted:#7c8399;
+    --line:#e6e9f2;
+    --line-soft:#eef1f7;
+    --brand:#4f46e5;
+    --brand-dark:#4035c9;
+    --brand-2:#0ea5e9;
+    --accent:#f59e0b;
+    --ok:#10b981;
+    --danger:#ef4444;
+    --grad:linear-gradient(135deg,#4f46e5 0%,#6366f1 45%,#0ea5e9 100%);
+    --grad-soft:linear-gradient(135deg,#eef1ff 0%,#e6f6ff 100%);
+    --r:14px;
+    --r-lg:22px;
+    --shadow-sm:0 1px 2px rgba(20,26,46,.05),0 2px 6px rgba(20,26,46,.05);
+    --shadow-md:0 8px 24px -8px rgba(20,26,46,.14);
+    --shadow-lg:0 30px 60px -22px rgba(79,70,229,.35);
+    --maxw:1160px;
+    --font:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,"Apple Color Emoji","Segoe UI Emoji",sans-serif;
+  }
+
+  *,*::before,*::after{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{
+    margin:0;
+    font-family:var(--font);
+    color:var(--ink-soft);
+    background:var(--bg);
+    line-height:1.6;
+    -webkit-font-smoothing:antialiased;
+    overflow-x:hidden;
+  }
+  h1,h2,h3,h4{color:var(--ink);line-height:1.15;margin:0;letter-spacing:-.02em;font-weight:800}
+  p{margin:0}
+  a{color:inherit;text-decoration:none}
+  img,svg{max-width:100%}
+  ::selection{background:#dfe3ff;color:var(--brand-dark)}
+
+  .wrap{max-width:var(--maxw);margin:0 auto;padding:0 24px}
+  .eyebrow{
+    display:inline-flex;align-items:center;gap:8px;
+    font-size:.74rem;font-weight:700;letter-spacing:.09em;text-transform:uppercase;
+    color:var(--brand);background:var(--bg-tint);
+    padding:7px 14px;border-radius:999px;border:1px solid #dfe3ff;
+  }
+  .lead{font-size:1.14rem;color:var(--ink-soft)}
+  .sec-head{max-width:660px;margin:0 auto 52px;text-align:center}
+  .sec-head h2{font-size:clamp(1.7rem,3.4vw,2.5rem);margin:16px 0 14px}
+  .sec-head p{font-size:1.08rem}
+
+  /* ===== Botones ======================================================== */
+  .btn{
+    display:inline-flex;align-items:center;justify-content:center;gap:9px;
+    font-weight:700;font-size:.98rem;padding:14px 24px;border-radius:12px;
+    border:1px solid transparent;cursor:pointer;transition:transform .15s ease,box-shadow .2s ease,background .2s ease;
+    white-space:nowrap;
+  }
+  .btn-primary{background:var(--grad);color:#fff;box-shadow:0 10px 24px -8px rgba(79,70,229,.6)}
+  .btn-primary:hover{transform:translateY(-2px);box-shadow:0 16px 30px -10px rgba(79,70,229,.7)}
+  .btn-ghost{background:#fff;color:var(--ink);border-color:var(--line)}
+  .btn-ghost:hover{border-color:#c9cfe4;background:var(--bg-soft);transform:translateY(-1px)}
+  .btn-light{background:rgba(255,255,255,.16);color:#fff;border-color:rgba(255,255,255,.32)}
+  .btn-light:hover{background:rgba(255,255,255,.26)}
+  .btn-white{background:#fff;color:var(--brand-dark)}
+  .btn-white:hover{transform:translateY(-2px);box-shadow:0 16px 30px -12px rgba(0,0,0,.3)}
+
+  /* ===== Header ========================================================= */
+  header{position:sticky;top:0;z-index:50;background:rgba(255,255,255,.82);backdrop-filter:saturate(160%) blur(12px);border-bottom:1px solid var(--line-soft)}
+  .nav{display:flex;align-items:center;justify-content:space-between;height:70px}
+  .brand{display:flex;align-items:center;gap:11px;font-weight:800;color:var(--ink);font-size:1.22rem;letter-spacing:-.02em}
+  .brand .mark{width:34px;height:34px;border-radius:9px;flex:0 0 auto;box-shadow:var(--shadow-sm)}
+  .nav-links{display:flex;align-items:center;gap:30px}
+  .nav-links a{font-size:.95rem;font-weight:600;color:var(--ink-soft);transition:color .15s}
+  .nav-links a:hover{color:var(--brand)}
+  .nav-cta{display:flex;align-items:center;gap:14px}
+  .menu-btn{display:none;background:none;border:1px solid var(--line);border-radius:10px;width:44px;height:44px;cursor:pointer;color:var(--ink)}
+
+  /* ===== Hero =========================================================== */
+  .hero{position:relative;overflow:hidden;padding:76px 0 90px}
+  .hero::before{
+    content:"";position:absolute;inset:0;z-index:-2;
+    background:
+      radial-gradient(60% 50% at 82% 8%,rgba(14,165,233,.14),transparent 60%),
+      radial-gradient(50% 45% at 12% 20%,rgba(79,70,229,.13),transparent 60%),
+      linear-gradient(180deg,#fbfcff 0%,#ffffff 70%);
+  }
+  .hero::after{
+    content:"";position:absolute;inset:0;z-index:-1;opacity:.5;
+    background-image:linear-gradient(var(--line-soft) 1px,transparent 1px),linear-gradient(90deg,var(--line-soft) 1px,transparent 1px);
+    background-size:44px 44px;
+    -webkit-mask-image:radial-gradient(70% 60% at 50% 30%,#000,transparent 78%);
+            mask-image:radial-gradient(70% 60% at 50% 30%,#000,transparent 78%);
+  }
+  .hero-grid{display:grid;grid-template-columns:1.05fr .95fr;gap:56px;align-items:center}
+  .hero h1{font-size:clamp(2.15rem,4.6vw,3.5rem);margin:22px 0 20px}
+  .hero h1 .hl{background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
+  .hero p.lead{max-width:540px;font-size:1.18rem}
+  .hero-cta{display:flex;flex-wrap:wrap;gap:14px;margin:32px 0 22px}
+  .hero-note{display:flex;align-items:center;gap:9px;font-size:.9rem;color:var(--ink-muted)}
+  .hero-note svg{color:var(--ok);flex:0 0 auto}
+
+  /* Mock de consola en el hero */
+  .mock-stage{position:relative}
+  .mock{
+    position:relative;z-index:2;background:#fff;border:1px solid var(--line);border-radius:18px;
+    box-shadow:var(--shadow-lg);overflow:hidden;
+  }
+  .mock-bar{display:flex;align-items:center;gap:8px;padding:13px 16px;border-bottom:1px solid var(--line-soft);background:var(--bg-soft)}
+  .dot{width:11px;height:11px;border-radius:50%}
+  .mock-title{margin-left:8px;font-size:.82rem;font-weight:700;color:var(--ink-soft)}
+  .live{margin-left:auto;display:inline-flex;align-items:center;gap:7px;font-size:.74rem;font-weight:700;color:var(--ok)}
+  .live .pulse{width:8px;height:8px;border-radius:50%;background:var(--ok);box-shadow:0 0 0 0 rgba(16,185,129,.5);animation:pulse 2s infinite}
+  @keyframes pulse{70%{box-shadow:0 0 0 8px rgba(16,185,129,0)}100%{box-shadow:0 0 0 0 rgba(16,185,129,0)}}
+  .mock-body{padding:18px}
+  .evt-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px}
+  .evt-time{font-size:.72rem;font-weight:700;letter-spacing:.05em;color:var(--ink-muted);text-transform:uppercase}
+  .chip{font-size:.7rem;font-weight:800;padding:4px 10px;border-radius:999px}
+  .chip-alta{background:#fef2f2;color:#dc2626;border:1px solid #fecaca}
+  .chip-l3{background:var(--bg-tint);color:var(--brand);border:1px solid #dfe3ff}
+  .evt-line{font-size:1rem;font-weight:700;color:var(--ink);margin-bottom:14px}
+  .flow{border-left:2px dashed #d7dbe8;margin-left:7px;padding-left:18px;display:grid;gap:12px}
+  .flow-step{position:relative}
+  .flow-step::before{content:"";position:absolute;left:-25px;top:4px;width:12px;height:12px;border-radius:50%;background:#fff;border:2px solid var(--brand)}
+  .flow-step.done::before{background:var(--ok);border-color:var(--ok)}
+  .flow-k{font-size:.72rem;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--ink-muted)}
+  .flow-v{font-size:.94rem;color:var(--ink);font-weight:600}
+  .flow-foot{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:16px;padding-top:15px;border-top:1px solid var(--line-soft)}
+  .resolved{display:inline-flex;align-items:center;gap:6px;font-size:.82rem;font-weight:800;color:var(--ok)}
+  .mock-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:16px}
+  .mstat{background:var(--bg-soft);border:1px solid var(--line-soft);border-radius:12px;padding:11px 12px;text-align:center}
+  .mstat b{display:block;font-size:1.15rem;color:var(--ink);letter-spacing:-.02em}
+  .mstat span{font-size:.72rem;color:var(--ink-muted);font-weight:600}
+  /* Insignias flotantes */
+  .float{position:absolute;z-index:3;background:#fff;border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow-md);padding:10px 13px;display:flex;align-items:center;gap:9px;font-size:.82rem;font-weight:700;color:var(--ink)}
+  .float svg{flex:0 0 auto}
+  .float.f1{top:-18px;left:-26px}
+  .float.f2{bottom:-20px;right:-22px}
+  .badge-ic{width:30px;height:30px;border-radius:8px;display:grid;place-items:center;color:#fff}
+
+  /* ===== Tira de confianza ============================================= */
+  .trust{border-top:1px solid var(--line-soft);border-bottom:1px solid var(--line-soft);background:var(--bg-soft)}
+  .trust .wrap{display:flex;align-items:center;justify-content:center;gap:14px 30px;flex-wrap:wrap;padding:22px 24px}
+  .trust span{font-size:.92rem;font-weight:700;color:var(--ink-muted);display:inline-flex;align-items:center;gap:9px}
+  .trust .sep{width:5px;height:5px;border-radius:50%;background:#cfd4e3}
+
+  /* ===== Secciones ===================================================== */
+  section{padding:88px 0}
+  .soft{background:var(--bg-soft)}
+
+  /* Problema */
+  .prob-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:20px}
+  .prob{background:#fff;border:1px solid var(--line);border-radius:var(--r);padding:24px}
+  .prob .ic{width:44px;height:44px;border-radius:11px;display:grid;place-items:center;background:#fff5f5;color:var(--danger);margin-bottom:14px}
+  .prob h3{font-size:1.05rem;margin-bottom:7px}
+  .prob p{font-size:.93rem}
+
+  /* Pilares */
+  .pillars{display:grid;grid-template-columns:repeat(3,1fr);gap:22px;margin-top:8px}
+  .pillar{text-align:center;padding:14px}
+  .pillar .num{font-size:.8rem;font-weight:800;color:var(--brand);letter-spacing:.1em}
+  .pillar h3{font-size:1.35rem;margin:10px 0 8px}
+  .pillar p{font-size:.98rem}
+
+  /* Beneficios */
+  .ben-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:20px}
+  .ben{background:#fff;border:1px solid var(--line);border-radius:var(--r);padding:26px 22px;transition:transform .18s ease,box-shadow .2s ease,border-color .2s}
+  .ben:hover{transform:translateY(-4px);box-shadow:var(--shadow-md);border-color:#d7dbef}
+  .ben .ic{width:50px;height:50px;border-radius:13px;display:grid;place-items:center;color:#fff;margin-bottom:18px;box-shadow:0 8px 18px -6px rgba(79,70,229,.5)}
+  .ben h3{font-size:1.08rem;margin-bottom:9px}
+  .ben p{font-size:.93rem}
+  .g1{background:linear-gradient(135deg,#4f46e5,#7c3aed)}
+  .g2{background:linear-gradient(135deg,#0ea5e9,#2563eb)}
+  .g3{background:linear-gradient(135deg,#0d9488,#10b981)}
+  .g4{background:linear-gradient(135deg,#7c3aed,#c026d3)}
+  .g5{background:linear-gradient(135deg,#2563eb,#0ea5e9)}
+  .g6{background:linear-gradient(135deg,#f59e0b,#f97316)}
+  .g7{background:linear-gradient(135deg,#4f46e5,#0ea5e9)}
+  .g8{background:linear-gradient(135deg,#059669,#0d9488)}
+
+  /* Cómo funciona */
+  .steps{display:grid;grid-template-columns:repeat(3,1fr);gap:24px;margin-bottom:56px}
+  .step{position:relative;background:#fff;border:1px solid var(--line);border-radius:var(--r-lg);padding:30px 26px}
+  .step-n{width:46px;height:46px;border-radius:12px;background:var(--grad);color:#fff;display:grid;place-items:center;font-weight:800;font-size:1.2rem;margin-bottom:18px}
+  .step h3{font-size:1.15rem;margin-bottom:9px}
+  .step p{font-size:.95rem}
+
+  /* Diagrama de datos locales */
+  .diagram{background:var(--grad-soft);border:1px solid #dbe6ff;border-radius:var(--r-lg);padding:34px;display:grid;grid-template-columns:1fr auto 1fr;gap:26px;align-items:center}
+  .dia-box{background:#fff;border:1px solid var(--line);border-radius:var(--r);padding:22px;box-shadow:var(--shadow-sm)}
+  .dia-box h4{font-size:1.02rem;display:flex;align-items:center;gap:9px;margin-bottom:14px}
+  .dia-tag{font-size:.72rem;font-weight:800;letter-spacing:.05em;text-transform:uppercase;padding:3px 9px;border-radius:6px}
+  .tag-local{background:#e7f9f0;color:#059669}
+  .tag-cloud{background:var(--bg-tint);color:var(--brand)}
+  .dia-items{display:flex;flex-wrap:wrap;gap:8px}
+  .dia-pill{font-size:.82rem;font-weight:600;background:var(--bg-soft);border:1px solid var(--line-soft);border-radius:8px;padding:7px 11px;color:var(--ink)}
+  .dia-arrows{display:flex;flex-direction:column;gap:14px;align-items:center;min-width:130px}
+  .arrow-out,.arrow-in{display:flex;flex-direction:column;align-items:center;gap:4px;font-size:.74rem;font-weight:700}
+  .arrow-out{color:var(--brand)}
+  .arrow-in{color:var(--ink-muted)}
+  .arrow-line{width:100%;display:flex;align-items:center;justify-content:center}
+
+  /* Autonomía */
+  .levels{display:grid;grid-template-columns:repeat(5,1fr);gap:14px;margin-top:8px}
+  .lvl{background:#fff;border:1px solid var(--line);border-radius:var(--r);padding:22px 18px;position:relative;overflow:hidden}
+  .lvl::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--grad)}
+  .lvl .lk{font-size:1.5rem;font-weight:800;background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent;letter-spacing:-.03em}
+  .lvl h3{font-size:1rem;margin:6px 0 8px}
+  .lvl p{font-size:.86rem}
+  .levels-note{display:flex;align-items:flex-start;gap:12px;margin-top:26px;background:#fffaf0;border:1px solid #fde9c8;border-radius:var(--r);padding:16px 20px;font-size:.94rem;color:#8a5a00}
+  .levels-note svg{color:var(--accent);flex:0 0 auto;margin-top:2px}
+
+  /* Seguridad */
+  .sec-split{display:grid;grid-template-columns:.95fr 1.05fr;gap:56px;align-items:center}
+  .sec-list{display:grid;gap:16px}
+  .sec-item{display:flex;gap:15px;align-items:flex-start}
+  .sec-item .ic{width:42px;height:42px;border-radius:11px;background:var(--bg-tint);color:var(--brand);display:grid;place-items:center;flex:0 0 auto}
+  .sec-item h3{font-size:1.03rem;margin-bottom:4px}
+  .sec-item p{font-size:.92rem}
+  .sec-visual{background:var(--ink);border-radius:var(--r-lg);padding:30px;color:#cfd6e6;box-shadow:var(--shadow-lg);position:relative;overflow:hidden}
+  .sec-visual::before{content:"";position:absolute;top:-40%;right:-20%;width:70%;height:80%;background:radial-gradient(circle,rgba(79,70,229,.5),transparent 70%)}
+  .sec-visual h4{color:#fff;font-size:1.05rem;margin-bottom:18px;position:relative}
+  .audit-line{display:flex;align-items:center;gap:12px;padding:11px 0;border-bottom:1px solid rgba(255,255,255,.09);font-size:.85rem;position:relative}
+  .audit-line:last-child{border-bottom:none}
+  .audit-hash{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;color:#7dd3fc;font-size:.78rem}
+  .audit-ic{width:26px;height:26px;border-radius:7px;background:rgba(255,255,255,.08);display:grid;place-items:center;color:#a5b4fc;flex:0 0 auto}
+  .audit-ok{margin-left:auto;color:#34d399;font-weight:700;font-size:.78rem;display:inline-flex;align-items:center;gap:5px}
+
+  /* CTA final */
+  .cta{background:var(--grad);border-radius:0;position:relative;overflow:hidden}
+  .cta-inner{text-align:center;color:#fff;padding:80px 24px;position:relative;z-index:2}
+  .cta h2{color:#fff;font-size:clamp(1.8rem,3.6vw,2.7rem);margin-bottom:16px}
+  .cta p{color:rgba(255,255,255,.9);font-size:1.14rem;max-width:560px;margin:0 auto 32px}
+  .cta-btns{display:flex;flex-wrap:wrap;gap:14px;justify-content:center}
+  .cta-sub{margin-top:22px;font-size:.9rem;color:rgba(255,255,255,.8)}
+  .cta::before{content:"";position:absolute;inset:0;opacity:.28;background-image:radial-gradient(circle at 20% 30%,rgba(255,255,255,.5) 1px,transparent 1px);background-size:26px 26px}
+
+  /* Footer */
+  footer{background:var(--ink);color:#9aa3ba;padding:56px 0 34px}
+  .foot-grid{display:flex;justify-content:space-between;gap:40px;flex-wrap:wrap;margin-bottom:36px}
+  .foot-brand{max-width:330px}
+  .foot-brand .brand{color:#fff;margin-bottom:14px}
+  .foot-brand p{font-size:.92rem;color:#8b93ab}
+  .foot-cols{display:flex;gap:60px;flex-wrap:wrap}
+  .foot-col h5{color:#fff;font-size:.82rem;letter-spacing:.06em;text-transform:uppercase;margin:0 0 14px}
+  .foot-col a{display:block;font-size:.92rem;color:#9aa3ba;padding:5px 0;transition:color .15s}
+  .foot-col a:hover{color:#fff}
+  .foot-bar{border-top:1px solid rgba(255,255,255,.1);padding-top:22px;display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;font-size:.85rem;color:#8b93ab}
+
+  /* Animación de entrada */
+  .reveal{opacity:0;transform:translateY(22px);transition:opacity .6s ease,transform .6s ease}
+  .reveal.in{opacity:1;transform:none}
+
+  /* ===== Responsive ==================================================== */
+  @media (max-width:960px){
+    .hero-grid{grid-template-columns:1fr;gap:64px}
+    .hero p.lead{max-width:none}
+    .prob-grid,.ben-grid{grid-template-columns:repeat(2,1fr)}
+    .sec-split{grid-template-columns:1fr;gap:40px}
+    .levels{grid-template-columns:repeat(2,1fr)}
+    .diagram{grid-template-columns:1fr;gap:20px}
+    .dia-arrows{flex-direction:row;min-width:0}
+  }
+  @media (max-width:680px){
+    section{padding:64px 0}
+    .hero{padding:52px 0 70px}
+    .nav-links{display:none}
+    .nav-cta .btn:not(.menu-btn){display:none}
+    .menu-btn{display:grid;place-items:center}
+    .nav-links.open{display:flex;position:absolute;top:70px;left:0;right:0;flex-direction:column;gap:0;background:#fff;border-bottom:1px solid var(--line);padding:10px 24px 18px}
+    .nav-links.open a{padding:12px 0;border-bottom:1px solid var(--line-soft);width:100%}
+    .prob-grid,.ben-grid,.pillars,.steps,.levels{grid-template-columns:1fr}
+    .float{display:none}
+    .foot-grid{flex-direction:column}
+  }
+  @media (prefers-reduced-motion:reduce){
+    *{animation:none!important;scroll-behavior:auto!important}
+    .reveal{opacity:1;transform:none;transition:none}
+  }
+</style>
+</head>
+<body>
+
+<!-- ===================== HEADER ===================== -->
+<header>
+  <div class="wrap nav">
+    <a class="brand" href="#top" aria-label="iTier — inicio">
+      <svg class="mark" viewBox="0 0 32 32" aria-hidden="true"><defs><linearGradient id="lg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#4f46e5"/><stop offset="1" stop-color="#0ea5e9"/></linearGradient></defs><rect width="32" height="32" rx="8" fill="url(#lg)"/><g fill="#fff"><rect x="8" y="19" width="16" height="4" rx="2"/><rect x="10" y="13" width="12" height="4" rx="2" opacity=".82"/><rect x="12" y="7" width="8" height="4" rx="2" opacity=".6"/></g></svg>
+      iTier
+    </a>
+    <nav class="nav-links" id="navlinks">
+      <a href="#beneficios">Beneficios</a>
+      <a href="#como">Cómo funciona</a>
+      <a href="#autonomia">Autonomía</a>
+      <a href="#seguridad">Seguridad</a>
+    </nav>
+    <div class="nav-cta">
+      <a class="btn btn-primary" href="#contacto">Solicitar demo</a>
+      <button class="menu-btn" id="menuBtn" aria-label="Abrir menú" aria-expanded="false">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+      </button>
+    </div>
+  </div>
+</header>
+
+<!-- ===================== HERO ===================== -->
+<main id="top">
+<section class="hero">
+  <div class="wrap hero-grid">
+    <div>
+      <span class="eyebrow">◆ Agentic AI · Basado en ITIL 4</span>
+      <h1>El equipo de IT que tu PyME necesita, ahora con <span class="hl">inteligencia artificial</span></h1>
+      <p class="lead">iTier inventaría tus activos, vigila tu infraestructura 24/7 y resuelve los incidentes de siempre siguiendo las mejores prácticas de la industria. Todo desde tu propia red: <strong>tus datos nunca salen de tu empresa</strong>.</p>
+      <div class="hero-cta">
+        <a class="btn btn-primary" href="#contacto">Solicitar una demo
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+        </a>
+        <a class="btn btn-ghost" href="#como">Ver cómo funciona</a>
+      </div>
+      <div class="hero-note">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+        Sin licencias por técnico · Se paga por lo que gestiona, no por asientos
+      </div>
+    </div>
+
+    <div class="mock-stage">
+      <!-- Insignias flotantes -->
+      <div class="float f1">
+        <span class="badge-ic" style="background:linear-gradient(135deg,#0d9488,#10b981)">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/></svg>
+        </span>
+        Datos on-premise
+      </div>
+      <div class="float f2">
+        <span class="badge-ic" style="background:linear-gradient(135deg,#4f46e5,#7c3aed)">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18M3 12h18" opacity="0"/><path d="M4 17V9m4 8V5m4 12v-6m4 6V8m4 9v-4"/></svg>
+        </span>
+        Monitoreo 24/7
+      </div>
+
+      <!-- Consola simulada -->
+      <div class="mock" role="img" aria-label="Consola de iTier resolviendo un incidente de disco lleno de forma automática">
+        <div class="mock-bar">
+          <span class="dot" style="background:#ff5f57"></span>
+          <span class="dot" style="background:#febc2e"></span>
+          <span class="dot" style="background:#28c840"></span>
+          <span class="mock-title">iTier · Consola</span>
+          <span class="live"><span class="pulse"></span>En línea</span>
+        </div>
+        <div class="mock-body">
+          <div class="evt-row">
+            <span class="evt-time">Evento · 14:32</span>
+            <span class="chip chip-alta">Severidad alta</span>
+          </div>
+          <div class="evt-line">Uso de disco 92% — SRV-FILE01</div>
+
+          <div class="flow">
+            <div class="flow-step done">
+              <div class="flow-k">Diagnóstico</div>
+              <div class="flow-v">Archivos temporales acumulados en volumen D:</div>
+            </div>
+            <div class="flow-step done">
+              <div class="flow-k">Acción</div>
+              <div class="flow-v">Ejecutar <code>limpiar_temp_windows</code> (playbook reversible)</div>
+            </div>
+          </div>
+
+          <div class="flow-foot">
+            <span class="chip chip-l3">Nivel L3 · Actúa y notifica</span>
+            <span class="resolved">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+              Resuelto en 38 s — ticket INC-3402 cerrado
+            </span>
+          </div>
+
+          <div class="mock-stats">
+            <div class="mstat"><b>128</b><span>activos</span></div>
+            <div class="mstat"><b>0</b><span>incidentes abiertos</span></div>
+            <div class="mstat"><b>99,9%</b><span>disponibilidad</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+</main>
+
+<!-- ===================== TIRA DE CONFIANZA ===================== -->
+<div class="trust">
+  <div class="wrap">
+    <span>Basado en estándares abiertos y probados:</span>
+    <span>ITIL 4</span><i class="sep"></i>
+    <span>GLPI</span><i class="sep"></i>
+    <span>Zabbix</span><i class="sep"></i>
+    <span>Ansible</span><i class="sep"></i>
+    <span>OWASP Agentic AI 2026</span>
+  </div>
+</div>
+
+<!-- ===================== PROBLEMA ===================== -->
+<section id="problema">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <span class="eyebrow">El punto de partida</span>
+      <h2>Gestionar IT en una PyME no debería ser así</h2>
+      <p>Sin un equipo dedicado ni herramientas a medida, la tecnología termina frenando al negocio en vez de impulsarlo.</p>
+    </div>
+    <div class="prob-grid">
+      <div class="prob reveal">
+        <div class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4m0 4h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/></svg></div>
+        <h3>Todo es urgente</h3>
+        <p>Se vive apagando incendios. Los problemas se atienden cuando ya explotaron y afectan a los usuarios.</p>
+      </div>
+      <div class="prob reveal">
+        <div class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.5 3h5M12 3v6m-7 3h14a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2Z"/></svg></div>
+        <h3>Nadie sabe qué hay</h3>
+        <p>Sin inventario confiable de equipos, software y licencias, cada decisión es a ciegas y cada auditoría, un dolor.</p>
+      </div>
+      <div class="prob reveal">
+        <div class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm13 10v-2a4 4 0 0 0-3-3.87M16 3.13A4 4 0 0 1 16 11"/></svg></div>
+        <h3>Sin equipo dedicado</h3>
+        <p>IT recae en quien puede: el dueño, un proveedor externo o el que "sabe de computadoras". No escala.</p>
+      </div>
+      <div class="prob reveal">
+        <div class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></div>
+        <h3>Las suites "grandes" no encajan</h3>
+        <p>Las plataformas enterprise cobran por técnico y por asiento: caras, complejas y pensadas para otra escala.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== SOLUCIÓN / PILARES ===================== -->
+<section class="soft" id="solucion">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <span class="eyebrow">Conocé a iTier</span>
+      <h2>Un agente de IA que trabaja como tu mejor técnico</h2>
+      <p>iTier no es otro tablero para mirar. Es un agente que entiende tu infraestructura y actúa sobre ella, con el criterio de ITIL y bajo tus reglas.</p>
+    </div>
+    <div class="pillars">
+      <div class="pillar reveal">
+        <div class="num">01</div>
+        <h3>Observa</h3>
+        <p>Descubre e inventaría tus activos y vigila métricas y eventos en tiempo real, día y noche.</p>
+      </div>
+      <div class="pillar reveal">
+        <div class="num">02</div>
+        <h3>Recomienda</h3>
+        <p>Diagnostica la causa raíz y propone la solución correcta, explicada en lenguaje claro.</p>
+      </div>
+      <div class="pillar reveal">
+        <div class="num">03</div>
+        <h3>Actúa</h3>
+        <p>Ejecuta soluciones probadas y reversibles —según el nivel de autonomía que vos definas.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== BENEFICIOS ===================== -->
+<section id="beneficios">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <span class="eyebrow">Beneficios</span>
+      <h2>Todo lo que ganás con iTier</h2>
+      <p>El control de IT que hoy solo tienen las grandes empresas, al alcance de tu PyME.</p>
+    </div>
+    <div class="ben-grid">
+      <div class="ben reveal">
+        <div class="ic g1"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/></svg></div>
+        <h3>Inventario siempre al día</h3>
+        <p>Descubre y cataloga equipos, software y servicios de forma automática. Sabés qué tenés sin planillas ni sorpresas.</p>
+      </div>
+      <div class="ben reveal">
+        <div class="ic g2"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg></div>
+        <h3>Monitoreo 24/7</h3>
+        <p>Detecta caídas, discos llenos y anomalías antes de que tus usuarios abran un ticket o el negocio se frene.</p>
+      </div>
+      <div class="ben reveal">
+        <div class="ic g3"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8Z"/></svg></div>
+        <h3>Resolución automática y segura</h3>
+        <p>Aplica soluciones probadas y reversibles para lo rutinario. Menos tickets, menos espera, menos noches en vela.</p>
+      </div>
+      <div class="ben reveal">
+        <div class="ic g4"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2Z"/></svg></div>
+        <h3>Basado en ITIL 4</h3>
+        <p>Procesos estándar de la industria, no improvisación. Incidentes, problemas, cambios y activos bajo un mismo marco.</p>
+      </div>
+      <div class="ben reveal">
+        <div class="ic g5"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9.5 12 3l9 6.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1Z"/></svg></div>
+        <h3>Tus datos se quedan en casa</h3>
+        <p>Corre en tu propia infraestructura. Solo el razonamiento usa la nube, siempre de forma saliente: nada entra.</p>
+      </div>
+      <div class="ben reveal">
+        <div class="ic g6"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6"/></svg></div>
+        <h3>Vos controlás la autonomía</h3>
+        <p>Del "solo avisame" al "resolvé y contame": elegís cuánto delega el agente, con freno humano para lo crítico.</p>
+      </div>
+      <div class="ben reveal">
+        <div class="ic g7"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/><path d="m9 12 2 2 4-4"/></svg></div>
+        <h3>Auditoría a prueba de manipulación</h3>
+        <p>Cada decisión y acción queda en una cadena verificable. Sabés siempre qué hizo la IA y por qué.</p>
+      </div>
+      <div class="ben reveal">
+        <div class="ic g8"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></div>
+        <h3>Precio pensado para PyMEs</h3>
+        <p>Sin licencias enterprise ni costo por asiento. Predecible y bajo, escalable a medida que tu empresa crece.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== CÓMO FUNCIONA ===================== -->
+<section class="soft" id="como">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <span class="eyebrow">Cómo funciona</span>
+      <h2>Ponerlo en marcha es simple</h2>
+      <p>Sin proyectos eternos ni consultoras. En tres pasos iTier está cuidando tu IT.</p>
+    </div>
+    <div class="steps">
+      <div class="step reveal">
+        <div class="step-n">1</div>
+        <h3>Conectás el appliance</h3>
+        <p>Un mini-equipo se instala en tu red y se enlaza con tu iTier. No abre ningún puerto hacia afuera: solo conexiones salientes y cifradas.</p>
+      </div>
+      <div class="step reveal">
+        <div class="step-n">2</div>
+        <h3>iTier aprende tu infraestructura</h3>
+        <p>Inventaría tus equipos, empieza a monitorear y arma el mapa de tus activos y servicios. En horas, no en semanas.</p>
+      </div>
+      <div class="step reveal">
+        <div class="step-n">3</div>
+        <h3>Empieza a cuidar tu IT</h3>
+        <p>Ante cada evento diagnostica y —según el nivel que elijas— te avisa, te propone la solución o la aplica y te notifica.</p>
+      </div>
+    </div>
+
+    <div class="diagram reveal">
+      <div class="dia-box">
+        <h4><span class="dia-tag tag-local">Tu empresa · borde</span></h4>
+        <div class="dia-items">
+          <span class="dia-pill">Activos y equipos</span>
+          <span class="dia-pill">Appliance iTier</span>
+          <span class="dia-pill">Inventario</span>
+          <span class="dia-pill">Eventos y métricas</span>
+        </div>
+      </div>
+      <div class="dia-arrows">
+        <div class="arrow-out">
+          <span>solo inferencia →</span>
+          <span class="arrow-line"><svg width="80" height="16" viewBox="0 0 80 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 8h72m-8-5 8 5-8 5"/></svg></span>
+        </div>
+        <div class="arrow-in">
+          <span class="arrow-line"><svg width="80" height="16" viewBox="0 0 80 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M78 8H6m8-5-8 5 8 5" opacity=".35"/></svg></span>
+          <span>✕ nada entra</span>
+        </div>
+      </div>
+      <div class="dia-box">
+        <h4><span class="dia-tag tag-cloud">Nube · razonamiento</span></h4>
+        <div class="dia-items">
+          <span class="dia-pill">Modelo de IA (Claude)</span>
+          <span class="dia-pill">Control de gasto</span>
+        </div>
+        <p style="font-size:.86rem;margin-top:12px;color:var(--ink-muted)">La nube solo recibe la consulta puntual para "pensar" la respuesta. Tus datos de inventario y eventos permanecen en tu red.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== AUTONOMÍA ===================== -->
+<section id="autonomia">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <span class="eyebrow">Vos tenés el control</span>
+      <h2>Elegís cuánto delegás</h2>
+      <p>iTier trabaja con niveles de autonomía graduales. Empezás observando y vas soltando control a medida que ganás confianza.</p>
+    </div>
+    <div class="levels">
+      <div class="lvl reveal"><div class="lk">L0</div><h3>Observa</h3><p>Mira, inventaría y aprende. No toca nada.</p></div>
+      <div class="lvl reveal"><div class="lk">L1</div><h3>Recomienda</h3><p>Diagnostica y sugiere. Vos decidís.</p></div>
+      <div class="lvl reveal"><div class="lk">L2</div><h3>Aprobás y actúa</h3><p>Propone y, con un clic tuyo, ejecuta.</p></div>
+      <div class="lvl reveal"><div class="lk">L3</div><h3>Actúa y notifica</h3><p>Resuelve lo rutinario y te avisa.</p></div>
+      <div class="lvl reveal"><div class="lk">L4</div><h3>Autónomo</h3><p>Para tareas repetitivas y de bajo riesgo.</p></div>
+    </div>
+    <div class="levels-note reveal">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/></svg>
+      <div><strong>Con topes de seguridad que la IA nunca puede superar.</strong> La infraestructura crítica —controladores de dominio, bases de datos, todo lo irreversible— siempre exige aprobación humana, sin importar el nivel configurado.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== SEGURIDAD ===================== -->
+<section class="soft" id="seguridad">
+  <div class="wrap sec-split">
+    <div class="reveal">
+      <span class="eyebrow">Seguridad por diseño</span>
+      <h2 style="font-size:clamp(1.7rem,3.4vw,2.4rem);margin:16px 0 18px">Una IA que nunca hace más de lo que debe</h2>
+      <p class="lead" style="margin-bottom:28px">iTier se construyó siguiendo el principio de mínima agencia y el estándar OWASP para aplicaciones Agentic 2026. La potencia de la IA, con los frenos de un sistema serio.</p>
+      <div class="sec-list">
+        <div class="sec-item">
+          <div class="ic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></div>
+          <div><h3>Herramientas acotadas</h3><p>El agente no tiene acceso a la consola ni a comandos libres. Solo puede usar acciones aprobadas y tipadas.</p></div>
+        </div>
+        <div class="sec-item">
+          <div class="ic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6M9 15l2 2 4-4"/></svg></div>
+          <div><h3>Playbooks firmados y reversibles</h3><p>Cada remediación es un procedimiento versionado, probado y con vuelta atrás. Nada de scripts improvisados.</p></div>
+        </div>
+        <div class="sec-item">
+          <div class="ic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2 4 5v6c0 5 3.4 8.5 8 11 4.6-2.5 8-6 8-11V5Z"/></svg></div>
+          <div><h3>Tus datos, en tu casa</h3><p>El inventario y los eventos nunca salen de tu red. La conexión al exterior es solo saliente y cifrada.</p></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="sec-visual reveal">
+      <h4>Registro de auditoría · cadena verificable</h4>
+      <div class="audit-line">
+        <span class="audit-ic"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg></span>
+        Evidencia recolectada <span class="audit-hash">a1f3…9c</span>
+        <span class="audit-ok"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>OK</span>
+      </div>
+      <div class="audit-line">
+        <span class="audit-ic"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></span>
+        Política evaluada · nivel L3 <span class="audit-hash">b7e0…4d</span>
+        <span class="audit-ok"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>OK</span>
+      </div>
+      <div class="audit-line">
+        <span class="audit-ic"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8Z"/></svg></span>
+        Playbook ejecutado <span class="audit-hash">c2d9…81</span>
+        <span class="audit-ok"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>OK</span>
+      </div>
+      <div style="margin-top:18px;font-size:.82rem;color:#8fa0c0;position:relative">Cada entrada encadena el hash de la anterior: si algo se altera, se detecta al instante.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== CTA FINAL ===================== -->
+<section class="cta" id="contacto" style="padding:0">
+  <div class="cta-inner">
+    <h2>¿Listo para que la IT deje de ser un problema?</h2>
+    <p>Agendá una demo sin cargo y te mostramos, con tu propio escenario, cómo iTier cuida la infraestructura de tu PyME.</p>
+    <div class="cta-btns">
+      <a class="btn btn-white" href="mailto:matiasvaldivia@pymesenlinea.com.ar?subject=Quiero%20una%20demo%20de%20iTier&body=Hola%2C%20me%20gustar%C3%ADa%20conocer%20iTier%20para%20mi%20empresa.">
+        Solicitar una demo
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+      </a>
+      <a class="btn btn-light" href="tel:">Hablar con un especialista</a>
+    </div>
+    <div class="cta-sub">Respuesta en 24 h hábiles · Sin compromiso · Para PyMEs de 10 a 250 puestos</div>
+  </div>
+</section>
+
+<!-- ===================== FOOTER ===================== -->
+<footer>
+  <div class="wrap">
+    <div class="foot-grid">
+      <div class="foot-brand">
+        <div class="brand">
+          <svg class="mark" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="8" fill="url(#lg)"/><g fill="#fff"><rect x="8" y="19" width="16" height="4" rx="2"/><rect x="10" y="13" width="12" height="4" rx="2" opacity=".82"/><rect x="12" y="7" width="8" height="4" rx="2" opacity=".6"/></g></svg>
+          iTier
+        </div>
+        <p>Gestión de servicios de IT asistida por agentes de IA, diseñada para PyMEs que quieren control real de su tecnología sin resignar sus datos.</p>
+      </div>
+      <div class="foot-cols">
+        <div class="foot-col">
+          <h5>Producto</h5>
+          <a href="#beneficios">Beneficios</a>
+          <a href="#como">Cómo funciona</a>
+          <a href="#autonomia">Autonomía</a>
+          <a href="#seguridad">Seguridad</a>
+        </div>
+        <div class="foot-col">
+          <h5>Contacto</h5>
+          <a href="mailto:matiasvaldivia@pymesenlinea.com.ar">Solicitar demo</a>
+          <a href="https://itier.pymesenlinea.com.ar">itier.pymesenlinea.com.ar</a>
+        </div>
+      </div>
+    </div>
+    <div class="foot-bar">
+      <span>© <span id="year">2026</span> iTier — una solución de Pymes en Línea.</span>
+      <span>Basado en ITIL 4 · Hecho en Argentina 🇦🇷</span>
+    </div>
+  </div>
+</footer>
+
+<script>
+  // Año dinámico
+  document.getElementById('year').textContent = new Date().getFullYear();
+
+  // Menú móvil
+  var menuBtn = document.getElementById('menuBtn');
+  var navlinks = document.getElementById('navlinks');
+  menuBtn.addEventListener('click', function(){
+    var open = navlinks.classList.toggle('open');
+    menuBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
+  });
+  navlinks.addEventListener('click', function(e){
+    if(e.target.tagName === 'A'){ navlinks.classList.remove('open'); menuBtn.setAttribute('aria-expanded','false'); }
+  });
+
+  // Revelado al hacer scroll
+  var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if(!reduce && 'IntersectionObserver' in window){
+    var io = new IntersectionObserver(function(entries){
+      entries.forEach(function(en){
+        if(en.isIntersecting){ en.target.classList.add('in'); io.unobserve(en.target); }
+      });
+    }, {threshold:.12, rootMargin:'0px 0px -40px 0px'});
+    document.querySelectorAll('.reveal').forEach(function(el){ io.observe(el); });
+  } else {
+    document.querySelectorAll('.reveal').forEach(function(el){ el.classList.add('in'); });
+  }
+</script>
+</body>
+</html>

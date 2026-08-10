@@ -1,0 +1,27 @@
+# Landing de iTier — sitio estático detrás de Nginx Proxy Manager (NPM).
+#
+# Sirve index.html con un nginx mínimo. NO publica puertos: se une a la red
+# externa de NPM y este lo expone con TLS en itier.pymesenlinea.com.ar.
+#
+# En NPM: Proxy Host  itier.pymesenlinea.com.ar → http://itier-landing:80
+#         (pedí el certificado Let's Encrypt desde la misma pantalla).
+
+name: itier-landing
+
+services:
+  landing:
+    image: nginx:alpine
+    container_name: itier-landing
+    restart: unless-stopped
+    security_opt: [no-new-privileges:true]
+    volumes:
+      - ./index.html:/usr/share/nginx/html/index.html:ro
+    networks: [npm]
+    logging:
+      driver: json-file
+      options: { max-size: "5m", max-file: "3" }
+
+networks:
+  npm:
+    external: true
+    name: ${NPM_NETWORK:-npm}
