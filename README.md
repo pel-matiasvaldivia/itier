@@ -41,6 +41,7 @@ que aprenda ITIL, ni que contrate un ingeniero, ni que exponga sus datos a una n
 | [04 · Seguridad y autonomía](docs/04-seguridad-y-autonomia.md) | Modelo de amenazas, ASI Top 10, niveles L0–L4 |
 | [05 · Modelo de costos](docs/05-modelo-de-costos.md) | Costo real por cliente/mes y pricing sugerido |
 | [06 · Roadmap](docs/06-roadmap.md) | Fases, hitos y criterios de salida |
+| [07 · Manual de operaciones](docs/07-manual-operativo.md) | Procesos y procedimientos para operar la plataforma (onboarding, incidentes, cambios, autonomía) |
 | [ADRs](docs/adr/) | Decisiones de arquitectura, con alternativas descartadas |
 
 ## Estructura del repositorio
@@ -49,6 +50,10 @@ que aprenda ITIL, ni que contrate un ingeniero, ni que exponga sus datos a una n
 itier/
 ├── docs/               Arquitectura y decisiones (fuente de verdad del diseño)
 │   └── adr/            Architecture Decision Records
+├── deploy/             Despliegue: VPS (GLPI+Zabbix tras NPM) y cliente (agente local)
+│   ├── vps/            Fases 1 y 2 en el servidor propio
+│   └── cliente/        Modo local, una instancia por cliente
+├── landing/            Landing pública (itier.pymesenlinea.com.ar)
 └── reference/          Esqueleto de referencia — ilustra la arquitectura, no es producción
     ├── edge-agent/     Bucle del agente, cliente MCP, motor de políticas
     ├── mcp-servers/    Servidor MCP de GLPI (lectura + acción tipada)
