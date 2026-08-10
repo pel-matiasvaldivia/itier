@@ -1,0 +1,232 @@
+# Catálogo de acciones de iTier
+#
+# Define el nivel de autonomía BASE de cada acción y sus techos duros.
+# Versionado en git, firmado en el plano de control, verificado en el borde.
+# Un cambio acá es un pull request revisado, no una edición en una UI.
+#
+# Niveles:  L0 observar · L1 recomendar · L2 aprobar-y-actuar
+#           L3 actuar-y-notificar · L4 autónomo
+
+version: 1
+
+# ---------------------------------------------------------------------------
+# Techos duros: ninguna cantidad de evidencia los levanta jamás.
+# Ver ADR-0006 y docs/04-seguridad-y-autonomia.md
+# ---------------------------------------------------------------------------
+techos_duros:
+  - id: otorga_acceso
+    max_nivel: L2
+    descripcion: >
+      Cualquier acción que otorgue o amplíe acceso: permisos, grupos,
+      membresías, roles. La aprobación de acceso es una decisión de negocio.
+
+  - id: destruccion_de_datos
+    max_nivel: L2
+    descripcion: >
+      Borrado, formateo o purga sin reversión verificada.
+
+  - id: infraestructura_critica
+    max_nivel: L2
+    aplica_a_roles_de_ci: [domain_controller, firewall_perimetral, sistema_backup]
+    descripcion: >
+      Controladores de dominio, firewall perimetral y sistema de backup.
+
+  - id: autoconfiguracion
+    max_nivel: L2
+    descripcion: >
+      Modificación de la configuración del propio iTier o de sus políticas.
+
+  - id: impacto_financiero
+    max_nivel: L2
+    descripcion: >
+      Compras, renovaciones, altas de licencia.
+
+# ---------------------------------------------------------------------------
+# Techos por criticidad del CI
+# ---------------------------------------------------------------------------
+techos_por_criticidad:
+  critica: L2
+  alta: L3
+  media: L4
+  baja: L4
+
+# ---------------------------------------------------------------------------
+# Techos por ventana horaria (zona horaria del tenant)
+# ---------------------------------------------------------------------------
+ventanas:
+  - id: horario_laboral
+    dias: [lun, mar, mie, jue, vie]
+    desde: "08:00"
+    hasta: "19:00"
+    max_nivel: L2
+    descripcion: Durante el horario laboral se prioriza no interrumpir al usuario.
+
+  - id: mantenimiento
+    dias: [sab, dom]
+    desde: "02:00"
+    hasta: "06:00"
+    max_nivel: L4
+
+  - id: fuera_de_horario
+    default: true
+    max_nivel: L3
+
+# ---------------------------------------------------------------------------
+# Catálogo de acciones
+# ---------------------------------------------------------------------------
+acciones:
+
+  # --- Clase read: sin efectos, siempre L4 ---------------------------------
+  - id: cmdb.get_ci
+    clase: read
+    nivel_base: L4
+  - id: cmdb.search_cis
+    clase: read
+    nivel_base: L4
+  - id: cmdb.get_impact_graph
+    clase: read
+    nivel_base: L4
+  - id: tickets.search
+    clase: read
+    nivel_base: L4
+  - id: tickets.get_similar
+    clase: read
+    nivel_base: L4
+  - id: metrics.query
+    clase: read
+    nivel_base: L4
+  - id: logs.tail
+    clase: read
+    nivel_base: L4
+    notas: Restringida a una allowlist de rutas declaradas por CI.
+  - id: assets.get_lifecycle
+    clase: read
+    nivel_base: L4
+  - id: kb.search
+    clase: read
+    nivel_base: L4
+
+  # --- Clase write_itsm: escribe en el ITSM, no toca infraestructura -------
+  - id: tickets.create
+    clase: write_itsm
+    nivel_base: L4
+  - id: tickets.update
+    clase: write_itsm
+    nivel_base: L4
+  - id: tickets.resolve
+    clase: write_itsm
+    nivel_base: L3
+  - id: kb.propose_article
+    clase: write_itsm
+    nivel_base: L2
+    notas: La publicación siempre requiere revisión humana.
+  - id: cmdb.propose_ci_change
+    clase: write_itsm
+    nivel_base: L2
+  - id: change.create_request
+    clase: write_itsm
+    nivel_base: L2
+
+  # --- Clase act: toca infraestructura -------------------------------------
+  - id: remediate.dry_run
+    clase: act
+    nivel_base: L4
+    notas: >
+      Ansible --check. Sin efectos por definición: siempre permitida.
+      Es la herramienta que convierte una propuesta en evidencia.
+
+  - id: remediate.run_playbook
+    clase: act
+    nivel_base: por_playbook   # ver sección playbooks
+
+  - id: remediate.rollback
+    clase: act
+    nivel_base: L3
+    notas: Revertir siempre es más seguro que no revertir.
+
+  - id: access.request_remote_session
+    clase: act
+    nivel_base: L2
+    techos_duros: [otorga_acceso]
+    notas: Requiere testigo humano presente durante toda la sesión.
+
+  # --- Clase notify ---------------------------------------------------------
+  - id: notify.user
+    clase: notify
+    nivel_base: L4
+  - id: notify.oncall
+    clase: notify
+    nivel_base: L4
+  - id: notify.escalate
+    clase: notify
+    nivel_base: L4
+
+# ---------------------------------------------------------------------------
+# Playbooks del catálogo firmado
+# ---------------------------------------------------------------------------
+playbooks:
+
+  - id: limpiar_temp_windows
+    nivel_base: L3
+    reversible: true
+    verificacion: uso_disco_menor_a_85_pct
+    radio_explosion_max_cis: 1
+    evidencia: { ejecuciones: 142, reversiones: 0, dias: 91 }
+
+  - id: reiniciar_servicio
+    nivel_base: L3
+    reversible: true
+    verificacion: servicio_en_estado_running
+    radio_explosion_max_cis: 1
+    evidencia: { ejecuciones: 88, reversiones: 1, dias: 74 }
+
+  - id: extender_volumen
+    nivel_base: L2
+    reversible: false
+    verificacion: uso_disco_menor_a_85_pct
+    radio_explosion_max_cis: 1
+    notas: Irreversible por naturaleza — no puede superar L2.
+
+  - id: reiniciar_servidor
+    nivel_base: L2
+    reversible: false
+    verificacion: host_responde_y_servicios_arriba
+    radio_explosion_max_cis: 1
+    techos_duros: [infraestructura_critica]
+
+  - id: aplicar_parches_seguridad
+    nivel_base: L2
+    reversible: true
+    verificacion: sin_parches_criticos_pendientes
+    radio_explosion_max_cis: 5
+
+  - id: rotar_logs
+    nivel_base: L4
+    reversible: true          # rota y conserva; no destruye
+    verificacion: uso_disco_menor_a_85_pct
+    radio_explosion_max_cis: 1
+    evidencia: { ejecuciones: 401, reversiones: 0, dias: 210 }
+
+  - id: liberar_bloqueo_cuenta
+    nivel_base: L2
+    reversible: true
+    verificacion: cuenta_desbloqueada
+    radio_explosion_max_cis: 1
+    techos_duros: [otorga_acceso]
+
+  - id: reintentar_backup
+    nivel_base: L3
+    reversible: false
+    verificacion: backup_completado_ok
+    radio_explosion_max_cis: 1
+    techos_duros: [infraestructura_critica]
+
+# ---------------------------------------------------------------------------
+# Cortacircuitos — ASI08 (Cascading Failures)
+# ---------------------------------------------------------------------------
+cortacircuitos:
+  max_acciones_por_hora_por_tenant: 20
+  max_acciones_por_hora_por_ci: 3
+  deshabilitar_playbook_tras_fallas_consecutivas: 2
+  max_cis_afectados_sin_aprobacion: 5
+  abortar_si_misma_tool_repetida_identica: 3

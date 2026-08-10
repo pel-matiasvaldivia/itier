@@ -1,0 +1,54 @@
+# Política del tenant — configuración por cliente
+#
+# El cliente controla estos valores desde su panel de autonomía.
+# El techo del tenant nunca puede SUBIR el nivel base de una acción, solo bajarlo.
+
+tenant: acme-sa
+zona_horaria: America/Argentina/Buenos_Aires
+plan: gestionado           # visibilidad (L1) | gestionado (L3) | autonomo (L4)
+
+# Techo global. El "freno de mano" del cliente: bajarlo a L1 desactiva
+# toda actuación automática sin llamar a soporte.
+techo_global: L3
+
+# CIs intocables: el agente es L0 permanente sobre estos, sin excepción.
+cis_intocables:
+  - ci_0001   # SRV-DC01  — controlador de dominio primario
+  - ci_0002   # FW-PERIM  — firewall perimetral
+  - ci_0119   # NAS-BACKUP
+
+# Ventanas de mantenimiento propias del cliente (sobrescriben las del catálogo)
+ventanas_mantenimiento:
+  - dias: [sab]
+    desde: "01:00"
+    hasta: "05:00"
+    max_nivel: L4
+
+# Excepciones por acción, decididas por el cliente
+excepciones:
+  - accion: remediate.run_playbook
+    playbook: reiniciar_servidor
+    max_nivel: L1
+    motivo: >
+      El cliente pide que ningún reinicio de servidor se ejecute sin
+      intervención de su responsable de IT, ni siquiera con aprobación remota.
+
+  - accion: access.request_remote_session
+    max_nivel: L1
+    motivo: El cliente exige coordinación telefónica previa a toda sesión remota.
+
+# Notificaciones
+notificaciones:
+  aprobaciones:
+    canal: whatsapp
+    destinatarios: ["+54911...."]
+    escalar_tras_minutos: 30
+  ejecuciones_l3:
+    canal: email
+    destinatarios: ["it@acme.com.ar"]
+
+# Control de costos — ver docs/05-modelo-de-costos.md
+presupuesto:
+  tope_mensual_usd: 120
+  al_alcanzar_tope: degradar_a_L0    # degradar_a_L0 | solo_notificar | detener
+  alerta_al_pct: 80

@@ -1,0 +1,19 @@
+[project]
+name = "itier-agent"
+version = "0.1.0"
+description = "Agente de borde de iTier — esqueleto de referencia"
+requires-python = ">=3.11"
+dependencies = [
+    "anthropic>=0.116.0",
+    "pyyaml>=6.0",
+]
+
+[project.scripts]
+itier-demo = "itier_agent.demo:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["itier_agent*"]

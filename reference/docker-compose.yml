@@ -1,0 +1,119 @@
+# Forma del despliegue en el appliance de iTier.
+#
+# Ilustrativo: fija la topología de servicios y los límites de seguridad, no es
+# un compose listo para producción (faltan secretos reales, healthchecks
+# completos, digests fijos de imagen y el ejecutor de Ansible).
+#
+# Perfil objetivo: mini-PC x86, 16 GB RAM, NVMe. Ver ADR-0007.
+
+name: itier
+
+x-hardening: &hardening
+  restart: unless-stopped
+  security_opt: [no-new-privileges:true]
+  cap_drop: [ALL]
+  logging:
+    driver: json-file
+    options: { max-size: "10m", max-file: "3" }
+
+services:
+
+  # ── Núcleo ITSM ─────────────────────────────────────────────────────────
+  db:
+    <<: *hardening
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: glpi
+      POSTGRES_USER: glpi
+      POSTGRES_PASSWORD_FILE: /run/secrets/db_password
+    secrets: [db_password]
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    networks: [interna]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U glpi"]
+      interval: 10s
+      retries: 5
+
+  glpi:
+    <<: *hardening
+    image: glpi/glpi:11.0
+    depends_on:
+      db: { condition: service_healthy }
+    environment:
+      GLPI_DB_HOST: db
+      GLPI_DB_NAME: glpi
+      GLPI_DB_USER: glpi
+    volumes:
+      - glpi_files:/var/glpi/files
+      - glpi_config:/var/glpi/config
+    networks: [interna, clientes]
+    # Sin `ports:` — nada se publica al host. El acceso web va por el proxy
+    # local, y desde afuera únicamente por el túnel saliente. Ver ADR-0005.
+
+  # ── Eventos y métricas ───────────────────────────────────────────────────
+  zabbix-proxy:
+    <<: *hardening
+    image: zabbix/zabbix-proxy-sqlite3:alpine-7.0-latest
+    environment:
+      ZBX_HOSTNAME: itier-${TENANT_ID:-local}
+      ZBX_SERVER_HOST: ${ZBX_SERVER_HOST:-127.0.0.1}
+    volumes:
+      - zbx_data:/var/lib/zabbix
+    networks: [interna, clientes]
+
+  # ── Capa agéntica ────────────────────────────────────────────────────────
+  agent:
+    <<: *hardening
+    build: ./edge-agent
+    depends_on:
+      glpi: { condition: service_started }
+    environment:
+      # El appliance NUNCA tiene la clave de la API. Apunta al gateway del
+      # plano de control, que la custodia y aplica el tope de gasto. ADR-0002.
+      ITIER_LLM_GATEWAY: https://gateway.itier.internal/v1
+      ITIER_TENANT: ${TENANT_ID:?falta TENANT_ID}
+      ITIER_GLPI_URL: http://glpi/api.php
+    volumes:
+      - ./policy:/etc/itier/policy:ro    # catálogo firmado, solo lectura
+      - audit:/var/lib/itier/audit       # cadena de auditoría
+      - agent_state:/var/lib/itier/state
+    read_only: true
+    tmpfs: [/tmp]
+    networks: [interna, clientes]
+    # Sin docker.sock montado: el agente no puede tocar el runtime de contenedores.
+
+  # ── Túnel saliente ───────────────────────────────────────────────────────
+  tunnel:
+    <<: *hardening
+    build: ./tunnel
+    environment:
+      ITIER_CONTROL_PLANE: wss://control.itier.io/appliance
+      ITIER_TENANT: ${TENANT_ID:?falta TENANT_ID}
+    volumes:
+      - ./certs:/etc/itier/certs:ro      # certificado de cliente mTLS
+      - queue:/var/lib/itier/queue       # cola durable para el modo degradado
+    networks: [interna, egress]
+    read_only: true
+    tmpfs: [/tmp]
+
+networks:
+  interna:
+    internal: true      # sin salida a internet: db, glpi y el agente entre sí
+  clientes:
+    driver: bridge      # descubrimiento y remediación en la LAN del cliente
+  egress:
+    driver: bridge      # solo el túnel llega a internet
+
+volumes:
+  db_data:
+  glpi_files:
+  glpi_config:
+  zbx_data:
+  agent_state:
+  audit:
+  queue:
+
+secrets:
+  db_password:
+    file: ./secrets/db_password
