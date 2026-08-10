@@ -1,0 +1,1039 @@
+<!doctype html>
+<html lang="es-AR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light">
+<meta name="theme-color" content="#4f46e5">
+<meta name="robots" content="noindex, nofollow">
+<title>Manual de operaciones · iTier</title>
+<meta name="description" content="Manual de procesos y procedimientos para operar la plataforma iTier.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%234f46e5'/%3E%3Cstop offset='1' stop-color='%230ea5e9'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='32' height='32' rx='8' fill='url(%23g)'/%3E%3Cg fill='%23fff'%3E%3Crect x='8' y='19' width='16' height='4' rx='2'/%3E%3Crect x='10' y='13' width='12' height='4' rx='2' opacity='.8'/%3E%3Crect x='12' y='7' width='8' height='4' rx='2' opacity='.6'/%3E%3C/g%3E%3C/svg%3E">
+<style>
+  :root{
+    --bg:#ffffff;--bg-soft:#f5f7fc;--bg-tint:#eef1ff;
+    --ink:#141a2e;--ink-soft:#41485f;--ink-muted:#7c8399;
+    --line:#e6e9f2;--line-soft:#eef1f7;
+    --brand:#4f46e5;--brand-dark:#4035c9;--brand-2:#0ea5e9;--accent:#f59e0b;--ok:#10b981;
+    --grad:linear-gradient(135deg,#4f46e5 0%,#6366f1 45%,#0ea5e9 100%);
+    --r:12px;--font:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  }
+  *,*::before,*::after{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;font-family:var(--font);color:var(--ink-soft);background:var(--bg);line-height:1.65;-webkit-font-smoothing:antialiased}
+  a{color:var(--brand);text-decoration:none}
+  a:hover{text-decoration:underline}
+
+  /* Topbar */
+  .topbar{position:sticky;top:0;z-index:50;background:rgba(255,255,255,.9);backdrop-filter:saturate(160%) blur(12px);border-bottom:1px solid var(--line-soft)}
+  .topbar-in{max-width:1200px;margin:0 auto;display:flex;align-items:center;gap:16px;height:64px;padding:0 24px}
+  .brand{display:flex;align-items:center;gap:10px;font-weight:800;color:var(--ink);font-size:1.12rem}
+  .brand .mark{width:30px;height:30px;border-radius:8px}
+  .brand small{font-weight:600;color:var(--ink-muted);font-size:.8rem;border-left:1px solid var(--line);padding-left:12px;margin-left:4px}
+  .top-actions{margin-left:auto;display:flex;align-items:center;gap:12px}
+  .top-actions a{font-size:.9rem;font-weight:600;color:var(--ink-soft)}
+  .btn{display:inline-flex;align-items:center;gap:7px;font-weight:700;font-size:.9rem;padding:9px 16px;border-radius:10px;background:var(--grad);color:#fff}
+  .btn:hover{text-decoration:none;filter:brightness(1.05)}
+  .toc-toggle{display:none;background:none;border:1px solid var(--line);border-radius:9px;padding:8px 12px;font-weight:600;color:var(--ink);cursor:pointer;font-size:.9rem}
+
+  /* Layout */
+  .layout{max-width:1200px;margin:0 auto;display:grid;grid-template-columns:290px 1fr;gap:44px;padding:0 24px}
+  .toc{position:sticky;top:64px;align-self:start;height:calc(100vh - 64px);overflow-y:auto;padding:30px 8px 40px 0}
+  .toc-title{font-size:.75rem;font-weight:800;letter-spacing:.09em;text-transform:uppercase;color:var(--ink-muted);padding:0 12px 12px}
+  .toc ul{list-style:none;margin:0;padding:0}
+  .toc ul ul{margin-left:12px;border-left:1px solid var(--line-soft)}
+  .toc li a{display:block;padding:5px 12px;font-size:.86rem;color:var(--ink-soft);border-left:2px solid transparent;margin-left:-1px;line-height:1.4}
+  .toc li a:hover{color:var(--brand);text-decoration:none}
+  .toc li a[data-lvl="3"]{font-size:.8rem;color:var(--ink-muted)}
+  .toc li a.active{color:var(--brand);border-left-color:var(--brand);background:var(--bg-tint);font-weight:700;border-radius:0 6px 6px 0}
+
+  /* Documento */
+  .doc{min-width:0;padding:34px 0 80px;max-width:820px}
+  .doc h1{font-size:clamp(1.8rem,4vw,2.5rem);color:var(--ink);letter-spacing:-.02em;line-height:1.15;margin:0 0 .4em}
+  .doc h2{font-size:1.5rem;color:var(--ink);letter-spacing:-.02em;margin:2.4em 0 .7em;padding-top:1.1em;border-top:1px solid var(--line-soft)}
+  .doc h3{font-size:1.16rem;color:var(--ink);margin:1.9em 0 .5em}
+  .doc h4{font-size:1rem;color:var(--ink);margin:1.5em 0 .4em}
+  .doc h2,.doc h3,.doc h4{scroll-margin-top:84px}
+  .doc p{margin:0 0 1.05em}
+  .doc ul,.doc ol{margin:0 0 1.15em;padding-left:1.4em}
+  .doc li{margin:.3em 0}
+  .doc li::marker{color:var(--brand)}
+  .doc strong{color:var(--ink);font-weight:700}
+  .doc hr{border:none;border-top:1px solid var(--line);margin:2.4em 0}
+  .doc a[href^="#"]{color:var(--brand);font-weight:600}
+
+  /* Referencias internas de-linkadas */
+  .xref{color:var(--ink);font-weight:600;border-bottom:1px dotted var(--ink-muted);cursor:help}
+
+  /* Código */
+  .doc code{font-family:var(--mono);font-size:.86em;background:var(--bg-tint);color:var(--brand-dark);padding:.13em .4em;border-radius:5px}
+  .doc pre{background:#0f1424;color:#e6e9f5;padding:18px 20px;border-radius:var(--r);overflow-x:auto;margin:0 0 1.3em;line-height:1.55;font-size:.85rem}
+  .doc pre code{background:none;color:inherit;padding:0;font-size:inherit}
+
+  /* Tablas */
+  .table-wrap{overflow-x:auto;margin:0 0 1.4em;border:1px solid var(--line);border-radius:var(--r)}
+  .doc table{border-collapse:collapse;width:100%;font-size:.9rem;background:#fff}
+  .doc th,.doc td{text-align:left;padding:10px 14px;border-bottom:1px solid var(--line-soft);vertical-align:top}
+  .doc thead th{background:var(--bg-soft);color:var(--ink);font-weight:700;font-size:.82rem;letter-spacing:.01em;border-bottom:1px solid var(--line)}
+  .doc tbody tr:last-child td{border-bottom:none}
+  .doc tbody tr:hover{background:var(--bg-soft)}
+
+  /* Citas / callouts */
+  .doc blockquote{margin:0 0 1.3em;padding:14px 20px;background:var(--bg-soft);border-left:3px solid var(--brand-2);border-radius:0 var(--r) var(--r) 0;color:var(--ink-soft)}
+  .doc blockquote p{margin:0}
+  .doc blockquote p+p{margin-top:.6em}
+  .doc blockquote.warn{background:#fffaf0;border-left-color:var(--accent)}
+
+  /* Badge de fase */
+  .badge-fase{display:inline-block;background:var(--bg-tint);color:var(--brand);font-size:.72em;font-weight:800;letter-spacing:.02em;padding:.15em .55em;border-radius:999px;border:1px solid #dfe3ff;vertical-align:middle;white-space:nowrap}
+
+  /* Volver arriba */
+  .totop{position:fixed;right:22px;bottom:22px;width:44px;height:44px;border-radius:50%;background:var(--grad);color:#fff;border:none;cursor:pointer;box-shadow:0 10px 24px -8px rgba(79,70,229,.6);opacity:0;pointer-events:none;transition:opacity .25s;display:grid;place-items:center;font-size:1.1rem;z-index:40}
+  .totop.show{opacity:1;pointer-events:auto}
+
+  /* Footer */
+  footer{background:var(--ink);color:#9aa3ba;padding:34px 0}
+  .foot-in{max-width:1200px;margin:0 auto;padding:0 24px;display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;font-size:.85rem}
+  footer a{color:#c7cdde}
+
+  @media (max-width:900px){
+    .layout{grid-template-columns:1fr;gap:0}
+    .toc{position:static;height:auto;overflow:visible;padding:16px 0;border-bottom:1px solid var(--line);display:none}
+    .toc.open{display:block}
+    .toc-toggle{display:inline-block}
+    .top-actions .hide-sm{display:none}
+    .doc{padding:26px 0 70px}
+  }
+  @media print{
+    .topbar,.toc,.totop,footer{display:none}
+    .layout{display:block;max-width:none;padding:0}
+    .doc{max-width:none}
+    .doc h2{border-top:none}
+    a{color:inherit}
+  }
+  @media (prefers-reduced-motion:reduce){*{scroll-behavior:auto!important;transition:none!important}}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-in">
+    <a class="brand" href="index.html">
+      <svg class="mark" viewBox="0 0 32 32" aria-hidden="true"><defs><linearGradient id="lg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#4f46e5"/><stop offset="1" stop-color="#0ea5e9"/></linearGradient></defs><rect width="32" height="32" rx="8" fill="url(#lg)"/><g fill="#fff"><rect x="8" y="19" width="16" height="4" rx="2"/><rect x="10" y="13" width="12" height="4" rx="2" opacity=".82"/><rect x="12" y="7" width="8" height="4" rx="2" opacity=".6"/></g></svg>
+      iTier <small>Manual de operaciones</small>
+    </a>
+    <div class="top-actions">
+      <button class="toc-toggle" id="tocToggle" aria-expanded="false">Contenido ▾</button>
+      <a class="hide-sm" href="index.html">← Volver al inicio</a>
+      <a class="btn hide-sm" href="mailto:matiasvaldivia@pymesenlinea.com.ar?subject=Consulta%20sobre%20iTier">Contacto</a>
+    </div>
+  </div>
+</div>
+
+<div class="layout">
+  <aside class="toc" id="toc">
+    <div class="toc-title">Contenido</div>
+    <nav><ul><li><a href="#1-cómo-usar-este-manual" data-lvl="2">1. Cómo usar este manual</a></li><li><a href="#2-roles-y-responsabilidades" data-lvl="2">2. Roles y responsabilidades</a></li><li><a href="#3-mapa-operativo-de-la-plataforma" data-lvl="2">3. Mapa operativo de la plataforma</a></li><li><a href="#4-operación-de-la-plataforma" data-lvl="2">4. Operación de la plataforma</a><ul><li><a href="#41-accesos-y-credenciales-" data-lvl="3">4.1 Accesos y credenciales 🔒</a></li><li><a href="#42-puesta-en-marcha-y-actualización" data-lvl="3">4.2 Puesta en marcha y actualización</a></li><li><a href="#43-backups-y-restauración" data-lvl="3">4.3 Backups y restauración</a></li><li><a href="#44-autovigilancia-self-monitoring" data-lvl="3">4.4 Autovigilancia (self-monitoring)</a></li></ul></li><li><a href="#proc-onb--alta-de-un-cliente-onboarding" data-lvl="2">PROC-ONB · Alta de un cliente (onboarding)</a><ul><li><a href="#pre-requisitos-checklist" data-lvl="3">Pre-requisitos (checklist)</a></li><li><a href="#pasos" data-lvl="3">Pasos</a></li><li><a href="#criterio-de-salida" data-lvl="3">Criterio de salida</a></li></ul></li><li><a href="#proc-cmdb--gestión-de-activos-y-configuración" data-lvl="2">PROC-CMDB · Gestión de activos y configuración</a><ul><li><a href="#61-cómo-entra-el-inventario" data-lvl="3">6.1 Cómo entra el inventario</a></li><li><a href="#62-curación-y-clasificación-de-criticidad--paso-clave" data-lvl="3">6.2 Curación y clasificación de criticidad 🔒 (paso clave)</a></li><li><a href="#63-mantenimiento-del-cmdb" data-lvl="3">6.3 Mantenimiento del CMDB</a></li></ul></li><li><a href="#proc-evt--monitoreo-y-gestión-de-eventos" data-lvl="2">PROC-EVT · Monitoreo y gestión de eventos</a><ul><li><a href="#71-diseño-de-umbrales" data-lvl="3">7.1 Diseño de umbrales</a></li><li><a href="#72-de-evento-a-incidente" data-lvl="3">7.2 De evento a incidente</a></li><li><a href="#73-ventanas-de-mantenimiento" data-lvl="3">7.3 Ventanas de mantenimiento</a></li></ul></li><li><a href="#proc-inc--gestión-de-incidentes" data-lvl="2">PROC-INC · Gestión de incidentes</a><ul><li><a href="#81-ciclo-de-vida" data-lvl="3">8.1 Ciclo de vida</a></li><li><a href="#82-priorización-impacto--urgencia" data-lvl="3">8.2 Priorización (impacto × urgencia)</a></li><li><a href="#83-el-lazo-del-agente-fase-3" data-lvl="3">8.3 El lazo del agente [Fase 3+]</a></li><li><a href="#84-procedimiento-del-operador" data-lvl="3">8.4 Procedimiento del operador</a></li><li><a href="#85-escalamiento" data-lvl="3">8.5 Escalamiento</a></li></ul></li><li><a href="#proc-req--gestión-de-solicitudes" data-lvl="2">PROC-REQ · Gestión de solicitudes</a></li><li><a href="#proc-prb--gestión-de-problemas" data-lvl="2">PROC-PRB · Gestión de problemas</a></li><li><a href="#proc-chg--cambios-y-remediación-con-playbooks" data-lvl="2">PROC-CHG · Cambios y remediación con playbooks</a><ul><li><a href="#111-tipos-de-cambio" data-lvl="3">11.1 Tipos de cambio</a></li><li><a href="#112-el-catálogo-de-playbooks" data-lvl="3">11.2 El catálogo de playbooks</a></li><li><a href="#113-proc-chg-new--incorporar-un-playbook-nuevo-" data-lvl="3">11.3 PROC-CHG-NEW · Incorporar un playbook nuevo 🔒</a></li></ul></li><li><a href="#proc-aut--niveles-de-autonomía-y-aprobaciones" data-lvl="2">PROC-AUT · Niveles de autonomía y aprobaciones</a><ul><li><a href="#121-los-cinco-niveles" data-lvl="3">12.1 Los cinco niveles</a></li><li><a href="#122-cómo-se-calcula-el-nivel-efectivo" data-lvl="3">12.2 Cómo se calcula el nivel efectivo</a></li><li><a href="#123-techos-duros-nunca-se-levantan" data-lvl="3">12.3 Techos duros (nunca se levantan)</a></li><li><a href="#124-proc-aut-apr--atender-una-aprobación-l2-" data-lvl="3">12.4 PROC-AUT-APR · Atender una aprobación (L2) ⏱</a></li><li><a href="#125-proc-aut-lvl--cambiar-el-nivel-de-autonomía-de-un-tenant-" data-lvl="3">12.5 PROC-AUT-LVL · Cambiar el nivel de autonomía de un tenant 🔒</a></li></ul></li><li><a href="#proc-seg--seguridad-auditoría-y-cortacircuitos" data-lvl="2">PROC-SEG · Seguridad, auditoría y cortacircuitos</a><ul><li><a href="#131-revisión-de-la-auditoría-" data-lvl="3">13.1 Revisión de la auditoría 🔒</a></li><li><a href="#132-gestión-de-secretos-" data-lvl="3">13.2 Gestión de secretos 🔒</a></li><li><a href="#133-cortacircuitos-freno-automático" data-lvl="3">13.3 Cortacircuitos (freno automático)</a></li><li><a href="#134-kill-switch" data-lvl="3">13.4 Kill switch</a></li></ul></li><li><a href="#proc-cont--continuidad-y-modo-degradado" data-lvl="2">PROC-CONT · Continuidad y modo degradado</a></li><li><a href="#15-indicadores-y-reportes-sla--kpis" data-lvl="2">15. Indicadores y reportes (SLA / KPIs)</a></li><li><a href="#16-procedimientos-de-cara-al-cliente" data-lvl="2">16. Procedimientos de cara al cliente</a></li><li><a href="#proc-off--baja-de-un-cliente-offboarding" data-lvl="2">PROC-OFF · Baja de un cliente (offboarding)</a></li><li><a href="#apéndices" data-lvl="2">Apéndices</a><ul><li><a href="#apéndice-a--matriz-raci-resumida" data-lvl="3">Apéndice A · Matriz RACI resumida</a></li><li><a href="#apéndice-b--glosario" data-lvl="3">Apéndice B · Glosario</a></li><li><a href="#apéndice-c--matriz-de-sla-sugerida" data-lvl="3">Apéndice C · Matriz de SLA sugerida</a></li><li><a href="#apéndice-d--plantilla-de-informe-mensual" data-lvl="3">Apéndice D · Plantilla de informe mensual</a></li><li><a href="#apéndice-e--referencias" data-lvl="3">Apéndice E · Referencias</a></li></ul></li></ul></nav>
+  </aside>
+  <main class="doc">
+    <h1 id="07--manual-de-operaciones-y-procedimientos">07 · Manual de operaciones y procedimientos</h1>
+<p>Manual de trabajo para el <strong>equipo que opera iTier</strong> (proveedor de servicio) sobre
+la plataforma. Reúne, en forma de procedimientos accionables, cómo poner en marcha
+un cliente, gestionar activos, incidentes, solicitudes, problemas y cambios, y cómo
+operar la capa agéntica con seguridad.</p>
+<div class="table-wrap"><table>
+
+<tbody>
+<tr>
+<td><strong>Audiencia</strong></td>
+<td>Operadores y administradores de plataforma de Pymes en Línea (NOC / mesa de servicio). Una guía breve para el cliente final está en el <a href="#16-procedimientos-de-cara-al-cliente">§16</a>.</td>
+</tr>
+<tr>
+<td><strong>Alcance</strong></td>
+<td>Operación diaria de la plataforma iTier: VPS (GLPI + Zabbix) y appliances/sondas en clientes.</td>
+</tr>
+<tr>
+<td><strong>No cubre</strong></td>
+<td>Instalación del VPS y del appliance paso a paso → ver <span class="xref" title="Documento interno del repositorio: ../deploy/README.md"><code>deploy/</code></span>. Diseño y decisiones → ver <span class="xref" title="Documento interno del repositorio: adr/">ADRs</span>.</td>
+</tr>
+<tr>
+<td><strong>Base normativa</strong></td>
+<td>ITIL 4 (ver <span class="xref" title="Documento interno del repositorio: 03-mapeo-itil4.md">03 · Mapeo ITIL 4</span>) · OWASP Agentic AI 2026 (ver <span class="xref" title="Documento interno del repositorio: 04-seguridad-y-autonomia.md">04 · Seguridad y autonomía</span>).</td>
+</tr>
+<tr>
+<td><strong>Estado</strong></td>
+<td>v1 · 2026. Documento vivo: se versiona en git; los cambios entran por revisión.</td>
+</tr>
+</tbody>
+</table></div>
+<blockquote class="warn"><p>⚠️ <strong>Sobre las fases del producto.</strong> Hoy (Fases 1–2) están operativos el
+inventario, el monitoreo y el ticketing asistido. La <strong>remediación automática</strong>
+con niveles L2–L4 (el lazo completo del agente) llega en <strong>Fase 3</strong> — ver
+<span class="xref" title="Documento interno del repositorio: 06-roadmap.md">06 · Roadmap</span>. Los procedimientos marcados con <strong><span class="badge-fase">Fase&nbsp;3+</span></strong>
+describen el modelo operativo objetivo; los demás se ejecutan ya.</p>
+</blockquote>
+<hr />
+<h2 id="1-cómo-usar-este-manual">1. Cómo usar este manual</h2>
+<p>Cada procedimiento sigue la misma plantilla:</p>
+<ul>
+<li><strong>Objetivo</strong> — qué logra.</li>
+<li><strong>Cuándo aplica</strong> — el disparador.</li>
+<li><strong>Responsable</strong> — el rol que lo ejecuta (ver <a href="#2-roles-y-responsabilidades">§2</a>).</li>
+<li><strong>Pasos</strong> — numerados, accionables.</li>
+<li><strong>Criterio de salida</strong> — cómo se sabe que terminó bien.</li>
+</ul>
+<p><strong>Convenciones</strong></p>
+<ul>
+<li><code>CI</code> = elemento de configuración (activo gestionado en el CMDB).</li>
+<li><code>tenant</code> = un cliente. Cada tenant tiene su appliance/sonda y su política.</li>
+<li>Los niveles de autonomía (L0–L4) se explican en <a href="#proc-aut--niveles-de-autonomía-y-aprobaciones">§12</a>.</li>
+<li><strong><span class="badge-fase">Fase&nbsp;3+</span></strong> marca lo que aplica cuando esté activo el lazo de remediación.</li>
+<li>🔒 marca un paso con implicancia de seguridad; ⏱ uno sujeto a SLA.</li>
+</ul>
+<hr />
+<h2 id="2-roles-y-responsabilidades">2. Roles y responsabilidades</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Rol</th>
+<th>Quién</th>
+<th>Responsabilidad principal</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Operador de plataforma</strong></td>
+<td>Mesa de servicio / NOC</td>
+<td>Atiende la cola de incidentes y aprobaciones, supervisa el monitoreo, comunica al cliente.</td>
+</tr>
+<tr>
+<td><strong>Administrador de plataforma</strong></td>
+<td>Referente técnico</td>
+<td>Onboarding/offboarding, salud del VPS, actualizaciones, backups, catálogo de acciones y playbooks.</td>
+</tr>
+<tr>
+<td><strong>Aprobador de cambios</strong></td>
+<td>Admin + contacto del cliente</td>
+<td>Aprueba playbooks nuevos y cambios de nivel de autonomía por tenant.</td>
+</tr>
+<tr>
+<td><strong>Responsable de seguridad</strong></td>
+<td>Rol asignado</td>
+<td>Revisa la auditoría, gestiona secretos, responde a comportamiento anómalo del agente.</td>
+</tr>
+<tr>
+<td><strong>Contacto técnico del cliente</strong></td>
+<td>Del lado del cliente</td>
+<td>Recibe notificaciones, aprueba acciones L2, coordina ventanas y accesos.</td>
+</tr>
+</tbody>
+</table></div>
+<blockquote>
+<p>Matriz RACI resumida por proceso en el <a href="#apéndice-a--matriz-raci-resumida">Apéndice A</a>.</p>
+</blockquote>
+<hr />
+<h2 id="3-mapa-operativo-de-la-plataforma">3. Mapa operativo de la plataforma</h2>
+<pre><code>   VPS (Pymes en Línea)  ── detrás de NPM, TLS ──┐
+   ├─ GLPI 11     → CMDB, tickets, ITAM, catálogo │  la operás desde acá
+   ├─ Zabbix 7.0  → eventos y métricas            │
+   └─ PostgreSQL  → datos (red interna)           │
+                                                  │  10051/tcp (saliente del cliente)
+   Cliente (uno por tenant) ──── solo salida ─────┘
+   ├─ itier-agent  → capa agéntica (consulta GLPI, razona, actúa) [Fase 3+]
+   ├─ zabbix-proxy → recolecta la LAN → VPS
+   └─ glpi-agent   → inventario de la LAN → GLPI
+</code></pre>
+<ul>
+<li><strong>Todo lo que hacés como operador</strong> ocurre en GLPI y Zabbix del VPS, más el panel
+  de autonomía (política del tenant).</li>
+<li><strong>El cliente no expone puertos</strong>: el appliance abre conexiones salientes. Ver
+  <span class="xref" title="Documento interno del repositorio: adr/ADR-0005-conectividad-solo-saliente.md">ADR-0005</span>.</li>
+<li>Detalle de despliegue: <span class="xref" title="Documento interno del repositorio: ../deploy/README.md"><code>deploy/README.md</code></span>.</li>
+</ul>
+<hr />
+<h2 id="4-operación-de-la-plataforma">4. Operación de la plataforma</h2>
+<h3 id="41-accesos-y-credenciales-">4.1 Accesos y credenciales 🔒</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Sistema</th>
+<th>Uso</th>
+<th>Dónde</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>GLPI</td>
+<td>Trabajo diario de ITSM</td>
+<td><code>https://itsm.&lt;tu-dominio&gt;</code> (vía NPM)</td>
+</tr>
+<tr>
+<td>Zabbix</td>
+<td>Monitoreo y eventos</td>
+<td><code>https://&lt;zabbix&gt;.&lt;tu-dominio&gt;</code> (vía NPM)</td>
+</tr>
+<tr>
+<td>NPM</td>
+<td>Reverse proxy / TLS</td>
+<td>Panel de NPM</td>
+</tr>
+<tr>
+<td>GHCR</td>
+<td>Imagen del agente</td>
+<td><code>ghcr.io/pel-matiasvaldivia/itier-agent</code></td>
+</tr>
+</tbody>
+</table></div>
+<p>Reglas: usuarios nominales (no compartidos), 2FA donde el sistema lo permita, y
+<strong>secretos fuera de git</strong> (viven en los <code>.env</code> de cada host). Rotación mínima
+semestral y ante cada baja de personal.</p>
+<h3 id="42-puesta-en-marcha-y-actualización">4.2 Puesta en marcha y actualización</h3>
+<ul>
+<li>Instalación del VPS → <span class="xref" title="Documento interno del repositorio: ../deploy/vps/README.md"><code>deploy/vps/README.md</code></span>.</li>
+<li>Instalación del cliente → <span class="xref" title="Documento interno del repositorio: ../deploy/cliente/README.md"><code>deploy/cliente/README.md</code></span>.</li>
+<li><strong>Actualizar</strong> un componente: <code>docker compose pull &amp;&amp; docker compose up -d</code> en el
+  host correspondiente. Antes de subir versiones mayores de GLPI/Zabbix, leer las
+  notas de migración y respaldar la base (§4.3).</li>
+</ul>
+<h3 id="43-backups-y-restauración">4.3 Backups y restauración</h3>
+<ul>
+<li><strong>Qué respaldar</strong> en el VPS: volumen <code>db_data</code> (o <code>pg_dump</code> de las bases <code>glpi</code> y
+  <code>zabbix</code>) y <code>glpi_files</code> (adjuntos).</li>
+<li><strong>Frecuencia</strong>: diaria, con retención mínima 14 días y una copia fuera del VPS.</li>
+<li><strong>Restauración</strong>: probar la restauración al menos una vez por trimestre (un backup
+  no verificado no es un backup).</li>
+</ul>
+<h3 id="44-autovigilancia-self-monitoring">4.4 Autovigilancia (self-monitoring)</h3>
+<p>Dar de alta en Zabbix el propio VPS y los contenedores del stack. Alertas mínimas:
+disco del VPS, disponibilidad de GLPI/Zabbix, y <strong>última conexión de cada
+zabbix-proxy</strong> (un proxy que dejó de reportar = un cliente potencialmente a ciegas).</p>
+<hr />
+<h2 id="proc-onb--alta-de-un-cliente-onboarding">PROC-ONB · Alta de un cliente (onboarding)</h2>
+<p><strong>Objetivo.</strong> Dejar un cliente nuevo monitoreado, inventariado y con su política de
+autonomía definida.
+<strong>Cuándo aplica.</strong> Cliente firmado, con fecha de instalación acordada.
+<strong>Responsable.</strong> Administrador de plataforma.</p>
+<h3 id="pre-requisitos-checklist">Pre-requisitos (checklist)</h3>
+<ul>
+<li>[ ] Datos del cliente y su contacto técnico (nombre, WhatsApp, email).</li>
+<li>[ ] Alcance acordado: rango(s) de red, cantidad de puestos/servidores, plan
+      contratado (<code>visibilidad</code> / <code>gestionado</code> / <code>autonomo</code>).</li>
+<li>[ ] Hardware definido: appliance mini-PC x86 o sonda Raspberry Pi (ver
+      <span class="xref" title="Documento interno del repositorio: adr/ADR-0007-perfiles-de-hardware.md">ADR-0007</span>).</li>
+<li>[ ] Ventanas de mantenimiento y lista preliminar de CIs intocables.</li>
+</ul>
+<h3 id="pasos">Pasos</h3>
+<ol>
+<li><strong>Crear el tenant en GLPI.</strong> Alta de la <em>entidad</em> del cliente (GLPI es
+   multi-entidad nativo). Definir ubicaciones y el/los grupo(s) de soporte.</li>
+<li><strong>Registrar el proxy en Zabbix.</strong> Dar de alta un <em>Proxy</em> con nombre
+   <code>itier-&lt;tenant&gt;</code> (debe coincidir con <code>ZBX_HOSTNAME</code> del cliente) y su PSK.
+   🔒 Usar PSK/TLS, no texto plano — ver <span class="xref" title="Documento interno del repositorio: ../deploy/cliente/README.md"><code>deploy/cliente/README.md</code></span>.</li>
+<li><strong>Preparar la política del tenant.</strong> Partir de
+   <span class="xref" title="Documento interno del repositorio: ../reference/policy/tenant-ejemplo.yaml"><code>reference/policy/tenant-ejemplo.yaml</code></span> y completar:
+   <code>plan</code>, <code>techo_global</code>, <code>zona_horaria</code>, <code>ventanas_mantenimiento</code>,
+   <code>cis_intocables</code>, <code>notificaciones</code> y <code>presupuesto</code>. <strong>Empezar conservador:</strong>
+   <code>techo_global: L1</code> (solo recomienda) para las primeras 2–4 semanas.</li>
+<li><strong>Desplegar el appliance/sonda</strong> en la LAN del cliente:
+   <code>cd deploy/cliente &amp;&amp; cp .env.example .env</code> → completar <code>ITIER_TENANT</code>,
+   <code>ITIER_GLPI_URL</code>, <code>ZBX_SERVER_HOST</code> y credenciales → <code>docker compose up -d</code>.</li>
+<li><strong>Verificar conectividad.</strong> ⏱
+   - <code>zabbix-proxy</code> aparece <em>activo</em> en Zabbix.
+   - Salud del agente: <code>/readyz</code> responde <code>200</code> (ver README del cliente). Un <code>503</code>
+     lista qué falta configurar.</li>
+<li><strong>Primera sincronización de inventario.</strong> Confirmar que <code>glpi-agent</code> cargó los CIs
+   y ejecutar <strong>PROC-CMDB §6.2</strong> (curación y criticidad).</li>
+<li><strong>Diseñar el monitoreo mínimo</strong> (PROC-EVT §7.1): disponibilidad de hosts, disco,
+   CPU/RAM, servicios críticos del cliente.</li>
+<li><strong>Entrega.</strong> Reunión con el contacto técnico: mostrar tablero, explicar niveles de
+   autonomía, acordar el plan de subida de autonomía y validar CIs intocables.</li>
+</ol>
+<h3 id="criterio-de-salida">Criterio de salida</h3>
+<ul>
+<li>Proxy activo, inventario cargado y curado, monitoreo base andando, política del
+  tenant cargada y <strong>acta de entrega</strong> firmada por el cliente.</li>
+</ul>
+<hr />
+<h2 id="proc-cmdb--gestión-de-activos-y-configuración">PROC-CMDB · Gestión de activos y configuración</h2>
+<blockquote>
+<p>ITIL 4: <em>Service Configuration Management</em> + <em>IT Asset Management</em>.</p>
+</blockquote>
+<h3 id="61-cómo-entra-el-inventario">6.1 Cómo entra el inventario</h3>
+<p><code>glpi-agent</code> (y descubrimiento SNMP/WinRM/SSH) alimenta el CMDB de GLPI de forma
+automática. Regla: <strong>no se cargan CIs a mano</strong> salvo excepción documentada; la fuente
+de verdad es el descubrimiento.</p>
+<h3 id="62-curación-y-clasificación-de-criticidad--paso-clave">6.2 Curación y clasificación de criticidad 🔒 (paso clave)</h3>
+<p>La <strong>criticidad de cada CI alimenta directamente el techo de autonomía</strong> del agente
+(ver <a href="#proc-aut--niveles-de-autonomía-y-aprobaciones">§12</a>). Por eso este paso es de
+seguridad, no cosmético.</p>
+<ol>
+<li>Revisar los CIs descubiertos y descartar duplicados/fantasmas.</li>
+<li>Asignar <strong>criticidad</strong> a cada CI según su impacto en el negocio:</li>
+</ol>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Criticidad</th>
+<th>Techo de autonomía</th>
+<th>Ejemplos típicos</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>critica</code></td>
+<td><strong>L2</strong> (siempre pide aprobación)</td>
+<td>Controlador de dominio, ERP, base de datos, firewall</td>
+</tr>
+<tr>
+<td><code>alta</code></td>
+<td>L3</td>
+<td>Servidor de archivos, aplicación de línea de negocio</td>
+</tr>
+<tr>
+<td><code>media</code></td>
+<td>L4</td>
+<td>Puestos de usuarios clave, impresoras de red</td>
+</tr>
+<tr>
+<td><code>baja</code></td>
+<td>L4</td>
+<td>Periféricos, equipos no productivos</td>
+</tr>
+</tbody>
+</table></div>
+<blockquote>
+<p>Valores definidos en <span class="xref" title="Documento interno del repositorio: ../reference/policy/acciones.yaml"><code>reference/policy/acciones.yaml</code></span> → <code>techos_por_criticidad</code>.
+3. Marcar los <strong>roles sensibles</strong> (<code>domain_controller</code>, <code>firewall_perimetral</code>,
+   <code>sistema_backup</code>): quedan sujetos al techo duro <code>infraestructura_critica</code> (L2)
+   además de su criticidad.
+4. Cargar los CIs intocables del tenant en <code>cis_intocables</code> (el agente es <strong>L0
+   permanente</strong> sobre ellos).</p>
+</blockquote>
+<h3 id="63-mantenimiento-del-cmdb">6.3 Mantenimiento del CMDB</h3>
+<ul>
+<li>Revisión mensual de altas/bajas y de la criticidad ante cambios del negocio.</li>
+<li>Gestión de <strong>licencias y contratos</strong> en GLPI: fechas de vencimiento con alerta
+  anticipada (evita cortes por licencia vencida).</li>
+</ul>
+<p><strong>Criterio de salida.</strong> Todo CI productivo tiene criticidad asignada; los sensibles,
+su rol; y no hay CIs "sin clasificar" en producción.</p>
+<hr />
+<h2 id="proc-evt--monitoreo-y-gestión-de-eventos">PROC-EVT · Monitoreo y gestión de eventos</h2>
+<blockquote>
+<p>ITIL 4: <em>Monitoring and Event Management</em>.</p>
+</blockquote>
+<h3 id="71-diseño-de-umbrales">7.1 Diseño de umbrales</h3>
+<p>En Zabbix, definir <em>triggers</em> por CI/servicio. Clasificar por severidad:</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Severidad Zabbix</th>
+<th>Significado</th>
+<th>Acción esperada</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Information / Warning</td>
+<td>Ruido o tendencia</td>
+<td>Se registra, no genera ticket</td>
+</tr>
+<tr>
+<td>Average / High</td>
+<td>Degradación real</td>
+<td>Genera incidente (§8)</td>
+</tr>
+<tr>
+<td>Disaster</td>
+<td>Caída con impacto</td>
+<td>Incidente P1 + escalamiento inmediato</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="72-de-evento-a-incidente">7.2 De evento a incidente</h3>
+<ul>
+<li>Un evento <strong>accionable</strong> abre (o el agente abre, <code>tickets.create</code> es L4) un
+  incidente en GLPI, evitando duplicados por <em>correlación</em> (mismo CI + mismo síntoma
+  = un solo ticket).</li>
+<li>Eventos informativos <strong>no</strong> abren tickets.</li>
+</ul>
+<h3 id="73-ventanas-de-mantenimiento">7.3 Ventanas de mantenimiento</h3>
+<p>Antes de una intervención planificada, poner el CI/host en <em>maintenance</em> en Zabbix
+para no generar falsos incidentes. Registrar inicio y fin.</p>
+<p><strong>Criterio de salida.</strong> Cada CI crítico tiene al menos un trigger de disponibilidad;
+no hay tormentas de alertas duplicadas.</p>
+<hr />
+<h2 id="proc-inc--gestión-de-incidentes">PROC-INC · Gestión de incidentes</h2>
+<blockquote>
+<p>ITIL 4: <em>Incident Management</em>. <strong>Objetivo:</strong> restaurar el servicio lo antes posible.</p>
+</blockquote>
+<h3 id="81-ciclo-de-vida">8.1 Ciclo de vida</h3>
+<pre><code>Detección → Registro → Clasificación/Priorización → Diagnóstico
+   → Resolución (manual o asistida por el agente) → Cierre → Verificación
+</code></pre>
+<h3 id="82-priorización-impacto--urgencia">8.2 Priorización (impacto × urgencia)</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th></th>
+<th>Urgencia alta</th>
+<th>Urgencia media</th>
+<th>Urgencia baja</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Impacto alto</strong></td>
+<td>P1</td>
+<td>P2</td>
+<td>P3</td>
+</tr>
+<tr>
+<td><strong>Impacto medio</strong></td>
+<td>P2</td>
+<td>P3</td>
+<td>P4</td>
+</tr>
+<tr>
+<td><strong>Impacto bajo</strong></td>
+<td>P3</td>
+<td>P4</td>
+<td>P4</td>
+</tr>
+</tbody>
+</table></div>
+<p>Asociar cada prioridad a su SLA (ver <a href="#apéndice-c--matriz-de-sla-sugerida">Apéndice C</a>).</p>
+<h3 id="83-el-lazo-del-agente-fase-3">8.3 El lazo del agente <strong><span class="badge-fase">Fase&nbsp;3+</span></strong></h3>
+<p>Ante un incidente, el <code>itier-agent</code>:</p>
+<ol>
+<li><strong>Reúne evidencia</strong> (herramientas <code>read</code>: métricas, logs acotados, CMDB, tickets
+   similares). Sin efectos.</li>
+<li><strong>Diagnostica</strong> la causa probable y <strong>propone</strong> una remediación del catálogo.</li>
+<li><strong>Verifica con <code>remediate.dry_run</code></strong> (Ansible <code>--check</code>) — convierte la propuesta
+   en evidencia sin tocar nada.</li>
+<li><strong>Actúa según el nivel efectivo</strong> (ver §12): recomienda (L1), pide aprobación (L2),
+   ejecuta y notifica (L3) o resuelve solo (L4).</li>
+<li>Todo queda en la <strong>cadena de auditoría</strong> (§13).</li>
+</ol>
+<h3 id="84-procedimiento-del-operador">8.4 Procedimiento del operador</h3>
+<ol>
+<li><strong>Tomar</strong> el incidente de la cola (o la aprobación pendiente).</li>
+<li><strong>Validar el diagnóstico</strong> del agente contra la evidencia adjunta.</li>
+<li>Según el nivel:
+   - <strong>L1 (recomienda):</strong> decidir y ejecutar el playbook manualmente o aprobar su
+     ejecución.
+   - <strong>L2 (aprobar-y-actuar):</strong> revisar el <code>dry_run</code>, y <strong>aprobar o rechazar</strong> (ver
+     PROC-AUT §12.4). ⏱ dentro del SLA de la prioridad.
+   - <strong>L3/L4:</strong> el agente ya actuó — <strong>supervisar</strong> el resultado y la verificación.</li>
+<li><strong>Comunicar</strong> al cliente según su política de notificaciones.</li>
+<li><strong>Cerrar</strong> solo tras confirmar la <em>verificación</em> del playbook (ej.
+   <code>uso_disco_menor_a_85_pct</code>). Registrar causa y solución.</li>
+</ol>
+<h3 id="85-escalamiento">8.5 Escalamiento</h3>
+<p>Escalar cuando: se vence el SLA, el impacto crece, el agente no propone solución con
+confianza, o se dispara un <strong>cortacircuito</strong> (§13.3). Ruta: Operador → Administrador →
+Responsable de seguridad (si hay sospecha de seguridad) → contacto del cliente.</p>
+<p><strong>Criterio de salida.</strong> Servicio restaurado y verificado, cliente informado, ticket
+cerrado con causa y solución documentadas.</p>
+<hr />
+<h2 id="proc-req--gestión-de-solicitudes">PROC-REQ · Gestión de solicitudes</h2>
+<blockquote>
+<p>ITIL 4: <em>Service Request Management</em>. Peticiones planificadas, no fallas.</p>
+</blockquote>
+<ol>
+<li>La solicitud entra por el <strong>catálogo de servicios</strong> de GLPI (alta de usuario,
+   nuevo equipo, instalación de software, acceso).</li>
+<li>Se aprueba según corresponda (las que <strong>otorgan acceso</strong> caen bajo el techo duro
+   <code>otorga_acceso</code> → <strong>L2 como mínimo</strong>, siempre con decisión humana).</li>
+<li>Se cumple (manual o con un playbook estándar) y se cierra con conformidad del
+   solicitante.</li>
+</ol>
+<p><strong>Criterio de salida.</strong> Solicitud cumplida, con aprobación registrada cuando aplica.</p>
+<hr />
+<h2 id="proc-prb--gestión-de-problemas">PROC-PRB · Gestión de problemas</h2>
+<blockquote>
+<p>ITIL 4: <em>Problem Management</em>. <strong>Objetivo:</strong> eliminar causas raíz, no solo síntomas.</p>
+</blockquote>
+<ol>
+<li><strong>Detectar</strong> patrones: incidentes recurrentes sobre el mismo CI/síntoma, o un P1
+   que amerita análisis.</li>
+<li>Abrir un <strong>problema</strong> en GLPI y vincular los incidentes relacionados.</li>
+<li><strong>Análisis de causa raíz</strong> — el agente ayuda cruzando histórico de tickets,
+   métricas y cambios recientes.</li>
+<li>Registrar la solución de fondo como <strong>error conocido</strong> (KEDB) y, si aplica,
+   proponer un <strong>cambio</strong> (PROC-CHG) o un artículo de KB (<code>kb.propose_article</code>, que
+   siempre requiere revisión humana antes de publicar).</li>
+</ol>
+<p><strong>Criterio de salida.</strong> Causa raíz identificada y documentada; incidentes recurrentes
+cerrados o con solución permanente en curso.</p>
+<hr />
+<h2 id="proc-chg--cambios-y-remediación-con-playbooks">PROC-CHG · Cambios y remediación con playbooks</h2>
+<blockquote>
+<p>ITIL 4: <em>Change Enablement</em>. En iTier, <strong>toda actuación sobre infraestructura es un
+playbook de Ansible</strong> del catálogo firmado — nunca shell libre generado por el
+modelo (ver <span class="xref" title="Documento interno del repositorio: adr/ADR-0004-ansible-para-remediacion.md">ADR-0004</span> y
+<span class="xref" title="Documento interno del repositorio: adr/ADR-0003-mcp-capa-de-herramientas.md">ADR-0003</span>).</p>
+</blockquote>
+<h3 id="111-tipos-de-cambio">11.1 Tipos de cambio</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Tipo</th>
+<th>Descripción</th>
+<th>Aprobación</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Estándar</strong></td>
+<td>Playbook probado, reversible, bajo radio de impacto</td>
+<td>Pre-aprobado; el nivel de autonomía decide si el agente lo ejecuta</td>
+</tr>
+<tr>
+<td><strong>Normal</strong></td>
+<td>Impacto o riesgo mayor</td>
+<td>Requiere aprobación del cambio</td>
+</tr>
+<tr>
+<td><strong>Urgente</strong></td>
+<td>Ante un incidente en curso</td>
+<td>Aprobación acelerada + revisión posterior</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="112-el-catálogo-de-playbooks">11.2 El catálogo de playbooks</h3>
+<p>Cada playbook (en <span class="xref" title="Documento interno del repositorio: ../reference/policy/acciones.yaml"><code>reference/policy/acciones.yaml</code></span> → <code>playbooks</code>)
+declara: <code>nivel_base</code>, <code>reversible</code>, <code>verificacion</code>, <code>radio_explosion_max_cis</code> y
+<code>evidencia</code> (ejecuciones/reversiones históricas). Reglas duras:</p>
+<ul>
+<li>Un playbook <strong>irreversible nunca supera L2</strong> (ej. <code>extender_volumen</code>,
+  <code>reiniciar_servidor</code>).</li>
+<li>Un playbook que toca <strong>infraestructura crítica</strong> arrastra el techo duro
+  correspondiente.</li>
+</ul>
+<h3 id="113-proc-chg-new--incorporar-un-playbook-nuevo-">11.3 PROC-CHG-NEW · Incorporar un playbook nuevo 🔒</h3>
+<p><strong>Responsable.</strong> Administrador + Aprobador de cambios.</p>
+<ol>
+<li>Escribir el playbook <strong>idempotente y reversible</strong> (o marcarlo irreversible → tope
+   L2). Definir su <code>verificacion</code> (cómo se prueba el éxito) y <code>radio_explosion</code>.</li>
+<li>Probarlo en un entorno controlado y con <code>dry_run</code>.</li>
+<li>Agregarlo al catálogo con <code>nivel_base</code> conservador y su <code>evidencia</code> inicial en 0.</li>
+<li><strong>Revisión por pull request</strong> (el catálogo se versiona y se firma; no se edita en
+   una UI). Merge = firma.</li>
+<li>Empezar en L1/L2 y <strong>subir el nivel solo con evidencia acumulada</strong> (ejecuciones
+   exitosas, 0 reversiones), por PROC-AUT.</li>
+</ol>
+<p><strong>Criterio de salida.</strong> Playbook en el catálogo firmado, probado, con nivel inicial
+conservador y verificación definida.</p>
+<hr />
+<h2 id="proc-aut--niveles-de-autonomía-y-aprobaciones">PROC-AUT · Niveles de autonomía y aprobaciones</h2>
+<p>El corazón operativo de iTier. Detalle de diseño en
+<span class="xref" title="Documento interno del repositorio: 04-seguridad-y-autonomia.md">04 · Seguridad y autonomía</span> y
+<span class="xref" title="Documento interno del repositorio: adr/ADR-0006-autonomia-graduada.md">ADR-0006</span>.</p>
+<h3 id="121-los-cinco-niveles">12.1 Los cinco niveles</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Nivel</th>
+<th>Nombre</th>
+<th>Qué hace el agente</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>L0</strong></td>
+<td>Observar</td>
+<td>Mira e inventaría. No actúa.</td>
+</tr>
+<tr>
+<td><strong>L1</strong></td>
+<td>Recomendar</td>
+<td>Diagnostica y sugiere; decide el humano.</td>
+</tr>
+<tr>
+<td><strong>L2</strong></td>
+<td>Aprobar-y-actuar</td>
+<td>Propone y ejecuta <strong>tras aprobación</strong> humana.</td>
+</tr>
+<tr>
+<td><strong>L3</strong></td>
+<td>Actuar-y-notificar</td>
+<td>Ejecuta lo rutinario y avisa.</td>
+</tr>
+<tr>
+<td><strong>L4</strong></td>
+<td>Autónomo</td>
+<td>Resuelve solo, para tareas de bajo riesgo.</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="122-cómo-se-calcula-el-nivel-efectivo">12.2 Cómo se calcula el nivel efectivo</h3>
+<p>Para cada acción, el nivel efectivo es el <strong>mínimo</strong> entre todos los topes, y después
+se aplican los techos duros:</p>
+<pre><code>nivel_efectivo = min( nivel_base_de_la_acción,
+                      techo_del_plan_del_tenant,   # visibilidad L1 | gestionado L3 | autonomo L4
+                      techo_por_criticidad_del_CI, # critica L2 | alta L3 | media/baja L4
+                      techo_por_ventana_horaria )  # laboral L2 | fuera_horario L3 | mantenimiento L4
+   luego → aplicar techos_duros (nunca suben, solo bajan)
+   luego → excepciones del tenant y cis_intocables (L0)
+</code></pre>
+<p><strong>Ejemplo real</strong> (del motor de políticas): el playbook <code>rotar_logs</code> tiene
+<code>nivel_base L4</code>, pero sobre un cliente en plan <code>gestionado</code> (techo L3), su nivel
+efectivo baja a <strong>L3</strong>. El mismo playbook sobre un controlador de dominio cae a <strong>L2</strong>
+por el techo duro <code>infraestructura_critica</code>. <em>La misma acción cambia de resultado
+según el CI, la hora y el cliente.</em></p>
+<h3 id="123-techos-duros-nunca-se-levantan">12.3 Techos duros (nunca se levantan)</h3>
+<p><code>otorga_acceso</code>, <code>destruccion_de_datos</code>, <code>infraestructura_critica</code>,
+<code>autoconfiguracion</code>, <code>impacto_financiero</code> → <strong>todos topan en L2</strong>. Ninguna cantidad de
+evidencia los sube. Definidos en <code>acciones.yaml → techos_duros</code>.</p>
+<h3 id="124-proc-aut-apr--atender-una-aprobación-l2-">12.4 PROC-AUT-APR · Atender una aprobación (L2) ⏱</h3>
+<p><strong>Responsable.</strong> Operador (o contacto del cliente, según política).</p>
+<ol>
+<li>Llega la notificación (WhatsApp/email según <code>notificaciones</code> del tenant).</li>
+<li>Abrir la solicitud: muestra <strong>acción propuesta, CI, diagnóstico, resultado del
+   <code>dry_run</code> y nivel efectivo con su motivo</strong>.</li>
+<li><strong>Validar</strong> que el diagnóstico y el radio de impacto sean razonables.</li>
+<li><strong>Aprobar</strong> o <strong>rechazar</strong> (con motivo). Si no se responde en
+   <code>escalar_tras_minutos</code> (ej. 30), escala automáticamente.</li>
+<li>La decisión queda en auditoría (§13).</li>
+</ol>
+<h3 id="125-proc-aut-lvl--cambiar-el-nivel-de-autonomía-de-un-tenant-">12.5 PROC-AUT-LVL · Cambiar el nivel de autonomía de un tenant 🔒</h3>
+<p><strong>Responsable.</strong> Administrador + Aprobador (contacto del cliente).</p>
+<ol>
+<li>Justificar el cambio con evidencia (semanas de operación estable, KPIs).</li>
+<li>Editar la política del tenant (<code>plan</code> / <code>techo_global</code> / <code>excepciones</code>).</li>
+<li>Comunicar al cliente <strong>qué implica</strong> (qué pasará a resolverse solo).</li>
+<li>Aplicar y registrar. <strong>Regla de oro:</strong> subir de a un nivel, con período de
+   observación entre saltos.</li>
+</ol>
+<blockquote>
+<p><strong>Freno de mano del cliente.</strong> Bajar <code>techo_global</code> a <strong>L1</strong> desactiva toda
+actuación automática al instante, sin llamar a soporte. Todo cliente debe saber
+cómo hacerlo.</p>
+</blockquote>
+<hr />
+<h2 id="proc-seg--seguridad-auditoría-y-cortacircuitos">PROC-SEG · Seguridad, auditoría y cortacircuitos</h2>
+<blockquote>
+<p>Marco: <span class="xref" title="Documento interno del repositorio: 04-seguridad-y-autonomia.md">04 · Seguridad y autonomía</span> · OWASP Agentic AI
+2026 · principio de <strong>mínima agencia</strong>.</p>
+</blockquote>
+<h3 id="131-revisión-de-la-auditoría-">13.1 Revisión de la auditoría 🔒</h3>
+<p>Cada acción del agente encadena un hash con la anterior (cadena inviolable: evidencia
+→ política → ejecución). <strong>Rutina semanal:</strong></p>
+<ol>
+<li>Verificar la <strong>integridad de la cadena</strong> de cada tenant (una alteración se detecta
+   al instante).</li>
+<li>Revisar acciones L3/L4 ejecutadas: ¿coincide lo actuado con lo aprobado por la
+   política?</li>
+<li>Investigar cualquier <code>❌</code> de verificación de integridad como incidente de seguridad.</li>
+</ol>
+<h3 id="132-gestión-de-secretos-">13.2 Gestión de secretos 🔒</h3>
+<ul>
+<li>Claves y contraseñas <strong>solo en los <code>.env</code></strong> de cada host; nunca en git, tickets,
+  prompts ni capturas.</li>
+<li>En producción, el appliance <strong>no</strong> tiene la clave del LLM: usa el gateway del plano
+  de control (<span class="xref" title="Documento interno del repositorio: adr/ADR-0002-razonamiento-fuera-del-borde.md">ADR-0002</span>). El
+  <code>ANTHROPIC_API_KEY</code> directo es solo para el modo local de Fases 1–2.</li>
+<li>Rotación ante baja de personal o sospecha de exposición.</li>
+</ul>
+<h3 id="133-cortacircuitos-freno-automático">13.3 Cortacircuitos (freno automático)</h3>
+<p>El sistema se autolimita (definido en <code>acciones.yaml → cortacircuitos</code>):</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Límite</th>
+<th>Valor de referencia</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Acciones por hora por tenant</td>
+<td>20</td>
+</tr>
+<tr>
+<td>Acciones por hora por CI</td>
+<td>3</td>
+</tr>
+<tr>
+<td>Deshabilitar un playbook tras fallas consecutivas</td>
+<td>2</td>
+</tr>
+<tr>
+<td>Máx. CIs afectados sin aprobación</td>
+<td>5</td>
+</tr>
+<tr>
+<td>Abortar si repite la misma tool idéntica</td>
+<td>3 veces</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>Procedimiento ante disparo de un cortacircuito:</strong></p>
+<ol>
+<li>El agente se <strong>frena solo</strong> y notifica.</li>
+<li>El Operador <strong>investiga la causa</strong> (¿falla real, bucle, evento masivo?).</li>
+<li>Si es seguro, rehabilitar; si no, escalar al Responsable de seguridad y dejar el
+   tenant en L0/L1 hasta resolver.</li>
+</ol>
+<h3 id="134-kill-switch">13.4 Kill switch</h3>
+<p>Para detener toda actuación de un tenant de inmediato: bajar <code>techo_global</code> a <strong>L1</strong>
+(o L0). Para detener el agente por completo: <code>docker compose stop itier-agent</code> en el
+appliance. El monitoreo (Zabbix) sigue funcionando.</p>
+<hr />
+<h2 id="proc-cont--continuidad-y-modo-degradado">PROC-CONT · Continuidad y modo degradado</h2>
+<p><strong>Objetivo.</strong> Que una caída de la nube o del enlace no deje al cliente sin servicio ni
+sin registro.</p>
+<ul>
+<li><strong>Se corta el enlace saliente:</strong> el appliance encola eventos de forma durable y
+  reintenta; al reconectar, drena la cola. El monitoreo local sigue.</li>
+<li><strong>No hay inferencia (nube/LLM caído o sin presupuesto):</strong> el agente <strong>degrada a L0</strong>
+  (según <code>presupuesto.al_alcanzar_tope</code>) — sigue observando y registrando, no actúa.</li>
+<li><strong>Se cae el VPS:</strong> restaurar desde backup (§4.3); los proxies de los clientes
+  reconectan solos y drenan lo encolado.</li>
+</ul>
+<p><strong>Procedimiento de recuperación.</strong> Confirmar servicio → verificar que cada proxy
+reconectó → revisar la cola drenada → validar integridad de auditoría (§13.1) →
+comunicar a los clientes afectados.</p>
+<hr />
+<h2 id="15-indicadores-y-reportes-sla--kpis">15. Indicadores y reportes (SLA / KPIs)</h2>
+<p><strong>KPIs mínimos por tenant (mensual):</strong></p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Indicador</th>
+<th>Qué mide</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>MTTR</td>
+<td>Tiempo medio de resolución de incidentes</td>
+</tr>
+<tr>
+<td>Cumplimiento de SLA</td>
+<td>% de incidentes resueltos en término</td>
+</tr>
+<tr>
+<td>Disponibilidad</td>
+<td>% uptime de CIs críticos</td>
+</tr>
+<tr>
+<td>Tasa de autorresolución <strong><span class="badge-fase">Fase&nbsp;3+</span></strong></td>
+<td>% de incidentes resueltos por el agente sin humano</td>
+</tr>
+<tr>
+<td>Acciones por nivel</td>
+<td>Distribución L1/L2/L3/L4</td>
+</tr>
+<tr>
+<td>Costo de inferencia</td>
+<td>USD del mes vs. <code>tope_mensual_usd</code> (ver <span class="xref" title="Documento interno del repositorio: 05-modelo-de-costos.md">05 · Costos</span>)</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>Informe mensual al cliente:</strong> resumen de incidentes, cambios ejecutados, estado del
+inventario, disponibilidad y una recomendación (ej. "listo para subir a L3 en
+servidores de archivos"). Plantilla en el <a href="#apéndice-d--plantilla-de-informe-mensual">Apéndice D</a>.</p>
+<hr />
+<h2 id="16-procedimientos-de-cara-al-cliente">16. Procedimientos de cara al cliente</h2>
+<p>Guía breve para entregar al contacto técnico del cliente.</p>
+<ul>
+<li><strong>Pedir soporte / reportar una falla:</strong> por el canal acordado (email a la casilla de
+  soporte o portal de GLPI). Incluir qué, desde cuándo y a quién afecta.</li>
+<li><strong>Qué esperar:</strong> acuse dentro del SLA, diagnóstico y resolución o plan de acción.</li>
+<li><strong>Aprobaciones (si el plan lo incluye):</strong> ante una notificación de aprobación,
+  revisar la acción propuesta y responder aprobando o rechazando.</li>
+<li><strong>Freno de mano:</strong> cómo pedir (o hacer) la bajada a L1 para frenar toda automación.</li>
+<li><strong>Ventanas de mantenimiento:</strong> cómo se avisan y coordinan.</li>
+</ul>
+<hr />
+<h2 id="proc-off--baja-de-un-cliente-offboarding">PROC-OFF · Baja de un cliente (offboarding)</h2>
+<p><strong>Responsable.</strong> Administrador.</p>
+<ol>
+<li>Acordar fecha y <strong>exportar los datos</strong> del cliente (inventario, histórico de
+   tickets) para entregárselos.</li>
+<li><code>docker compose down</code> en el appliance/sonda; retirar o reinicializar el hardware.</li>
+<li>En el VPS: deshabilitar el proxy en Zabbix y <strong>archivar</strong> (no borrar de inmediato)
+   la entidad en GLPI, según retención acordada.</li>
+<li>🔒 <strong>Revocar credenciales</strong>: PSK del proxy, accesos, y el <code>ANTHROPIC_API_KEY</code> o el
+   certificado del tenant en el gateway.</li>
+<li>Conservar la <strong>auditoría</strong> por el período legal/contractual antes de purgar.</li>
+</ol>
+<p><strong>Criterio de salida.</strong> Cliente sin servicios activos, datos entregados, credenciales
+revocadas, auditoría conservada.</p>
+<hr />
+<h2 id="apéndices">Apéndices</h2>
+<h3 id="apéndice-a--matriz-raci-resumida">Apéndice A · Matriz RACI resumida</h3>
+<p><code>R</code>=Responsable · <code>A</code>=Aprueba · <code>C</code>=Consultado · <code>I</code>=Informado</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Proceso</th>
+<th>Operador</th>
+<th>Administrador</th>
+<th>Aprob. cambios</th>
+<th>Seguridad</th>
+<th>Cliente</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Onboarding (ONB)</td>
+<td>C</td>
+<td>R</td>
+<td>A</td>
+<td>C</td>
+<td>A</td>
+</tr>
+<tr>
+<td>Incidentes (INC)</td>
+<td>R</td>
+<td>C</td>
+<td>–</td>
+<td>I*</td>
+<td>I</td>
+</tr>
+<tr>
+<td>Solicitudes (REQ)</td>
+<td>R</td>
+<td>C</td>
+<td>A**</td>
+<td>–</td>
+<td>A</td>
+</tr>
+<tr>
+<td>Cambios/playbooks (CHG)</td>
+<td>C</td>
+<td>R</td>
+<td>A</td>
+<td>C</td>
+<td>I</td>
+</tr>
+<tr>
+<td>Autonomía (AUT)</td>
+<td>R (aprob. L2)</td>
+<td>R (nivel)</td>
+<td>A</td>
+<td>C</td>
+<td>A</td>
+</tr>
+<tr>
+<td>Seguridad/auditoría (SEG)</td>
+<td>C</td>
+<td>C</td>
+<td>–</td>
+<td>R</td>
+<td>I</td>
+</tr>
+</tbody>
+</table></div>
+<p>* si hay sospecha de seguridad · ** si otorga acceso</p>
+<h3 id="apéndice-b--glosario">Apéndice B · Glosario</h3>
+<ul>
+<li><strong>CI</strong> — elemento de configuración (activo gestionado).</li>
+<li><strong>CMDB</strong> — base de datos de configuración (los CIs y sus relaciones).</li>
+<li><strong>Tenant</strong> — un cliente y su instancia.</li>
+<li><strong>Playbook</strong> — procedimiento de remediación en Ansible, versionado y firmado.</li>
+<li><strong>Nivel de autonomía (L0–L4)</strong> — cuánto puede actuar el agente sin humano.</li>
+<li><strong>Techo duro</strong> — límite de autonomía que ninguna evidencia levanta.</li>
+<li><strong>Radio de explosión</strong> — cantidad máxima de CIs que una acción puede afectar.</li>
+<li><strong>Appliance / sonda</strong> — hardware en el cliente (ver <span class="xref" title="Documento interno del repositorio: adr/ADR-0007-perfiles-de-hardware.md">ADR-0007</span>).</li>
+<li><strong>Cortacircuito</strong> — freno automático ante actividad anómala.</li>
+</ul>
+<h3 id="apéndice-c--matriz-de-sla-sugerida">Apéndice C · Matriz de SLA sugerida</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Prioridad</th>
+<th>Respuesta</th>
+<th>Resolución objetivo</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>P1</td>
+<td>15 min</td>
+<td>4 h</td>
+</tr>
+<tr>
+<td>P2</td>
+<td>1 h</td>
+<td>8 h</td>
+</tr>
+<tr>
+<td>P3</td>
+<td>4 h</td>
+<td>2 días hábiles</td>
+</tr>
+<tr>
+<td>P4</td>
+<td>1 día hábil</td>
+<td>5 días hábiles</td>
+</tr>
+</tbody>
+</table></div>
+<blockquote>
+<p>Valores de referencia — ajustar por contrato de cada cliente.</p>
+</blockquote>
+<h3 id="apéndice-d--plantilla-de-informe-mensual">Apéndice D · Plantilla de informe mensual</h3>
+<pre><code>Cliente: ____________________   Período: __/____
+1. Resumen ejecutivo (2–3 líneas)
+2. Incidentes: total / por prioridad / MTTR / cumplimiento SLA
+3. Cambios ejecutados (playbooks) y resultado
+4. Estado del inventario (altas/bajas, CIs sin clasificar)
+5. Disponibilidad de CIs críticos
+6. Autonomía: distribución de acciones por nivel [Fase 3+]
+7. Costo de inferencia vs. presupuesto
+8. Recomendaciones para el próximo período
+</code></pre>
+<h3 id="apéndice-e--referencias">Apéndice E · Referencias</h3>
+<ul>
+<li><span class="xref" title="Documento interno del repositorio: 02-arquitectura.md">02 · Arquitectura</span> · <span class="xref" title="Documento interno del repositorio: 03-mapeo-itil4.md">03 · Mapeo ITIL 4</span> ·
+  <span class="xref" title="Documento interno del repositorio: 04-seguridad-y-autonomia.md">04 · Seguridad y autonomía</span> ·
+  <span class="xref" title="Documento interno del repositorio: 05-modelo-de-costos.md">05 · Modelo de costos</span> · <span class="xref" title="Documento interno del repositorio: 06-roadmap.md">06 · Roadmap</span></li>
+<li><span class="xref" title="Documento interno del repositorio: adr/">ADRs</span> · <span class="xref" title="Documento interno del repositorio: ../deploy/README.md">Guía de despliegue</span></li>
+<li>Políticas: <span class="xref" title="Documento interno del repositorio: ../reference/policy/acciones.yaml"><code>acciones.yaml</code></span> ·
+  <span class="xref" title="Documento interno del repositorio: ../reference/policy/tenant-ejemplo.yaml"><code>tenant-ejemplo.yaml</code></span></li>
+</ul>
+  </main>
+</div>
+
+<footer>
+  <div class="foot-in">
+    <span>© 2026 iTier — una solución de Pymes en Línea.</span>
+    <span><a href="index.html">itier.pymesenlinea.com.ar</a> · Documento interno de operaciones</span>
+  </div>
+</footer>
+
+<button class="totop" id="totop" aria-label="Volver arriba">↑</button>
+
+<script>
+  // Volver arriba
+  var totop=document.getElementById('totop');
+  window.addEventListener('scroll',function(){ totop.classList.toggle('show', window.scrollY>500); });
+  totop.addEventListener('click',function(){ window.scrollTo({top:0,behavior:'smooth'}); });
+
+  // Índice móvil
+  var toc=document.getElementById('toc'), tg=document.getElementById('tocToggle');
+  if(tg){ tg.addEventListener('click',function(){
+    var o=toc.classList.toggle('open'); tg.setAttribute('aria-expanded',o?'true':'false');
+  });
+  toc.addEventListener('click',function(e){ if(e.target.tagName==='A') toc.classList.remove('open'); }); }
+
+  // Resaltado de sección activa
+  var links={}, targets=[];
+  document.querySelectorAll('.toc a[href^="#"]').forEach(function(a){ links[a.getAttribute('href').slice(1)]=a; });
+  document.querySelectorAll('.doc h2, .doc h3').forEach(function(h){ if(links[h.id]) targets.push(h); });
+  if('IntersectionObserver' in window && targets.length){
+    var cur=null;
+    var io=new IntersectionObserver(function(ents){
+      ents.forEach(function(en){ if(en.isIntersecting) cur=en.target.id; });
+      Object.values(links).forEach(function(a){ a.classList.remove('active'); });
+      if(cur&&links[cur]) links[cur].classList.add('active');
+    },{rootMargin:'-70px 0px -75% 0px',threshold:0});
+    targets.forEach(function(t){ io.observe(t); });
+  }
+</script>
+</body>
+</html>

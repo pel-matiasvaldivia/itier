@@ -7,7 +7,11 @@ CSS y JS va embebido, así que funciona servido por cualquier servidor estático
 ## Contenido
 
 - `index.html` — la landing completa (autónoma).
-- `docker-compose.yml` — nginx mínimo para servirla detrás de NPM.
+- `manual.html` — el [manual de operaciones](../docs/07-manual-operativo.md)
+  renderizado como página HTML, con el mismo diseño. Se enlaza desde el pie de la
+  landing. **Generado** (no editar a mano): ver [Regenerar el manual](#regenerar-el-manual).
+- `build-manual.py` — generador de `manual.html` a partir del markdown.
+- `docker-compose.yml` — nginx mínimo para servir ambas páginas detrás de NPM.
 
 ## Desplegar detrás de Nginx Proxy Manager
 
@@ -51,6 +55,27 @@ ajustar:
 
 Tras editar, `docker compose restart landing` (o recargá: el archivo está
 montado, no copiado).
+
+## Regenerar el manual
+
+`manual.html` se genera desde `docs/07-manual-operativo.md`. Si editás el manual,
+regeneralo:
+
+```sh
+pip install markdown        # única dependencia, solo para regenerar
+python3 landing/build-manual.py
+```
+
+El HTML resultante es autónomo (sin dependencias) y conserva los anclajes internos
+del documento. Los enlaces a otros archivos del repo (ADRs, deploy, políticas) se
+muestran como referencias no navegables, para no dejar enlaces rotos en el sitio
+público.
+
+> **Visibilidad.** El manual es un documento **interno de operaciones**. Lleva
+> `noindex` para no aparecer en buscadores, pero si está enlazado desde la landing
+> es accesible por URL. Si no querés que sea público, protegé la ruta `/manual.html`
+> en NPM (pestaña **Advanced**) con *Access List* (usuario/clave) o quitá el enlace
+> del pie de `index.html` y serví el manual en otro Proxy Host restringido.
 
 ## Servir sin Docker
 

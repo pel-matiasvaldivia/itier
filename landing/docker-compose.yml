@@ -16,6 +16,7 @@ services:
     security_opt: [no-new-privileges:true]
     volumes:
       - ./index.html:/usr/share/nginx/html/index.html:ro
+      - ./manual.html:/usr/share/nginx/html/manual.html:ro
     networks: [npm]
     logging:
       driver: json-file
