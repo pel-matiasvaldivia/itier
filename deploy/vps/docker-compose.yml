@@ -70,6 +70,8 @@ services:
       GLPI_DB_USER: ${POSTGRES_USER:-glpi}
       GLPI_DB_PASSWORD: ${POSTGRES_PASSWORD:?falta POSTGRES_PASSWORD}
       TZ: ${TZ:-America/Argentina/Buenos_Aires}
+    ports:
+      - 8884:80
     volumes:
       - glpi_files:/var/glpi/files
       - glpi_config:/var/glpi/config
@@ -114,6 +116,8 @@ services:
       POSTGRES_USER: zabbix
       POSTGRES_PASSWORD: ${ZABBIX_DB_PASSWORD:?falta ZABBIX_DB_PASSWORD}
       PHP_TZ: ${TZ:-America/Argentina/Buenos_Aires}
+      ports:
+       - 8885:8080  
     networks: [interna, npm]
     # Sin `ports:` — en NPM, Proxy Host hacia http://zabbix-web:8080.
 
