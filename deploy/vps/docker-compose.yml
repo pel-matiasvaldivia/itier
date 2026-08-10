@@ -1,0 +1,135 @@
+# iTier — Fase 1 y 2 en el VPS propio, detrás de Nginx Proxy Manager (NPM).
+#
+# Núcleo ITSM (GLPI) + eventos/métricas (Zabbix), sobre un único PostgreSQL con
+# dos bases (glpi y zabbix). NPM termina TLS y publica los frontends; por eso
+# GLPI y la web de Zabbix NO exponen 80/443 al host: se unen a la red externa de
+# NPM y este los alcanza por nombre de contenedor.
+#
+# El único puerto que sí se publica al host es 10051/tcp del servidor Zabbix,
+# porque el zabbix-proxy que corre en la LAN de cada cliente se conecta ahí de
+# forma saliente. Ver deploy/README.md para la topología completa.
+#
+# Requisitos previos:
+#   - NPM ya corriendo y su red creada (por defecto se asume `npm`).
+#   - Copiar .env.example a .env y completar las contraseñas.
+#
+# ⚠ VERIFICAR antes de producción: los nombres de variables del contenedor de
+#   GLPI 11 (imagen oficial reciente) pueden diferir; ver comentarios en el
+#   servicio `glpi` y deploy/vps/README.md.
+
+name: itier-vps
+
+x-comun: &comun
+  restart: unless-stopped
+  security_opt: [no-new-privileges:true]
+  logging:
+    driver: json-file
+    options: { max-size: "10m", max-file: "3" }
+
+services:
+
+  # ── Base de datos compartida ──────────────────────────────────────────────
+  db:
+    <<: *comun
+    image: postgres:16-alpine
+    environment:
+      # Base y rol de GLPI: los crea el propio entrypoint de Postgres.
+      POSTGRES_DB: ${POSTGRES_DB:-glpi}
+      POSTGRES_USER: ${POSTGRES_USER:-glpi}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?falta POSTGRES_PASSWORD}
+      # La usa el script de init para crear el rol/base de Zabbix.
+      ZABBIX_DB_PASSWORD: ${ZABBIX_DB_PASSWORD:?falta ZABBIX_DB_PASSWORD}
+      TZ: ${TZ:-America/Argentina/Buenos_Aires}
+    volumes:
+      - db_data:/var/lib/postgresql/data
+      # Los .sh de este directorio corren SOLO en la primera inicialización
+      # (data dir vacío). Crea el rol y la base de Zabbix junto a los de GLPI.
+      - ./init:/docker-entrypoint-initdb.d:ro
+    networks: [interna]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-glpi} -d ${POSTGRES_DB:-glpi}"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+
+  # ── Núcleo ITSM: GLPI ─────────────────────────────────────────────────────
+  glpi:
+    <<: *comun
+    # GLPI 11 salió en 2025-10; la imagen y sus variables son nuevas. Se
+    # parametriza para poder fijar un digest/tag verificado sin editar el YAML.
+    image: ${GLPI_IMAGE:-glpi/glpi:11.0}
+    depends_on:
+      db: { condition: service_healthy }
+    environment:
+      # ⚠ VERIFICAR estos nombres contra la doc de la imagen que uses. GLPI
+      #   soporta PostgreSQL; confirmá que la imagen elegida también.
+      GLPI_DB_ENGINE: pgsql
+      GLPI_DB_HOST: db
+      GLPI_DB_PORT: "5432"
+      GLPI_DB_NAME: ${POSTGRES_DB:-glpi}
+      GLPI_DB_USER: ${POSTGRES_USER:-glpi}
+      GLPI_DB_PASSWORD: ${POSTGRES_PASSWORD:?falta POSTGRES_PASSWORD}
+      TZ: ${TZ:-America/Argentina/Buenos_Aires}
+    volumes:
+      - glpi_files:/var/glpi/files
+      - glpi_config:/var/glpi/config
+    networks: [interna, npm]
+    # Sin `ports:` — NPM publica el frontend. Configurá en NPM un Proxy Host
+    # apuntando a http://glpi:80 (o el puerto que exponga la imagen).
+
+  # ── Eventos y métricas: servidor Zabbix ───────────────────────────────────
+  zabbix-server:
+    <<: *comun
+    image: zabbix/zabbix-server-pgsql:${ZABBIX_VERSION:-alpine-7.0-latest}
+    depends_on:
+      db: { condition: service_healthy }
+    environment:
+      DB_SERVER_HOST: db
+      DB_SERVER_PORT: "5432"
+      POSTGRES_DB: zabbix
+      POSTGRES_USER: zabbix
+      POSTGRES_PASSWORD: ${ZABBIX_DB_PASSWORD:?falta ZABBIX_DB_PASSWORD}
+      ZBX_TIMEOUT: "10"
+      TZ: ${TZ:-America/Argentina/Buenos_Aires}
+    ports:
+      # Único puerto publicado al host: los zabbix-proxy de los clientes se
+      # conectan aquí de forma saliente. Restringí el origen en el firewall del
+      # VPS o publicá vía un stream de NPM. Ver deploy/vps/README.md.
+      - "${ZBX_SERVER_BIND:-0.0.0.0}:10051:10051"
+    networks: [interna]
+
+  # ── Eventos y métricas: frontend web de Zabbix ────────────────────────────
+  zabbix-web:
+    <<: *comun
+    image: zabbix/zabbix-web-nginx-pgsql:${ZABBIX_VERSION:-alpine-7.0-latest}
+    depends_on:
+      db: { condition: service_healthy }
+      zabbix-server: { condition: service_started }
+    environment:
+      ZBX_SERVER_HOST: zabbix-server
+      ZBX_SERVER_PORT: "10051"
+      DB_SERVER_HOST: db
+      DB_SERVER_PORT: "5432"
+      POSTGRES_DB: zabbix
+      POSTGRES_USER: zabbix
+      POSTGRES_PASSWORD: ${ZABBIX_DB_PASSWORD:?falta ZABBIX_DB_PASSWORD}
+      PHP_TZ: ${TZ:-America/Argentina/Buenos_Aires}
+    networks: [interna, npm]
+    # Sin `ports:` — en NPM, Proxy Host hacia http://zabbix-web:8080.
+
+networks:
+  # Red externa que ya usa Nginx Proxy Manager. Los frontends se unen aquí para
+  # que NPM los alcance por nombre. Crearla (si no existe) con:
+  #   docker network create npm
+  npm:
+    external: true
+    name: ${NPM_NETWORK:-npm}
+  # Red interna del stack: la base de datos nunca sale a internet.
+  interna:
+    driver: bridge
+    internal: true
+
+volumes:
+  db_data:
+  glpi_files:
+  glpi_config:

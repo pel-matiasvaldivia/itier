@@ -1,0 +1,90 @@
+# iTier — lado del cliente, en modo local (una instancia por cliente).
+#
+# Corre en la LAN de cada cliente (mini-PC x86 del appliance, o la sonda
+# Raspberry Pi del perfil reducido; ver docs/adr/ADR-0007). Tres piezas:
+#
+#   itier-agent   → la capa agéntica (imagen propia desde GHCR). Solo SALIDA:
+#                   habla con la API de GLPI del VPS y con el LLM. Sin puertos
+#                   entrantes (ADR-0005). En Fase 1/2 corre como esqueleto:
+#                   valida config y expone health; el bucle de eventos llega en
+#                   Fase 3.
+#   zabbix-proxy  → recolecta métricas/eventos de la LAN y los empuja, de forma
+#                   SALIENTE, al servidor Zabbix del VPS (puerto 10051).
+#   glpi-agent    → inventario/descubrimiento de la LAN hacia GLPI del VPS.
+#
+# zabbix-proxy y glpi-agent usan `network_mode: host` porque necesitan ver la
+# LAN para descubrir y monitorear. El itier-agent NO: queda en una red puente
+# solo-salida, sin exponer nada.
+#
+# Copiá .env.example a .env y completá los valores.
+
+name: itier-cliente
+
+services:
+
+  # ── Capa agéntica (imagen propia) ─────────────────────────────────────────
+  itier-agent:
+    image: ${ITIER_AGENT_IMAGE:-ghcr.io/pel-matiasvaldivia/itier-agent:latest}
+    restart: unless-stopped
+    environment:
+      ITIER_TENANT: ${ITIER_TENANT:?falta ITIER_TENANT}
+      # API de GLPI del VPS (a través de NPM). Ej: https://itsm.tu-dominio.com
+      ITIER_GLPI_URL: ${ITIER_GLPI_URL:?falta ITIER_GLPI_URL}
+      # Inferencia: en producción, el gateway del plano de control custodia la
+      # clave (ITIER_LLM_GATEWAY). En "modo local" de Fase 1/2 se admite la
+      # clave directa (ANTHROPIC_API_KEY). Definí AL MENOS una.
+      ITIER_LLM_GATEWAY: ${ITIER_LLM_GATEWAY:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      ITIER_LOG_LEVEL: ${ITIER_LOG_LEVEL:-INFO}
+    # Endurecimiento: sin privilegios nuevos, FS de solo lectura + tmpfs.
+    security_opt: [no-new-privileges:true]
+    read_only: true
+    tmpfs: [/tmp]
+    # Sin `ports:` — cero entrada. El health (:8080) lo usa el HEALTHCHECK de la
+    # imagen internamente. Para depurar en la máquina, descomentá y atalo a
+    # loopback: publica solo en 127.0.0.1, nunca a la LAN.
+    # ports:
+    #   - "127.0.0.1:8080:8080"
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
+
+  # ── Proxy de Zabbix (LAN → VPS) ───────────────────────────────────────────
+  zabbix-proxy:
+    image: zabbix/zabbix-proxy-sqlite3:${ZABBIX_VERSION:-alpine-7.0-latest}
+    restart: unless-stopped
+    network_mode: host
+    environment:
+      # Este nombre debe coincidir con el proxy que des de alta en el server.
+      ZBX_HOSTNAME: itier-${ITIER_TENANT:?falta ITIER_TENANT}
+      ZBX_SERVER_HOST: ${ZBX_SERVER_HOST:?falta ZBX_SERVER_HOST}
+      ZBX_SERVER_PORT: "10051"
+      # PSK recomendado para cifrar proxy↔server (ver README del cliente).
+      ZBX_TLSCONNECT: ${ZBX_TLSCONNECT:-unencrypted}
+      ZBX_TLSPSKIDENTITY: ${ZBX_TLSPSKIDENTITY:-}
+      ZBX_TLSPSKFILE: ${ZBX_TLSPSKFILE:-}
+    volumes:
+      - zbx_data:/var/lib/zabbix
+    security_opt: [no-new-privileges:true]
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
+
+  # ── Agente de inventario de GLPI (LAN → VPS) ──────────────────────────────
+  # ⚠ VERIFICAR imagen y variables contra la doc de glpi-agent antes de usar.
+  glpi-agent:
+    image: ${GLPI_AGENT_IMAGE:-glpi/glpi-agent:latest}
+    restart: unless-stopped
+    network_mode: host
+    environment:
+      # URL del servidor GLPI del VPS que recibe el inventario.
+      GLPI_AGENT_SERVER: ${ITIER_GLPI_URL:?falta ITIER_GLPI_URL}
+      # Identificador del equipo/agente en GLPI.
+      GLPI_AGENT_HOSTNAME: itier-${ITIER_TENANT:?falta ITIER_TENANT}
+    security_opt: [no-new-privileges:true]
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
+
+volumes:
+  zbx_data:

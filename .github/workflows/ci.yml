@@ -1,0 +1,56 @@
+name: CI
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  # ── Paquete del agente: compila y corre la parte determinista de la demo ──
+  edge-agent:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Instalar el paquete (editable, para que la demo halle las policies)
+        run: pip install -e ./reference/edge-agent
+
+      - name: Compilar todo el paquete (chequeo de sintaxis)
+        run: python -m compileall -q reference/edge-agent/itier_agent
+
+      - name: Demo sin clave (motor de políticas + auditoría)
+        # Sin ANTHROPIC_API_KEY la demo corre solo la parte determinista y
+        # omite el bucle del LLM; sirve como smoke test en CI.
+        run: python -m itier_agent.demo
+
+  # ── Manifiestos de despliegue: valida que los compose interpolen y parseen ─
+  compose:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validar compose del VPS
+        run: |
+          cd deploy/vps
+          cp .env.example .env
+          docker compose config >/dev/null
+          echo "deploy/vps OK"
+
+      - name: Validar compose del cliente
+        run: |
+          cd deploy/cliente
+          cp .env.example .env
+          docker compose config >/dev/null
+          echo "deploy/cliente OK"

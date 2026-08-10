@@ -10,6 +10,7 @@ dependencies = [
 
 [project.scripts]
 itier-demo = "itier_agent.demo:main"
+itier-serve = "itier_agent.serve:main"
 
 [build-system]
 requires = ["setuptools>=68"]
