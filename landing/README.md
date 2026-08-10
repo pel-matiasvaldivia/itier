@@ -15,22 +15,28 @@ CSS y JS va embebido, así que funciona servido por cualquier servidor estático
 
 ## Desplegar detrás de Nginx Proxy Manager
 
+NPM corre en **otro VPS de la LAN**, así que la landing publica su puerto en el
+host (por defecto `8082`) y NPM lo alcanza por IP:puerto.
+
 ```sh
 cd landing
+# opcional: atá el puerto a la IP de la LAN de este host
+echo "LANDING_BIND=<IP-LAN-de-este-host>" > .env
 docker compose up -d
 ```
 
-Luego, en la UI de NPM:
+Luego, en la UI de NPM (en el otro VPS):
 
 1. **Proxy Hosts → Add Proxy Host.**
 2. *Domain Names:* `itier.pymesenlinea.com.ar`
-3. *Forward Hostname / IP:* `itier-landing` · *Forward Port:* `80`
-   (comparten la red `npm`, así que NPM lo resuelve por nombre).
+3. *Forward Hostname / IP:* `<IP-LAN-de-este-host>` · *Forward Port:* `8082`
+   (o el `LANDING_PORT` que hayas fijado).
 4. Activá **Block Common Exploits** y **Websockets** si querés.
 5. Pestaña **SSL:** *Request a new SSL Certificate* + *Force SSL* + *HTTP/2*.
 
-> Si tu red de NPM no se llama `npm`, exportá `NPM_NETWORK` o creá un `.env`
-> con `NPM_NETWORK=<tu-red>` antes de `docker compose up`.
+> **Firewall.** Limitá el puerto `8082` a la IP del VPS de NPM. Si la landing
+> corre en el **mismo** VPS que NPM, podés apuntar el Proxy Host a
+> `http://127.0.0.1:8082`. Si la LAN no es de confianza, tunelizá con WireGuard.
 
 ### Cabeceras y caché (opcional)
 

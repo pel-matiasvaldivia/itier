@@ -1,42 +1,42 @@
 # iTier en el VPS (Fase 1 y 2)
 
-Núcleo ITSM y observabilidad de iTier sobre tu propio VPS, detrás de **Nginx
-Proxy Manager (NPM)**. Corresponde a las Fases 1 y 2 del roadmap
-(`docs/06-roadmap.md`): poner en marcha GLPI y Zabbix y validar el flujo antes
-de sumar la capa agéntica.
+Núcleo ITSM y observabilidad de iTier sobre tu propio VPS. **Nginx Proxy Manager
+(NPM) corre en OTRO VPS de la misma LAN** y termina TLS. Corresponde a las Fases
+1 y 2 del roadmap (`docs/06-roadmap.md`): poner en marcha GLPI y Zabbix y validar
+el flujo antes de sumar la capa agéntica.
 
 > **Alcance.** Esto es andamiaje de referencia, no un producto llave en mano.
 > Repasá los puntos marcados con ⚠ antes de exponer nada a internet.
 
 ## Qué se levanta
 
-| Servicio        | Imagen                                   | Publicado                    | Rol |
-|-----------------|------------------------------------------|------------------------------|-----|
-| `db`            | `postgres:16-alpine`                     | nada (solo red interna)      | Un motor, dos bases: `glpi` y `zabbix`. |
-| `glpi`          | `glpi/glpi:11.0` (parametrizable)        | vía NPM                      | CMDB, ITAM, tickets, catálogo. |
-| `zabbix-server` | `zabbix/zabbix-server-pgsql`             | `10051/tcp` al host          | Recibe datos de los proxies de cada cliente. |
-| `zabbix-web`    | `zabbix/zabbix-web-nginx-pgsql`          | vía NPM                      | Frontend de Zabbix. |
+| Servicio        | Imagen                                   | Publicado en el host              | Rol |
+|-----------------|------------------------------------------|-----------------------------------|-----|
+| `db`            | `postgres:16-alpine`                     | **nada** (solo red interna)       | Un motor, dos bases: `glpi` y `zabbix`. |
+| `glpi`          | `glpi/glpi:11.0` (parametrizable)        | `${GLPI_HTTP_PORT:-8884}/tcp` (LAN) | CMDB, ITAM, tickets, catálogo. |
+| `zabbix-web`    | `zabbix/zabbix-web-nginx-pgsql`          | `${ZBX_WEB_PORT:-8885}/tcp` (LAN)   | Frontend de Zabbix. |
+| `zabbix-server` | `zabbix/zabbix-server-pgsql`             | `10051/tcp` (público)             | Recibe datos de los proxies de cada cliente. |
 
-Los frontends (`glpi`, `zabbix-web`) **no publican 80/443**: se unen a la red
-externa de NPM y este los alcanza por nombre. La base de datos vive en una red
-`interna` marcada como `internal: true`, así que **nunca sale a internet**.
+Como NPM está en otro VPS, **no comparte la red de Docker** con este stack: los
+frontends **publican su puerto** en el host y NPM los alcanza por
+`IP-LAN-de-este-VPS:puerto`. Atá esos puertos a la IP de la LAN con `WEB_BIND`.
+La base de datos vive en una red `interna` (`internal: true`) y **no publica
+ningún puerto**: nadie fuera del stack la alcanza.
 
 ## Requisitos
 
-- Docker Engine + Compose v2.
-- NPM ya funcionando en el mismo host, con su red de Docker creada. Por defecto
-  se asume que se llama `npm`:
-  ```sh
-  docker network ls | grep npm    # ¿existe?
-  docker network create npm       # si no existe (y apuntá NPM a esa red)
-  ```
+- Docker Engine + Compose v2 en este VPS.
+- NPM funcionando en el otro VPS, con conectividad de red (LAN) hacia este.
+- La IP de la LAN de **este** VPS (la que verá NPM), para `WEB_BIND`. Averiguala
+  con `ip -4 addr` (buscá la interfaz de la red privada, ej. `10.0.0.5`).
 
 ## Puesta en marcha
 
 ```sh
 cd deploy/vps
 cp .env.example .env
-# editá .env: contraseñas robustas (openssl rand -base64 24), imagen de GLPI, TZ
+# editá .env: contraseñas (openssl rand -base64 24), WEB_BIND (IP LAN de este
+# VPS), puertos web, imagen de GLPI, TZ
 nano .env
 
 docker compose config      # valida el YAML y la interpolación de variables
@@ -48,32 +48,37 @@ En el primer arranque, `init/10-init-zabbix.sh` crea el rol y la base
 `zabbix`. **Solo corre con el volumen de datos vacío**: si ya inicializaste
 Postgres sin ese script, creá la base a mano o recreá el volumen.
 
-### Publicar en NPM
+### Publicar en NPM (que está en el otro VPS)
 
 En la UI de NPM, creá un *Proxy Host* por cada frontend (con su dominio y
-certificado Let's Encrypt):
+certificado Let's Encrypt), apuntando a la **IP de la LAN de este VPS** y el
+puerto publicado:
 
-- GLPI → `http://glpi:80`
-- Zabbix → `http://zabbix-web:8080`
+- GLPI → `http://<IP-LAN-de-este-VPS>:8884`
+- Zabbix → `http://<IP-LAN-de-este-VPS>:8885`
 
-Como comparten la red `npm`, NPM resuelve esos nombres directamente. No hace
-falta publicar puertos en el host.
+(Reemplazá los puertos si cambiaste `GLPI_HTTP_PORT` / `ZBX_WEB_PORT`.)
+
+**Firewall — importante.** Como estos puertos quedan escuchando en el host,
+limitá el acceso a ellos **solo desde la IP del VPS de NPM**:
+
+- Ideal: poné `WEB_BIND` en la IP privada de este VPS para que ni siquiera
+  escuchen en la interfaz pública, **y** en el firewall permití 8884/8885 solo
+  desde la IP LAN del VPS de NPM.
+- El tráfico NPM→backend viaja por la LAN como HTTP plano. Si esa red no es de
+  confianza (ej. red compartida del proveedor), tunelizala: un **WireGuard**
+  entre ambos VPS y atá `WEB_BIND` a la IP de WireGuard.
 
 ### El puerto 10051 (proxies de los clientes)
 
-El `zabbix-proxy` que corre en la LAN de cada cliente abre una conexión
-**saliente** hacia `tu-vps:10051`. Por eso es el único puerto publicado al host.
-Protegelo:
+Distinto de la web: el `zabbix-proxy` de cada cliente se conecta desde
+**internet** hacia `tu-vps-público:10051`, así que este bind es **público**
+(`ZBX_SERVER_BIND=0.0.0.0`). Protegelo:
 
 - **Firewall del VPS:** permití 10051/tcp solo desde las IP públicas de tus
-  clientes, o
-- **VPN / red overlay:** atá `ZBX_SERVER_BIND` a la IP de la VPN y hacé que los
-  proxies se conecten por ahí, o
-- **Stream de NPM:** NPM puede proxyar TCP; publicá 10051 como *stream* en lugar
-  de exponerlo directo.
-
-Zabbix admite PSK/TLS entre proxy y servidor: configuralo para no depender solo
-del firewall (ver README del cliente).
+  clientes, o atalo a una **VPN** y que los proxies entren por ahí.
+- **PSK/TLS:** Zabbix cifra proxy↔servidor; configuralo para no depender solo del
+  firewall (ver README del cliente).
 
 ## ⚠ Puntos a verificar
 

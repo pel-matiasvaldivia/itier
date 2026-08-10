@@ -1,10 +1,14 @@
-# Landing de iTier — sitio estático detrás de Nginx Proxy Manager (NPM).
+# Landing de iTier — sitio estático, con NPM en otro VPS de la misma LAN.
 #
-# Sirve index.html con un nginx mínimo. NO publica puertos: se une a la red
-# externa de NPM y este lo expone con TLS en itier.pymesenlinea.com.ar.
+# Sirve index.html y manual.html con un nginx mínimo. Como NPM corre en otro VPS
+# y no comparte la red de Docker, la landing PUBLICA su puerto en el host y NPM
+# lo alcanza por IP-LAN:puerto.
 #
-# En NPM: Proxy Host  itier.pymesenlinea.com.ar → http://itier-landing:80
-#         (pedí el certificado Let's Encrypt desde la misma pantalla).
+# En NPM (en el otro VPS): Proxy Host
+#   itier.pymesenlinea.com.ar → http://<IP-LAN-de-este-host>:${LANDING_PORT:-8082}
+#   (pedí el certificado Let's Encrypt desde la misma pantalla).
+#
+# Atá LANDING_BIND a la IP de la LAN y limitá el firewall a la IP del VPS de NPM.
 
 name: itier-landing
 
@@ -17,12 +21,8 @@ services:
     volumes:
       - ./index.html:/usr/share/nginx/html/index.html:ro
       - ./manual.html:/usr/share/nginx/html/manual.html:ro
-    networks: [npm]
+    ports:
+      - "${LANDING_BIND:-0.0.0.0}:${LANDING_PORT:-8082}:80"
     logging:
       driver: json-file
       options: { max-size: "5m", max-file: "3" }
-
-networks:
-  npm:
-    external: true
-    name: ${NPM_NETWORK:-npm}

@@ -1,17 +1,19 @@
-# iTier — Fase 1 y 2 en el VPS propio, detrás de Nginx Proxy Manager (NPM).
+# iTier — Fase 1 y 2 en el VPS propio, con NPM en OTRO VPS de la misma LAN.
 #
 # Núcleo ITSM (GLPI) + eventos/métricas (Zabbix), sobre un único PostgreSQL con
-# dos bases (glpi y zabbix). NPM termina TLS y publica los frontends; por eso
-# GLPI y la web de Zabbix NO exponen 80/443 al host: se unen a la red externa de
-# NPM y este los alcanza por nombre de contenedor.
+# dos bases (glpi y zabbix).
 #
-# El único puerto que sí se publica al host es 10051/tcp del servidor Zabbix,
-# porque el zabbix-proxy que corre en la LAN de cada cliente se conecta ahí de
-# forma saliente. Ver deploy/README.md para la topología completa.
+# Topología: como Nginx Proxy Manager corre en un VPS distinto, no comparte la
+# red de Docker con este stack; por eso los frontends PUBLICAN su puerto en el
+# host y NPM los alcanza por `IP-LAN-de-este-VPS:puerto`:
+#   - GLPI        → ${GLPI_HTTP_PORT:-8884}/tcp
+#   - Zabbix web  → ${ZBX_WEB_PORT:-8885}/tcp
+# Atá esos puertos a la IP de la LAN (WEB_BIND) y limitá el firewall al VPS de
+# NPM. El puerto 10051/tcp (servidor Zabbix) es aparte: lo usan los zabbix-proxy
+# remotos de cada cliente por internet. La base de datos NO publica puertos.
 #
 # Requisitos previos:
-#   - NPM ya corriendo y su red creada (por defecto se asume `npm`).
-#   - Copiar .env.example a .env y completar las contraseñas.
+#   - Copiar .env.example a .env y completar contraseñas, WEB_BIND y puertos.
 #
 # ⚠ VERIFICAR antes de producción: los nombres de variables del contenedor de
 #   GLPI 11 (imagen oficial reciente) pueden diferir; ver comentarios en el
@@ -70,14 +72,15 @@ services:
       GLPI_DB_USER: ${POSTGRES_USER:-glpi}
       GLPI_DB_PASSWORD: ${POSTGRES_PASSWORD:?falta POSTGRES_PASSWORD}
       TZ: ${TZ:-America/Argentina/Buenos_Aires}
-    ports:
-      - 8884:80
     volumes:
       - glpi_files:/var/glpi/files
       - glpi_config:/var/glpi/config
-    networks: [interna, npm]
-    # Sin `ports:` — NPM publica el frontend. Configurá en NPM un Proxy Host
-    # apuntando a http://glpi:80 (o el puerto que exponga la imagen).
+    networks: [interna, publica]
+    ports:
+      # Publicado para que NPM (en otro VPS de la LAN) lo alcance. Atalo a la IP
+      # de la LAN con WEB_BIND. El contenedor sirve en 80 (ajustá si tu imagen
+      # usa otro puerto). En NPM: Proxy Host → http://<IP-LAN>:${GLPI_HTTP_PORT:-8884}
+      - "${WEB_BIND:-0.0.0.0}:${GLPI_HTTP_PORT:-8884}:80"
 
   # ── Eventos y métricas: servidor Zabbix ───────────────────────────────────
   zabbix-server:
@@ -94,9 +97,10 @@ services:
       ZBX_TIMEOUT: "10"
       TZ: ${TZ:-America/Argentina/Buenos_Aires}
     ports:
-      # Único puerto publicado al host: los zabbix-proxy de los clientes se
-      # conectan aquí de forma saliente. Restringí el origen en el firewall del
-      # VPS o publicá vía un stream de NPM. Ver deploy/vps/README.md.
+      # Los zabbix-proxy de los clientes se conectan aquí de forma saliente por
+      # internet — por eso este bind es PÚBLICO (distinto del de la web, que va a
+      # la LAN). Restringí el origen en el firewall a las IP de tus clientes y
+      # usá PSK/TLS. Ver deploy/vps/README.md.
       - "${ZBX_SERVER_BIND:-0.0.0.0}:10051:10051"
     networks: [interna]
 
@@ -116,19 +120,18 @@ services:
       POSTGRES_USER: zabbix
       POSTGRES_PASSWORD: ${ZABBIX_DB_PASSWORD:?falta ZABBIX_DB_PASSWORD}
       PHP_TZ: ${TZ:-America/Argentina/Buenos_Aires}
-      ports:
-       - 8885:8080  
-    networks: [interna, npm]
-    # Sin `ports:` — en NPM, Proxy Host hacia http://zabbix-web:8080.
+    networks: [interna, publica]
+    ports:
+      # El contenedor de la web de Zabbix sirve en 8080. En NPM:
+      # Proxy Host → http://<IP-LAN>:${ZBX_WEB_PORT:-8885}
+      - "${WEB_BIND:-0.0.0.0}:${ZBX_WEB_PORT:-8885}:8080"
 
 networks:
-  # Red externa que ya usa Nginx Proxy Manager. Los frontends se unen aquí para
-  # que NPM los alcance por nombre. Crearla (si no existe) con:
-  #   docker network create npm
-  npm:
-    external: true
-    name: ${NPM_NETWORK:-npm}
-  # Red interna del stack: la base de datos nunca sale a internet.
+  # Red de los frontends: puente normal con salida a internet. Sobre ella viven
+  # los puertos publicados que NPM alcanza desde el otro VPS.
+  publica:
+    driver: bridge
+  # Red interna del stack: la base de datos nunca sale a internet ni se publica.
   interna:
     driver: bridge
     internal: true
