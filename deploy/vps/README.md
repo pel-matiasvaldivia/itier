@@ -95,6 +95,32 @@ Distinto de la web: el `zabbix-proxy` de cada cliente se conecta desde
   producción sumá backups del volumen `db_data`, rotación de credenciales y
   monitoreo del propio stack.
 
+## Permisos de los volúmenes de GLPI
+
+GLPI corre como usuario **no-root** dentro del contenedor. Los volúmenes
+`glpi_files` y `glpi_config` nacen propiedad de `root`, así que GLPI no puede
+crear su caché y falla con:
+
+```
+mkdir: cannot create directory '/var/glpi/files/_cache': Permission denied
+```
+
+El stack lo resuelve solo con el servicio **`glpi-init`**: corre antes que
+`glpi`, como root y con la misma imagen, detecta el dueño correcto (el que la
+imagen le da a `/var/glpi`) y se lo aplica a los volúmenes. No hay que hacer
+nada: `docker compose up -d` ejecuta el arreglo (también sobre volúmenes ya
+creados) y recién entonces levanta GLPI.
+
+Si preferís arreglar los volúmenes **ya existentes** sin recrear nada, en una
+sola línea:
+
+```sh
+docker compose run --rm --no-deps --user 0:0 --entrypoint sh glpi -c \
+  'ref=$(stat -c "%u:%g" /var/glpi); [ "$ref" = "0:0" ] && ref=33:33; \
+   echo "dueño=$ref"; chown -R "$ref" /var/glpi/files /var/glpi/config'
+docker compose up -d
+```
+
 ## Datos y backups
 
 Todo el estado vive en volúmenes Docker: `db_data`, `glpi_files`,

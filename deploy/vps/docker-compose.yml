@@ -54,6 +54,28 @@ services:
       timeout: 5s
       retries: 6
 
+  # ── Arreglo de permisos de los volúmenes de GLPI ──────────────────────────
+  # GLPI corre como usuario no-root; los volúmenes glpi_files/glpi_config nacen
+  # propiedad de root, así que GLPI no puede crear `_cache` y falla. Este init
+  # corre ANTES que glpi, como root y con la MISMA imagen de GLPI: lee el dueño
+  # real de /var/glpi (el que la imagen le da a su usuario web) y se lo aplica a
+  # los volúmenes. Es agnóstico del uid, idempotente y sale al terminar.
+  glpi-init:
+    image: ${GLPI_IMAGE:-glpi/glpi:11.0}
+    user: "0:0"
+    entrypoint: ["sh", "-c"]
+    command:
+      - >
+        ref=$$(stat -c '%u:%g' /var/glpi);
+        [ "$$ref" = "0:0" ] && ref=33:33;
+        echo "iTier: aplicando dueño $$ref a los volúmenes de GLPI";
+        chown -R "$$ref" /vol/files /vol/config
+    volumes:
+      - glpi_files:/vol/files
+      - glpi_config:/vol/config
+    networks: [interna]
+    restart: "no"
+
   # ── Núcleo ITSM: GLPI ─────────────────────────────────────────────────────
   glpi:
     <<: *comun
@@ -62,6 +84,7 @@ services:
     image: ${GLPI_IMAGE:-glpi/glpi:11.0}
     depends_on:
       db: { condition: service_healthy }
+      glpi-init: { condition: service_completed_successfully }
     environment:
       # ⚠ VERIFICAR estos nombres contra la doc de la imagen que uses. GLPI
       #   soporta PostgreSQL; confirmá que la imagen elegida también.
