@@ -8,6 +8,7 @@
 # host y NPM los alcanza por `IP-LAN-de-este-VPS:puerto`:
 #   - GLPI        → ${GLPI_HTTP_PORT:-8884}/tcp
 #   - Zabbix web  → ${ZBX_WEB_PORT:-8885}/tcp
+#   - Consola     → ${CONSOLE_PORT:-8083}/tcp  (plano de control; opera GLPI+Zabbix)
 # Atá esos puertos a la IP de la LAN (WEB_BIND) y limitá el firewall al VPS de
 # NPM. El puerto 10051/tcp (servidor Zabbix) es aparte: lo usan los zabbix-proxy
 # remotos de cada cliente por internet. La base de datos NO publica puertos.
@@ -149,6 +150,51 @@ services:
       # Proxy Host → http://<IP-LAN>:${ZBX_WEB_PORT:-8885}
       - "${WEB_BIND:-0.0.0.0}:${ZBX_WEB_PORT:-8885}:8080"
 
+  # ── Consola de operación: el plano de control (ADR-0008) ──────────────────
+  # Web única que opera GLPI y Zabbix POR LA RED INTERNA (por nombre de servicio:
+  # http://glpi y http://zabbix-web:8080), sin salir al host ni exponer sus APIs.
+  # Publica su propio puerto en `publica` para que NPM (en el otro VPS) la alcance.
+  # Los tokens de API se generan DENTRO de GLPI/Zabbix: ver deploy/vps/README.md.
+  consola:
+    <<: *comun
+    build: ../../consola
+    image: ${CONSOLE_IMAGE:-itier-console:local}
+    depends_on:
+      glpi: { condition: service_started }
+      zabbix-web: { condition: service_started }
+    environment:
+      # Clave de sesión (obligatoria): openssl rand -hex 32
+      ITIER_CONSOLE_SECRET: ${ITIER_CONSOLE_SECRET:?falta ITIER_CONSOLE_SECRET}
+      # Admin inicial (se crea solo en el primer arranque; cambia clave + enrola 2FA).
+      ITIER_CONSOLE_ADMIN_USER: ${ITIER_CONSOLE_ADMIN_USER:-admin}
+      ITIER_CONSOLE_ADMIN_PASSWORD: ${ITIER_CONSOLE_ADMIN_PASSWORD:?falta ITIER_CONSOLE_ADMIN_PASSWORD}
+      ITIER_CONSOLE_DB: /data/consola.sqlite3
+      ITIER_CONSOLE_PORT: "8080"
+      # GLPI por la red interna (API REST en /apirest.php). Tokens: ver README.
+      ITIER_GLPI_URL: ${ITIER_GLPI_URL:-http://glpi}
+      ITIER_GLPI_APP_TOKEN: ${ITIER_GLPI_APP_TOKEN:-}
+      ITIER_GLPI_USER_TOKEN: ${ITIER_GLPI_USER_TOKEN:-}
+      # URL PÚBLICA de GLPI (por NPM) para el bundle de enrolamiento del cliente.
+      ITIER_PUBLIC_GLPI_URL: ${ITIER_PUBLIC_GLPI_URL:-}
+      # Zabbix por la red interna (la web sirve en 8080).
+      ITIER_ZBX_URL: ${ITIER_ZBX_URL:-http://zabbix-web:8080}
+      ITIER_ZBX_TOKEN: ${ITIER_ZBX_TOKEN:-}
+      ITIER_ZBX_USER: ${ITIER_ZBX_USER:-}
+      ITIER_ZBX_PASSWORD: ${ITIER_ZBX_PASSWORD:-}
+      # Dirección pública del server Zabbix (host o host:puerto) que marcan los
+      # zabbix-proxy de los clientes. Va en el bundle de enrolamiento.
+      ITIER_ZBX_SERVER_HOST: ${ITIER_ZBX_SERVER_HOST:-}
+      TZ: ${TZ:-America/Argentina/Buenos_Aires}
+    volumes:
+      - consola_data:/data
+    networks: [interna, publica]
+    ports:
+      # NPM (otro VPS) → Proxy Host http://<IP-LAN>:${CONSOLE_PORT:-8083}
+      - "${WEB_BIND:-0.0.0.0}:${CONSOLE_PORT:-8083}:8080"
+    # Endurecimiento extra: FS de solo lectura + tmpfs (el estado va al volumen).
+    read_only: true
+    tmpfs: [/tmp]
+
 networks:
   # Red de los frontends: puente normal con salida a internet. Sobre ella viven
   # los puertos publicados que NPM alcanza desde el otro VPS.
@@ -163,3 +209,4 @@ volumes:
   db_data:
   glpi_files:
   glpi_config:
+  consola_data:

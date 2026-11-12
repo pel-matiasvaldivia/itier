@@ -49,6 +49,13 @@ En demo se crea `admin` / `itier-demo-admin`. Al primer login vas a **enrolar el
 
 ## Desplegar en producción (detrás de NPM)
 
+> **Camino recomendado: integrada al stack del VPS.** La consola ya está cableada
+> como el servicio `consola` en [`deploy/vps/`](../deploy/vps/): habla con GLPI y
+> Zabbix por la red interna (`http://glpi`, `http://zabbix-web:8080`), sin exponer
+> sus APIs. Seguí [`deploy/vps/README.md` → "Consola de operación"](../deploy/vps/README.md)
+> (incluye cómo generar los tokens de API). Lo de abajo es para correrla
+> **sola**, en un host aparte o en desarrollo.
+
 NPM corre en **otro VPS de la LAN** (misma topología que el resto): la consola
 publica su puerto y NPM lo alcanza por `IP-LAN:puerto`.
 

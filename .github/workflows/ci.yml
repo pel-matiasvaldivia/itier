@@ -56,6 +56,11 @@ jobs:
         # cadena de auditoría, más pruebas negativas. Sin GLPI/Zabbix reales.
         run: python consola/tests/smoke_demo.py
 
+      - name: Test de adaptadores (camino real, HTTP simulado)
+        # Verifica la construcción de requests y el parseo contra GLPI/Zabbix
+        # falsos (httpx.MockTransport): headers, envoltura JSON-RPC, PSK, etc.
+        run: python consola/tests/test_adapters.py
+
   # ── Manifiestos de despliegue: valida que los compose interpolen y parseen ─
   compose:
     runs-on: ubuntu-latest
