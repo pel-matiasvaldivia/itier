@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block titulo %}Nuevo ticket · Consola de iTier{% endblock %}
+{% block contenido %}
+  <div class="page-head"><h1>Nuevo ticket</h1></div>
+  <div class="card narrow">
+    {% if clientes %}
+    <form method="post" action="/tickets/nuevo" class="form">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <label>Cliente
+        <select name="cliente" required>
+          {% for c in clientes %}<option value="{{ c.slug }}">{{ c.nombre }}</option>{% endfor %}
+        </select>
+      </label>
+      <label>Asunto
+        <input type="text" name="titulo" required autofocus>
+      </label>
+      <label>Descripción
+        <textarea name="contenido" rows="5"></textarea>
+      </label>
+      <label>Prioridad
+        <select name="prioridad">
+          <option value="2">Baja</option>
+          <option value="3" selected>Media</option>
+          <option value="4">Alta</option>
+          <option value="5">Muy alta</option>
+        </select>
+      </label>
+      <button class="btn btn-primary" type="submit">Crear ticket</button>
+    </form>
+    {% else %}
+    <p class="muted">Primero tenés que dar de alta un cliente con entidad de GLPI.</p>
+    <a class="btn btn-primary" href="/clientes/nuevo">Dar de alta un cliente</a>
+    {% endif %}
+  </div>
+{% endblock %}

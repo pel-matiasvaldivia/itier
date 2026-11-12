@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block titulo %}{{ cli.nombre }} · Consola de iTier{% endblock %}
+{% block contenido %}
+  <div class="page-head">
+    <h1>{{ cli.nombre }}</h1>
+    <a class="btn" href="/clientes/{{ cli.slug }}/agentes">Agentes de Zabbix →</a>
+  </div>
+
+  <div class="card">
+    <table class="kv">
+      <tr><th>Tenant</th><td><code>{{ cli.slug }}</code></td></tr>
+      <tr><th>Estado</th><td><span class="badge badge-{{ cli.estado }}">{{ cli.estado }}</span></td></tr>
+      <tr><th>Entidad GLPI</th><td>{{ cli.glpi_entity_id or '—' }}</td></tr>
+      <tr><th>Grupo Zabbix</th><td>{{ cli.zbx_hostgroup_id or '—' }}</td></tr>
+      <tr><th>Proxy Zabbix</th><td><code>{{ cli.zbx_proxy_name }}</code> (id {{ cli.zbx_proxy_id or '—' }})</td></tr>
+      <tr><th>Alta</th><td>{{ cli.created_at }} · por {{ cli.created_by }}</td></tr>
+      {% if cli.notas %}<tr><th>Notas</th><td>{{ cli.notas }}</td></tr>{% endif %}
+    </table>
+  </div>
+
+  <div class="card">
+    <h2>Bundle de enrolamiento</h2>
+    <p class="muted">Pegá esto en <code>deploy/cliente/.env</code> del appliance del cliente y levantá el stack. Los nombres calzan con <code>deploy/cliente/docker-compose.yml</code>.</p>
+
+    <div class="bundle-head">
+      <span class="bundle-t">.env</span>
+      <button class="btn btn-sm" type="button" data-copy="#bundle-env">Copiar</button>
+    </div>
+    <pre class="codeblock" id="bundle-env">{{ bundle }}</pre>
+
+    <div class="bundle-head">
+      <span class="bundle-t">PSK — guardá su contenido en el archivo <code>proxy.psk</code> (ruta <code>ZBX_TLSPSKFILE</code>)</span>
+      <button class="btn btn-sm" type="button" data-copy="#bundle-psk">Copiar</button>
+    </div>
+    <pre class="codeblock" id="bundle-psk">{{ cli.psk_key }}</pre>
+
+    <div class="note small">
+      <strong>Secreto.</strong> La PSK da acceso de proxy al servidor Zabbix. Compartila por un canal seguro
+      y nunca la publiques. En el appliance:
+      <code>mkdir -p enc &amp;&amp; printf '%s' '&lt;PSK&gt;' &gt; enc/proxy.psk &amp;&amp; chmod 600 enc/proxy.psk</code>
+      y montá <code>enc/proxy.psk</code> en <code>/var/lib/zabbix/enc/proxy.psk</code>.
+    </div>
+  </div>
+{% endblock %}

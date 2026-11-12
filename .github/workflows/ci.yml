@@ -35,6 +35,27 @@ jobs:
         # omite el bucle del LLM; sirve como smoke test en CI.
         run: python -m itier_agent.demo
 
+  # ── Consola (plano de control): compila y corre el smoke test en modo demo ─
+  consola:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Instalar el paquete de la consola
+        run: pip install -e ./consola
+
+      - name: Compilar todo el paquete (chequeo de sintaxis)
+        run: python -m compileall -q consola/itier_console
+
+      - name: Smoke test funcional en modo demo
+        # Recorre login+2FA (TOTP real), alta de cliente, agentes, tickets y la
+        # cadena de auditoría, más pruebas negativas. Sin GLPI/Zabbix reales.
+        run: python consola/tests/smoke_demo.py
+
   # ── Manifiestos de despliegue: valida que los compose interpolen y parseen ─
   compose:
     runs-on: ubuntu-latest
@@ -54,3 +75,11 @@ jobs:
           cp .env.example .env
           docker compose config >/dev/null
           echo "deploy/cliente OK"
+
+      - name: Validar compose de la consola
+        run: |
+          cd consola
+          cp .env.example .env
+          # ITIER_CONSOLE_SECRET vacío en el ejemplo; para `config` no importa.
+          docker compose config >/dev/null
+          echo "consola OK"

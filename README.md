@@ -53,6 +53,7 @@ itier/
 ├── deploy/             Despliegue: VPS (GLPI+Zabbix tras NPM) y cliente (agente local)
 │   ├── vps/            Fases 1 y 2 en el servidor propio
 │   └── cliente/        Modo local, una instancia por cliente
+├── consola/            Plano de control: web única que opera GLPI+Zabbix (login 2FA)
 ├── landing/            Landing pública (itier.pymesenlinea.com.ar)
 └── reference/          Esqueleto de referencia — ilustra la arquitectura, no es producción
     ├── edge-agent/     Bucle del agente, cliente MCP, motor de políticas

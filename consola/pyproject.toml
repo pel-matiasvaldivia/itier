@@ -1,0 +1,30 @@
+[project]
+name = "itier-console"
+version = "0.1.0"
+description = "Consola de iTier — plano de control que opera GLPI y Zabbix por API (BFF)"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.115,<0.116",
+    "uvicorn[standard]>=0.30,<0.35",
+    "jinja2>=3.1,<4",
+    "python-multipart>=0.0.9",
+    "itsdangerous>=2.2,<3",
+    "argon2-cffi>=23.1",
+    "pyotp>=2.9,<3",
+    "segno>=1.6,<2",
+    "httpx>=0.27,<0.29",
+]
+
+[project.scripts]
+itier-console = "itier_console.main:main"
+itier-console-admin = "itier_console.cli:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["itier_console*"]
+
+[tool.setuptools.package-data]
+itier_console = ["templates/**/*.html", "static/**/*"]

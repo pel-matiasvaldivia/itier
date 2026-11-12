@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block titulo %}Clientes · Consola de iTier{% endblock %}
+{% block contenido %}
+  <div class="page-head">
+    <h1>Clientes</h1>
+    <a class="btn btn-primary" href="/clientes/nuevo">+ Nuevo cliente</a>
+  </div>
+
+  {% if clientes %}
+  <div class="card">
+    <table class="tabla">
+      <thead>
+        <tr><th>Cliente</th><th>Tenant</th><th>Entidad GLPI</th><th>Proxy Zabbix</th><th>Estado</th><th></th></tr>
+      </thead>
+      <tbody>
+        {% for c in clientes %}
+        <tr>
+          <td><a href="/clientes/{{ c.slug }}">{{ c.nombre }}</a></td>
+          <td><code>{{ c.slug }}</code></td>
+          <td>{{ c.glpi_entity_id or '—' }}</td>
+          <td>{{ c.zbx_proxy_name or '—' }}</td>
+          <td><span class="badge badge-{{ c.estado }}">{{ c.estado }}</span></td>
+          <td class="acciones">
+            <a href="/clientes/{{ c.slug }}">Bundle</a>
+            <a href="/clientes/{{ c.slug }}/agentes">Agentes</a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty">
+    <p>Todavía no hay clientes.</p>
+    <a class="btn btn-primary" href="/clientes/nuevo">Dar de alta el primero</a>
+  </div>
+  {% endif %}
+{% endblock %}

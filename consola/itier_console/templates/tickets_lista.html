@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block titulo %}Tickets · Consola de iTier{% endblock %}
+{% block contenido %}
+  <div class="page-head">
+    <h1>Tickets</h1>
+    <a class="btn btn-primary" href="/tickets/nuevo">+ Nuevo ticket</a>
+  </div>
+
+  <div class="card">
+    <form method="get" action="/tickets" class="filtro">
+      <label>Cliente
+        <select name="cliente" onchange="this.form.submit()">
+          <option value="">Todos</option>
+          {% for c in clientes %}
+          <option value="{{ c.slug }}" {{ 'selected' if sel == c.slug else '' }}>{{ c.nombre }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <noscript><button class="btn btn-sm" type="submit">Filtrar</button></noscript>
+    </form>
+
+    {% if error %}<div class="note note-bad">No se pudo leer GLPI: {{ error }}</div>{% endif %}
+
+    {% if tickets %}
+    <table class="tabla">
+      <thead><tr><th>#</th><th>Asunto</th><th>Estado</th><th>Prioridad</th><th>Fecha</th></tr></thead>
+      <tbody>
+        {% for t in tickets %}
+        <tr>
+          <td><a href="/tickets/{{ t.id }}">{{ t.id }}</a></td>
+          <td><a href="/tickets/{{ t.id }}">{{ t.name }}</a></td>
+          <td><span class="badge">{{ t.estado_label }}</span></td>
+          <td>{{ t.prioridad_label }}</td>
+          <td class="muted">{{ t.date or '—' }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p class="muted">No hay tickets para mostrar.</p>
+    {% endif %}
+  </div>
+{% endblock %}

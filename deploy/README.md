@@ -18,6 +18,8 @@ y el **agente en modo local** en la LAN de cada cliente.
                         │  VPS de iTier  (deploy/vps/)       │
         IP-LAN:8884 ───▶│  glpi         (frontend)           │
         IP-LAN:8885 ───▶│  zabbix-web   (frontend)           │
+        IP-LAN:8083 ───▶│  consola  (consola/) ─┐            │
+                        │     opera glpi+zabbix ◀┘ por API    │
                         │  [db postgres]  red interna, sin    │
                         │                 puertos publicados  │
                         │  zabbix-server ──── 10051/tcp ──────┼──┐
@@ -43,6 +45,11 @@ y el **agente en modo local** en la LAN de cada cliente.
 | [`cliente/`](cliente/) | LAN de cada cliente | itier-agent (GHCR) + zabbix-proxy + glpi-agent | local |
 
 Cada carpeta tiene su propio `README.md`, `docker-compose.yml` y `.env.example`.
+
+> La **consola de operación** (plano de control) vive en [`../consola/`](../consola/):
+> login con 2FA, alta de clientes y vinculación de agentes, operando GLPI y Zabbix
+> por API. Se despliega en el VPS como un frontend más detrás de NPM
+> (`IP-LAN:8083`). Ver [ADR-0008](../docs/adr/ADR-0008-plano-de-control-consola.md).
 
 ## Principios que fija esta topología
 

@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block titulo %}Ticket #{{ t.id }} · Consola de iTier{% endblock %}
+{% block contenido %}
+  <div class="page-head">
+    <h1>Ticket #{{ t.id }}</h1>
+    <a class="btn" href="/tickets">← Volver</a>
+  </div>
+
+  <div class="card">
+    <h2>{{ t.name }}</h2>
+    <p>
+      <span class="badge">{{ t.estado_label }}</span>
+      <span class="badge">Prioridad: {{ t.prioridad_label }}</span>
+      {% if t.date %}<span class="muted">· {{ t.date }}</span>{% endif %}
+    </p>
+    {% if t.content %}<div class="ticket-body">{{ t.content }}</div>{% endif %}
+  </div>
+
+  <div class="card narrow">
+    <h2>Asignar</h2>
+    <form method="post" action="/tickets/{{ t.id }}/asignar" class="form row">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <label>ID de técnico (GLPI users_id)
+        <input type="number" name="users_id" min="1" required>
+      </label>
+      <button class="btn btn-primary" type="submit">Asignar</button>
+    </form>
+    <p class="muted small">En una próxima iteración se reemplaza el ID por un selector de técnicos leído de GLPI.</p>
+  </div>
+{% endblock %}

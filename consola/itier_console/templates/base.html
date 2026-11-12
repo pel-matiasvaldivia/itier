@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <title>{% block titulo %}Consola de iTier{% endblock %}</title>
+  <link rel="stylesheet" href="/static/app.css">
+</head>
+<body class="{% if user %}app{% else %}auth{% endif %}">
+
+{% if user %}
+  <header class="topbar">
+    <a class="brand" href="/">i<span>Tier</span> <small>consola</small></a>
+    <div class="topbar-right">
+      {% if demo %}<span class="chip chip-demo" title="Datos de ejemplo; sin GLPI/Zabbix reales">modo demo</span>{% endif %}
+      <span class="who">{{ user.user }}{% if user.is_admin %} · admin{% endif %}</span>
+      <form method="post" action="/logout" class="inline">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <button class="btn btn-ghost btn-sm" type="submit">Salir</button>
+      </form>
+    </div>
+  </header>
+
+  <div class="shell">
+    <nav class="sidebar">
+      <a href="/" class="{{ 'on' if ruta == '/' else '' }}">Tablero</a>
+      <a href="/clientes" class="{{ 'on' if ruta.startswith('/clientes') else '' }}">Clientes</a>
+      <a href="/tickets" class="{{ 'on' if ruta.startswith('/tickets') else '' }}">Tickets</a>
+      <a href="/auditoria" class="{{ 'on' if ruta.startswith('/auditoria') else '' }}">Auditoría</a>
+    </nav>
+
+    <main class="content">
+      {% include "_flash.html" %}
+      {% block contenido %}{% endblock %}
+    </main>
+  </div>
+{% else %}
+  <main class="authwrap">
+    <div class="authcard">
+      <div class="authbrand">i<span>Tier</span></div>
+      {% include "_flash.html" %}
+      {% block auth %}{% endblock %}
+    </div>
+    <p class="authfoot">Consola de operación · acceso restringido</p>
+  </main>
+{% endif %}
+
+<script src="/static/app.js" defer></script>
+</body>
+</html>

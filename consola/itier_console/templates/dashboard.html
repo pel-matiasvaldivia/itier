@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block titulo %}Tablero · Consola de iTier{% endblock %}
+{% block contenido %}
+  <div class="page-head">
+    <h1>Tablero</h1>
+    <a class="btn btn-primary" href="/clientes/nuevo">+ Nuevo cliente</a>
+  </div>
+
+  <section class="tiles">
+    <div class="tile">
+      <div class="tile-k">GLPI</div>
+      <div class="tile-v">
+        {% if salud_glpi.ok %}<span class="dot ok"></span>Operativo{% else %}<span class="dot bad"></span>Sin conexión{% endif %}
+      </div>
+      <div class="tile-s">{{ salud_glpi.version or salud_glpi.detalle }}</div>
+    </div>
+    <div class="tile">
+      <div class="tile-k">Zabbix</div>
+      <div class="tile-v">
+        {% if salud_zbx.ok %}<span class="dot ok"></span>Operativo{% else %}<span class="dot bad"></span>Sin conexión{% endif %}
+      </div>
+      <div class="tile-s">{{ salud_zbx.version or salud_zbx.detalle }}</div>
+    </div>
+    <div class="tile">
+      <div class="tile-k">Clientes</div>
+      <div class="tile-v big">{{ n_clientes }}</div>
+      <div class="tile-s">
+        {% for estado, n in por_estado.items() %}<span class="badge badge-{{ estado }}">{{ n }} {{ estado }}</span> {% endfor %}
+        {% if not por_estado %}aún no hay clientes{% endif %}
+      </div>
+    </div>
+  </section>
+
+  {% if not glpi_conf or not zbx_conf %}
+  <div class="note">
+    <strong>Configuración pendiente.</strong>
+    {% if not glpi_conf %}Falta configurar GLPI (ITIER_GLPI_URL / ITIER_GLPI_APP_TOKEN). {% endif %}
+    {% if not zbx_conf %}Falta configurar Zabbix (ITIER_ZBX_URL + token o usuario/clave). {% endif %}
+    Ver <code>consola/README.md</code>.
+  </div>
+  {% endif %}
+
+  <section class="card">
+    <h2>Accesos rápidos</h2>
+    <div class="quick">
+      <a href="/clientes/nuevo">Dar de alta un cliente →</a>
+      <a href="/clientes">Ver clientes y bundles →</a>
+      <a href="/tickets/nuevo">Crear un ticket →</a>
+      <a href="/auditoria">Revisar auditoría →</a>
+    </div>
+  </section>
+{% endblock %}

@@ -1,0 +1,52 @@
+# Consola de iTier — el plano de control, detrás de NPM (que está en otro VPS).
+#
+# Publica su puerto en el host (como el resto de los frontends del VPS) para que
+# NPM lo alcance por IP-LAN:puerto. Corre como no-root, FS de solo lectura + tmpfs,
+# y el estado (usuarios, 2FA, clientes, auditoría) vive en el volumen consola_data.
+#
+# Para HABLAR con GLPI y Zabbix tenés dos opciones (ver consola/README.md):
+#   A) por los puertos publicados del stack, vía el host (host.docker.internal).
+#   B) uniéndote a la red interna del stack del VPS (networks, al pie, comentado),
+#      y usando los nombres de servicio (http://glpi, http://zabbix-web:8080).
+#
+# Copiá .env.example a .env y completá los valores (¡incluido ITIER_CONSOLE_SECRET!).
+
+name: itier-consola
+
+services:
+  consola:
+    build: .
+    image: ${CONSOLE_IMAGE:-itier-console:local}
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      ITIER_CONSOLE_DB: /data/consola.sqlite3
+      ITIER_CONSOLE_PORT: "8080"
+    volumes:
+      - consola_data:/data
+    ports:
+      # NPM (en el otro VPS) apunta un Proxy Host a http://<IP-LAN>:${CONSOLE_PORT}
+      - "${WEB_BIND:-0.0.0.0}:${CONSOLE_PORT:-8083}:8080"
+    # Permite usar http://host.docker.internal:8884 / :8885 para llegar a GLPI/Zabbix
+    # por sus puertos publicados (opción A).
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    security_opt: [no-new-privileges:true]
+    read_only: true
+    tmpfs: [/tmp]
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
+    # Opción B — descomentá para hablar con GLPI/Zabbix por nombre de servicio:
+    # networks: [default, itier_interna]
+
+volumes:
+  consola_data:
+
+# Opción B (continuación): red interna del stack del VPS (deploy/vps). El nombre
+# por defecto es "<name>_interna" = "itier-vps_interna"; ajustá si cambiaste el
+# name: del otro compose.
+# networks:
+#   itier_interna:
+#     external: true
+#     name: itier-vps_interna

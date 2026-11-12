@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block titulo %}Activar 2FA · Consola de iTier{% endblock %}
+{% block auth %}
+  <h1>Activá tu segundo factor</h1>
+  <p class="muted">Escaneá el código con Google Authenticator, Microsoft Authenticator o Aegis. Es obligatorio para operar.</p>
+  <div class="qr">{{ qr_svg | safe }}</div>
+  <p class="muted small">¿No podés escanear? Cargá esta clave manualmente:</p>
+  <div class="codebox"><code>{{ secret }}</code></div>
+  <form method="post" action="/login/2fa/enrolar" class="form">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <label>Código de verificación
+      <input type="text" name="code" inputmode="numeric" pattern="[0-9 ]*" autocomplete="one-time-code" autofocus required>
+    </label>
+    <button class="btn btn-primary" type="submit">Activar y entrar</button>
+  </form>
+{% endblock %}

@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block titulo %}Agentes · {{ cli.nombre }}{% endblock %}
+{% block contenido %}
+  <div class="page-head">
+    <h1>Agentes · {{ cli.nombre }}</h1>
+    <a class="btn" href="/clientes/{{ cli.slug }}">← Volver al cliente</a>
+  </div>
+
+  {% if error %}<div class="note note-bad">No se pudo consultar Zabbix: {{ error }}</div>{% endif %}
+
+  <div class="card">
+    <h2>Proxy del cliente</h2>
+    {% if proxy %}
+      <p>
+        <code>{{ proxy.name }}</code> ·
+        {% if proxy.visto %}<span class="dot ok"></span>visto (lastaccess {{ proxy.lastaccess }}){% else %}<span class="dot warn"></span>nunca conectó{% endif %}
+      </p>
+    {% else %}
+      <p class="muted">Sin proxy provisionado para este cliente. Revisá el alta.</p>
+    {% endif %}
+  </div>
+
+  <div class="card">
+    <h2>Hosts</h2>
+    <p class="muted">«Vincular» asigna el host al proxy del cliente y lo suma a su grupo <code>iTier/{{ cli.nombre }}</code>.</p>
+    {% if hosts %}
+    <table class="tabla">
+      <thead><tr><th>Host</th><th>Nombre</th><th>Estado</th><th>Disponibilidad</th><th>Vinculado</th><th></th></tr></thead>
+      <tbody>
+        {% for h in hosts %}
+        <tr>
+          <td><code>{{ h.host }}</code></td>
+          <td>{{ h.name }}</td>
+          <td>{{ h.estado_label }}</td>
+          <td>
+            {% if h.available == '1' %}<span class="dot ok"></span>{% elif h.available == '2' %}<span class="dot bad"></span>{% else %}<span class="dot warn"></span>{% endif %}
+            {{ h.disponibilidad }}
+          </td>
+          <td>{% if h.vinculado %}<span class="badge badge-activo">sí</span>{% else %}<span class="badge">no</span>{% endif %}</td>
+          <td class="acciones">
+            {% if not h.vinculado %}
+            <form method="post" action="/clientes/{{ cli.slug }}/agentes/vincular" class="inline">
+              <input type="hidden" name="csrf" value="{{ csrf }}">
+              <input type="hidden" name="hostid" value="{{ h.hostid }}">
+              <input type="hidden" name="host_label" value="{{ h.host }}">
+              <button class="btn btn-sm btn-primary" type="submit">Vincular</button>
+            </form>
+            {% else %}—{% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p class="muted">No hay hosts en el grupo del cliente todavía. Cuando el <code>zabbix-proxy</code> del appliance se conecte y descubra equipos, aparecerán acá.</p>
+    {% endif %}
+  </div>
+{% endblock %}

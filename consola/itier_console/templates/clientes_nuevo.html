@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block titulo %}Nuevo cliente · Consola de iTier{% endblock %}
+{% block contenido %}
+  <div class="page-head"><h1>Dar de alta un cliente</h1></div>
+  <div class="card narrow">
+    <p class="muted">Esto crea, en un paso: la <strong>entidad en GLPI</strong>, el <strong>grupo de hosts</strong> y el <strong>proxy con PSK</strong> en Zabbix, y genera el <strong>bundle de enrolamiento</strong> para el appliance del cliente.</p>
+    <form method="post" action="/clientes/nuevo" class="form">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <label>Nombre del cliente
+        <input type="text" name="nombre" placeholder="Ferretería San Martín" autofocus required>
+      </label>
+      <label>Notas <span class="muted small">(opcional)</span>
+        <textarea name="notas" rows="3" placeholder="Contacto, dirección, observaciones…"></textarea>
+      </label>
+      <button class="btn btn-primary" type="submit">Crear cliente</button>
+    </form>
+  </div>
+  {% if demo %}<p class="muted small">Modo demo: no se tocan GLPI/Zabbix reales; los identificadores son de ejemplo.</p>{% endif %}
+{% endblock %}
