@@ -1,9 +1,11 @@
 # iTier en el VPS (Fase 1 y 2)
 
-Núcleo ITSM y observabilidad de iTier sobre tu propio VPS. **Nginx Proxy Manager
-(NPM) corre en OTRO VPS de la misma LAN** y termina TLS. Corresponde a las Fases
-1 y 2 del roadmap (`docs/06-roadmap.md`): poner en marcha GLPI y Zabbix y validar
-el flujo antes de sumar la capa agéntica.
+Núcleo ITSM y observabilidad de iTier sobre tu propio VPS, servido detrás de un
+proxy que termina TLS. Camino recomendado: **Cloudflare Tunnel corriendo en este
+mismo VPS** (ver [Detrás de Cloudflare Tunnel](#detrás-de-cloudflare-tunnel)).
+Alternativa: NPM en otro VPS de la LAN. Corresponde a las Fases 1 y 2 del roadmap
+(`docs/06-roadmap.md`): poner en marcha GLPI y Zabbix y validar el flujo antes de
+sumar la capa agéntica.
 
 > **Alcance.** Esto es andamiaje de referencia, no un producto llave en mano.
 > Repasá los puntos marcados con ⚠ antes de exponer nada a internet.
@@ -18,30 +20,31 @@ el flujo antes de sumar la capa agéntica.
 | `zabbix-server` | `zabbix/zabbix-server-pgsql`             | `10051/tcp` (público)             | Recibe datos de los proxies de cada cliente. |
 | `consola`       | `itier-console` (build local)            | `${CONSOLE_PORT:-8083}/tcp` (LAN) | Plano de control: opera GLPI+Zabbix por API (login 2FA). |
 
-Como NPM está en otro VPS, **no comparte la red de Docker** con este stack: los
-frontends **publican su puerto** en el host y NPM los alcanza por
-`IP-LAN-de-este-VPS:puerto`. Atá esos puertos a la IP de la LAN con `WEB_BIND`.
-La base de datos vive en una red `interna` (`internal: true`) y **no publica
-ningún puerto**: nadie fuera del stack la alcanza.
+Los frontends **publican su puerto** en el host y el proxy los alcanza por
+`WEB_BIND:puerto`. Con Cloudflare Tunnel en este host, `WEB_BIND=127.0.0.1`
+(solo loopback: nada queda expuesto en la red ni en internet). La base de datos
+vive en una red `interna` (`internal: true`) y **no publica ningún puerto**.
+La consola habla con GLPI y Zabbix por esa red interna (nombres de servicio),
+no por los puertos publicados.
 
 ## Requisitos
 
 - Docker Engine + Compose v2 en este VPS.
-- NPM funcionando en el otro VPS, con conectividad de red (LAN) hacia este.
-- La IP de la LAN de **este** VPS (la que verá NPM), para `WEB_BIND`. Averiguala
-  con `ip -4 addr` (buscá la interfaz de la red privada, ej. `10.0.0.5`).
+- El proxy que termina TLS: **cloudflared** en este VPS (recomendado) o NPM en
+  otro VPS. Ver [Detrás de Cloudflare Tunnel](#detrás-de-cloudflare-tunnel).
+- Los hostnames (y DNS en Cloudflare) para la landing, la consola y GLPI.
 
 ## Puesta en marcha
 
 ```sh
 cd deploy/vps
 cp .env.example .env
-# editá .env: contraseñas (openssl rand -base64 24), WEB_BIND (IP LAN de este
-# VPS), puertos web, imagen de GLPI, TZ
+# editá .env: contraseñas (openssl rand -base64 24), WEB_BIND (127.0.0.1 con
+# cloudflared en el host), tokens de la consola, imagen de GLPI, TZ
 nano .env
 
 docker compose config      # valida el YAML y la interpolación de variables
-docker compose up -d
+docker compose up -d --build
 docker compose ps
 ```
 
@@ -49,26 +52,49 @@ En el primer arranque, `init/10-init-zabbix.sh` crea el rol y la base
 `zabbix`. **Solo corre con el volumen de datos vacío**: si ya inicializaste
 Postgres sin ese script, creá la base a mano o recreá el volumen.
 
-### Publicar en NPM (que está en el otro VPS)
+## Detrás de Cloudflare Tunnel
 
-En la UI de NPM, creá un *Proxy Host* por cada frontend (con su dominio y
-certificado Let's Encrypt), apuntando a la **IP de la LAN de este VPS** y el
-puerto publicado:
+`cloudflared` corre en **este mismo VPS** y abre una conexión saliente a
+Cloudflare: no hay que abrir ningún puerto entrante. TLS se termina en el borde
+de Cloudflare y el túnel entrega el tráfico a los servicios locales por HTTP en
+loopback. Por eso `WEB_BIND=127.0.0.1`: nada queda expuesto en la red del VPS.
 
-- GLPI → `http://<IP-LAN-de-este-VPS>:8884`
-- Zabbix → `http://<IP-LAN-de-este-VPS>:8885`
+### Hostnames
 
-(Reemplazá los puertos si cambiaste `GLPI_HTTP_PORT` / `ZBX_WEB_PORT`.)
+| Hostname | Servicio local | Qué sirve |
+|---|---|---|
+| `itier.pymesenlinea.com.ar` | `http://localhost:8082` | Landing pública (`landing/`) |
+| `panel.itier.pymesenlinea.com.ar` | `http://localhost:8083` | **Consola / dashboard** |
+| `itsm.itier.pymesenlinea.com.ar` | `http://localhost:8884` | GLPI (lo usan los clientes) |
+| `zabbix.itier.pymesenlinea.com.ar` | `http://localhost:8885` | Zabbix web (opcional) |
 
-**Firewall — importante.** Como estos puertos quedan escuchando en el host,
-limitá el acceso a ellos **solo desde la IP del VPS de NPM**:
+GLPI necesita hostname propio porque los clientes (glpi-agent y el agente) lo
+alcanzan por internet. Zabbix web es opcional: la consola ya opera Zabbix.
 
-- Ideal: poné `WEB_BIND` en la IP privada de este VPS para que ni siquiera
-  escuchen en la interfaz pública, **y** en el firewall permití 8884/8885 solo
-  desde la IP LAN del VPS de NPM.
-- El tráfico NPM→backend viaja por la LAN como HTTP plano. Si esa red no es de
-  confianza (ej. red compartida del proveedor), tunelizala: un **WireGuard**
-  entre ambos VPS y atá `WEB_BIND` a la IP de WireGuard.
+### Ingress
+
+Con `WEB_BIND=127.0.0.1` (y la landing con `LANDING_BIND=127.0.0.1`), cargá las
+reglas del ejemplo [`cloudflared/config.example.yml`](cloudflared/config.example.yml):
+
+- **Túnel por token (desde el panel):** Zero Trust → Networks → Tunnels → tu
+  túnel → *Public Hostnames*. Una fila por hostname; *Service* = la URL
+  `http://localhost:<puerto>` de la tabla.
+- **Túnel local (`config.yml`):** copiá el ejemplo a `/etc/cloudflared/config.yml`
+  y creá los DNS con `cloudflared tunnel route dns <túnel> <hostname>`.
+
+La consola funciona bien detrás del túnel: Cloudflare le llega por HTTPS (cookies
+`Secure`), uvicorn confía en `X-Forwarded-Proto`. **Accedé solo por el dominio
+HTTPS** (`panel.…`); si probás `http://IP:8083` directo, la cookie de sesión no
+viaja y el login “no anda”.
+
+> ⚠ El servidor Zabbix (`10051`) **no** pasa por el túnel (ver sección siguiente).
+
+### Alternativa: NPM en otro VPS
+
+Si en vez de Cloudflare usás NPM en otro VPS de la LAN: poné `WEB_BIND` en la IP
+privada de este VPS, creá un *Proxy Host* por frontend apuntando a
+`http://IP-LAN:puerto`, y limitá el firewall a la IP de NPM (o tunelizá con
+WireGuard si la LAN no es de confianza).
 
 ### El puerto 10051 (proxies de los clientes)
 
@@ -85,13 +111,14 @@ Distinto de la web: el `zabbix-proxy` de cada cliente se conecta desde
 
 La consola (servicio `consola`) habla con GLPI y Zabbix **por la red interna del
 stack** (`http://glpi` y `http://zabbix-web:8080`): no salen sus APIs a la LAN ni
-a internet. Solo publica su propio puerto (`${CONSOLE_PORT:-8083}`) para que NPM
-la alcance. Lo único manual es **generar los tokens de API** dentro de GLPI y
-Zabbix y ponerlos en `.env`.
+a internet. Solo publica su propio puerto (`${CONSOLE_PORT:-8083}`, en loopback)
+para que el túnel la alcance, y se sirve en `panel.itier.pymesenlinea.com.ar`.
+Lo único manual es **generar los tokens de API** dentro de GLPI y Zabbix y
+ponerlos en `.env`.
 
 ### 1) Token de API de GLPI
 
-Entrá a GLPI (por NPM) como administrador:
+Entrá a GLPI (por su hostname, ej. `https://itsm.itier.pymesenlinea.com.ar`) como administrador:
 
 1. **Configuración → General → pestaña API:** activá *Habilitar la API REST* y
    anotá la *URL de la API*. Asegurate de que exista un **cliente de API** con
@@ -108,7 +135,7 @@ Entrá a GLPI (por NPM) como administrador:
 
 ### 2) Token de API de Zabbix
 
-Entrá a Zabbix (por NPM) como *Super admin*:
+Entrá a Zabbix (por su hostname, ej. `https://zabbix.itier.pymesenlinea.com.ar`, o por la consola) como *Super admin*:
 
 1. **Usuarios → Tokens de API → Crear token**, asignado a un usuario con permisos
    para **crear grupos de hosts y proxies** (*Super admin*). Copiá el token: se
@@ -123,16 +150,15 @@ cd deploy/vps
 # En .env, además de los tokens:
 #   ITIER_CONSOLE_SECRET      → openssl rand -hex 32
 #   ITIER_CONSOLE_ADMIN_PASSWORD → clave del admin inicial
-#   ITIER_PUBLIC_GLPI_URL     → URL pública de GLPI por NPM (para el bundle)
-#   ITIER_ZBX_SERVER_HOST     → host público del server Zabbix (proxies de clientes)
+#   ITIER_PUBLIC_GLPI_URL     → URL pública de GLPI por el túnel (https://itsm.itier.pymesenlinea.com.ar)
+#   ITIER_ZBX_SERVER_HOST     → host DIRECTO del server Zabbix (IP/VPN; NO Cloudflare)
 nano .env
 
 docker compose up -d --build     # ahora también construye la imagen de la consola
 ```
 
-En NPM (otro VPS): *Proxy Host* → `http://<IP-LAN-de-este-VPS>:8083`, con su
-dominio (ej. `panel.tu-dominio.com`) y SSL. Limitá ese puerto por firewall a la
-IP de NPM, igual que los otros frontends.
+Publicá la consola en el túnel: hostname `panel.itier.pymesenlinea.com.ar` →
+`http://localhost:8083` (ver [Detrás de Cloudflare Tunnel](#detrás-de-cloudflare-tunnel)).
 
 ### 4) Primer login y verificación
 
@@ -152,8 +178,8 @@ IP de NPM, igual que los otros frontends.
   motor o la imagen antes de desplegar. Fijá la imagen por **digest**
   (`glpi/glpi@sha256:...`) para builds reproducibles.
 - **Instalación inicial de GLPI.** Puede requerir completar el asistente web la
-  primera vez (a través de NPM) o un comando de consola. Revisá la doc de la
-  imagen.
+  primera vez (a través de su hostname) o un comando de consola. Revisá la doc de
+  la imagen.
 - **Hardening.** Este compose aplica `no-new-privileges` y límites de log. Para
   producción sumá backups del volumen `db_data`, rotación de credenciales y
   monitoreo del propio stack.

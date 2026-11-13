@@ -13,14 +13,24 @@ CSS y JS va embebido, así que funciona servido por cualquier servidor estático
 - `build-manual.py` — generador de `manual.html` a partir del markdown.
 - `docker-compose.yml` — nginx mínimo para servir ambas páginas detrás de NPM.
 
-## Desplegar detrás de Nginx Proxy Manager
+## Desplegar detrás del proxy que termina TLS
 
-NPM corre en **otro VPS de la LAN**, así que la landing publica su puerto en el
+> **Recomendado — Cloudflare Tunnel en este host.** La landing escucha solo en
+> loopback y el túnel la publica en el dominio raíz:
+> ```sh
+> cd landing
+> echo "LANDING_BIND=127.0.0.1" > .env
+> docker compose up -d
+> ```
+> En el ingress de Cloudflare: `itier.pymesenlinea.com.ar → http://localhost:8082`
+> (ver [`deploy/vps/README.md`](../deploy/vps/README.md) → "Detrás de Cloudflare Tunnel").
+
+Alternativa — **NPM en otro VPS de la LAN**: la landing publica su puerto en el
 host (por defecto `8082`) y NPM lo alcanza por IP:puerto.
 
 ```sh
 cd landing
-# opcional: atá el puerto a la IP de la LAN de este host
+# atá el puerto a la IP de la LAN de este host
 echo "LANDING_BIND=<IP-LAN-de-este-host>" > .env
 docker compose up -d
 ```

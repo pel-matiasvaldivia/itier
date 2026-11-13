@@ -1,8 +1,15 @@
 # Despliegue de iTier
 
 Manifiestos de despliegue para la topología real de este proyecto: el núcleo en
-un **VPS propio**, con **Nginx Proxy Manager (NPM) en otro VPS de la misma LAN**,
-y el **agente en modo local** en la LAN de cada cliente.
+un **VPS propio**, fronteado por un proxy que termina TLS, y el **agente en modo
+local** en la LAN de cada cliente.
+
+> **Proxy TLS.** Camino recomendado: **Cloudflare Tunnel en el mismo VPS del
+> núcleo** (sin puertos entrantes; landing en el raíz, consola/GLPI/Zabbix en
+> subdominios). Ver [`vps/README.md` → "Detrás de Cloudflare Tunnel"](vps/README.md).
+> Alternativa: NPM en otro VPS de la LAN (lo que describe el diagrama de abajo).
+> El `10051` de Zabbix (proxies de clientes) es TCP crudo y va directo, nunca por
+> el túnel HTTP.
 
 ```
                          INTERNET

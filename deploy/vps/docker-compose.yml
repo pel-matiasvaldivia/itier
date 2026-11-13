@@ -1,17 +1,19 @@
-# iTier — Fase 1 y 2 en el VPS propio, con NPM en OTRO VPS de la misma LAN.
+# iTier — Fase 1 y 2 en el VPS propio. El stack se sirve detrás de un proxy que
+# termina TLS: Cloudflare Tunnel en ESTE host (recomendado), o NPM en otro VPS.
 #
 # Núcleo ITSM (GLPI) + eventos/métricas (Zabbix), sobre un único PostgreSQL con
 # dos bases (glpi y zabbix).
 #
-# Topología: como Nginx Proxy Manager corre en un VPS distinto, no comparte la
-# red de Docker con este stack; por eso los frontends PUBLICAN su puerto en el
-# host y NPM los alcanza por `IP-LAN-de-este-VPS:puerto`:
+# Topología: los frontends PUBLICAN su puerto en el host y el proxy los alcanza
+# por `WEB_BIND:puerto`:
 #   - GLPI        → ${GLPI_HTTP_PORT:-8884}/tcp
 #   - Zabbix web  → ${ZBX_WEB_PORT:-8885}/tcp
 #   - Consola     → ${CONSOLE_PORT:-8083}/tcp  (plano de control; opera GLPI+Zabbix)
-# Atá esos puertos a la IP de la LAN (WEB_BIND) y limitá el firewall al VPS de
-# NPM. El puerto 10051/tcp (servidor Zabbix) es aparte: lo usan los zabbix-proxy
-# remotos de cada cliente por internet. La base de datos NO publica puertos.
+# Con Cloudflare Tunnel en este host: WEB_BIND=127.0.0.1 (solo loopback, nada
+# expuesto) y el ingress apunta a http://localhost:<puerto>. Con NPM en otra VPS:
+# WEB_BIND=IP-LAN y firewall al VPS de NPM. El 10051/tcp (servidor Zabbix) es
+# aparte y TCP crudo: NO pasa por el túnel HTTP de Cloudflare — los zabbix-proxy
+# de los clientes lo alcanzan directo (IP/VPN). La base de datos NO publica puertos.
 #
 # Requisitos previos:
 #   - Copiar .env.example a .env y completar contraseñas, WEB_BIND y puertos.

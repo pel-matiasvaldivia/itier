@@ -1,14 +1,16 @@
-# Landing de iTier — sitio estático, con NPM en otro VPS de la misma LAN.
+# Landing de iTier — sitio estático detrás de un proxy que termina TLS.
 #
-# Sirve index.html y manual.html con un nginx mínimo. Como NPM corre en otro VPS
-# y no comparte la red de Docker, la landing PUBLICA su puerto en el host y NPM
-# lo alcanza por IP-LAN:puerto.
+# Sirve index.html y manual.html con un nginx mínimo. PUBLICA su puerto en el
+# host y el proxy lo alcanza por LANDING_BIND:puerto.
 #
-# En NPM (en el otro VPS): Proxy Host
+# Recomendado — Cloudflare Tunnel en ESTE host: LANDING_BIND=127.0.0.1 (solo
+# loopback) y en el ingress:
+#   itier.pymesenlinea.com.ar → http://localhost:${LANDING_PORT:-8082}
+# (ver deploy/vps/README.md → "Detrás de Cloudflare Tunnel").
+#
+# Alternativa — NPM en otro VPS: LANDING_BIND=IP-LAN y Proxy Host
 #   itier.pymesenlinea.com.ar → http://<IP-LAN-de-este-host>:${LANDING_PORT:-8082}
-#   (pedí el certificado Let's Encrypt desde la misma pantalla).
-#
-# Atá LANDING_BIND a la IP de la LAN y limitá el firewall a la IP del VPS de NPM.
+# limitando el firewall a la IP del VPS de NPM.
 
 name: itier-landing
 
