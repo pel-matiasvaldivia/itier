@@ -41,6 +41,36 @@
   {% endif %}
 
   <section class="card">
+    <div class="page-head" style="margin-bottom:.75rem">
+      <h2 style="margin:0">Tickets recientes</h2>
+      <a class="btn btn-sm" href="/tickets">Ver todos →</a>
+    </div>
+    {% if error_tickets %}<div class="note note-bad">No se pudo leer GLPI: {{ error_tickets }}</div>{% endif %}
+    {% if tickets %}
+    <table class="tabla">
+      <thead>
+        <tr><th>#</th><th>Cliente</th><th>Asunto</th><th>Estado</th><th>Prioridad</th><th>Técnico</th><th>Fecha</th></tr>
+      </thead>
+      <tbody>
+        {% for t in tickets %}
+        <tr>
+          <td><a href="/tickets/{{ t.id }}">{{ t.id }}</a></td>
+          <td>{{ t.cliente }}</td>
+          <td><a href="/tickets/{{ t.id }}">{{ t.name }}</a></td>
+          <td><span class="badge">{{ t.estado_label }}</span></td>
+          <td>{{ t.prioridad_label }}</td>
+          <td>{{ t.tecnico or '—' }}</td>
+          <td class="muted nowrap">{{ t.date or '—' }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% elif not error_tickets %}
+    <p class="muted">No hay tickets todavía. Cuando se creen (desde la consola o en GLPI), aparecen acá.</p>
+    {% endif %}
+  </section>
+
+  <section class="card">
     <h2>Accesos rápidos</h2>
     <div class="quick">
       <a href="/clientes/nuevo">Dar de alta un cliente →</a>

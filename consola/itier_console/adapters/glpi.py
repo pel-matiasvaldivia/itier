@@ -42,6 +42,9 @@ _DEMO_TICKETS = [
 # coherente entre requests sin tocar GLPI real.
 _DEMO_TICKETS_EXTRA: dict[int, dict] = {}
 
+# Técnico asignado por ticket (demo).
+_DEMO_TECNICOS: dict[int, str] = {1042: "María Técnica", 1041: "", 1038: "Juan Soporte"}
+
 # status GLPI: 1 nuevo, 2 en curso (asignado), 3 en curso (planificado),
 #              4 en espera, 5 resuelto, 6 cerrado.
 ESTADOS_TICKET = {
@@ -57,6 +60,7 @@ class GLPIClient:
         self._base = f"{cfg.glpi_url}{cfg.glpi_apirest_path}" if cfg.glpi_url else ""
         self._session_token: str | None = None
         self._http: httpx.Client | None = None
+        self._users_cache: dict[int, str] = {}
 
     def __enter__(self) -> "GLPIClient":
         return self
@@ -186,6 +190,46 @@ class GLPIClient:
             datos = [t for t in datos if str(t.get("entities_id")) == str(entity_id)]
         datos.sort(key=lambda t: t.get("id", 0) or 0, reverse=True)
         return datos
+
+    def tecnico_de_ticket(self, ticket_id: int) -> str:
+        """Técnico(s) asignado(s) a un ticket.
+
+        El asignado no es un campo del ticket: es un actor (Ticket_User con
+        type=2). Se leen los actores y se devuelven los nombres de los de tipo 2.
+        """
+        if self.demo:
+            return _DEMO_TECNICOS.get(ticket_id, "")
+        try:
+            recs = self._get(f"/Ticket/{ticket_id}/Ticket_User", params={"expand_dropdowns": "true"})
+        except AdapterError:
+            return ""
+        if not isinstance(recs, list):
+            return ""
+        nombres: list[str] = []
+        for r in recs:
+            if str(r.get("type")) != "2":  # 1=solicitante, 2=asignado, 3=observador
+                continue
+            u = r.get("users_id")
+            if u in (None, "", 0, "0"):
+                continue
+            if isinstance(u, str) and not u.isdigit():
+                nombres.append(u)  # expand_dropdowns ya trajo el nombre
+            else:
+                nombres.append(self._nombre_usuario(int(u)))
+        return ", ".join(n for n in nombres if n)
+
+    def _nombre_usuario(self, uid: int) -> str:
+        if uid in self._users_cache:
+            return self._users_cache[uid]
+        nombre = str(uid)
+        try:
+            u = self._get(f"/User/{uid}")
+            full = " ".join(p for p in [u.get("realname") or "", u.get("firstname") or ""] if p).strip()
+            nombre = full or u.get("name") or str(uid)
+        except AdapterError:
+            pass
+        self._users_cache[uid] = nombre
+        return nombre
 
     def ver_ticket(self, ticket_id: int) -> dict:
         if self.demo:

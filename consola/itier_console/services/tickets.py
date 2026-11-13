@@ -22,9 +22,26 @@ def listar(cfg, entity_id: int | None = None, limit: int = 100) -> list[dict]:
         return [_enriquecer(t) for t in g.listar_tickets(entity_id=entity_id, limit=limit)]
 
 
+def recientes(cfg, limit: int = 10) -> list[dict]:
+    """Tickets más recientes (de todos los clientes) con técnico asignado.
+
+    Para el Tablero. Enriquece cada uno con estado/prioridad y el técnico (lo que
+    cuesta una llamada por ticket, por eso se acota con `limit`). Una sola sesión.
+    """
+    with glpi_mod.cliente(cfg) as g:
+        salida = []
+        for t in g.listar_tickets(limit=limit)[:limit]:
+            t = _enriquecer(t)
+            t["tecnico"] = g.tecnico_de_ticket(int(t["id"]))
+            salida.append(t)
+        return salida
+
+
 def ver(cfg, ticket_id: int) -> dict:
     with glpi_mod.cliente(cfg) as g:
-        return _enriquecer(g.ver_ticket(ticket_id))
+        t = _enriquecer(g.ver_ticket(ticket_id))
+        t["tecnico"] = g.tecnico_de_ticket(int(t["id"]))
+        return t
 
 
 def crear(cfg, titulo: str, contenido: str, entity_id: int, priority: int = 3) -> int:

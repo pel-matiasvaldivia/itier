@@ -65,6 +65,8 @@ secret = m.group(1) if m else ""
 check("enrolar: se muestra el secreto TOTP", bool(secret))
 r = c.post("/login/2fa/enrolar", data={"code": pyotp.TOTP(secret).now(), "csrf": csrf_de(html)})
 check("2FA enrolado → entra al tablero", r.url.path == "/" and "Tablero" in r.text, r.url.path)
+check("dashboard: panel de tickets recientes", "Tickets recientes" in r.text)
+check("dashboard: ticket con asunto y técnico", "No anda el correo" in r.text and "María Técnica" in r.text)
 
 # 5) Rutas protegidas accesibles
 check("clientes 200", c.get("/clientes").status_code == 200)

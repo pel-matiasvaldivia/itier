@@ -60,7 +60,15 @@ def handler(request: httpx.Request) -> httpx.Response:
             return httpx.Response(201, json={"id": 42})
         return httpx.Response(200, json=[{"id": 0, "name": "Root"}])
     if "/Ticket_User" in p:
-        return httpx.Response(201, json={"id": 1})
+        if request.method == "POST":
+            return httpx.Response(201, json={"id": 1})
+        # GET /Ticket/{id}/Ticket_User → actores (type 2 = asignado).
+        return httpx.Response(200, json=[
+            {"tickets_id": 77, "users_id": 7, "type": 2},
+            {"tickets_id": 77, "users_id": 3, "type": 1},
+        ])
+    if "/User/" in p:
+        return httpx.Response(200, json={"id": 7, "realname": "Pérez", "firstname": "Ana", "name": "aperez"})
     if "/Ticket" in p:
         if request.method == "POST":
             return httpx.Response(201, json={"id": 77})
@@ -120,6 +128,8 @@ with glpi_mod.cliente(cfg) as g:
     check("glpi.listar_tickets ordena por id desc", len(tks) == 2 and tks[0]["id"] == 1050)
     tks2 = g.listar_tickets(entity_id=2)
     check("glpi.listar_tickets filtra por entidad client-side", len(tks2) == 1 and tks2[0]["id"] == 1042)
+    tec = g.tecnico_de_ticket(77)
+    check("glpi.tecnico_de_ticket resuelve el asignado (type=2)", tec == "Pérez Ana", tec)
     tid = g.crear_ticket("Asunto", "cuerpo", 2, 4)
     check("glpi.crear_ticket parsea id", tid == 77, tid)
 

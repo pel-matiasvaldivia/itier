@@ -11,6 +11,7 @@
     <p>
       <span class="badge">{{ t.estado_label }}</span>
       <span class="badge">Prioridad: {{ t.prioridad_label }}</span>
+      <span class="badge">Técnico: {{ t.tecnico or 'sin asignar' }}</span>
       {% if t.date %}<span class="muted">· {{ t.date }}</span>{% endif %}
     </p>
     {% if t.content %}<div class="ticket-body">{{ t.content }}</div>{% endif %}
