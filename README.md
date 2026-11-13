@@ -24,7 +24,7 @@ que aprenda ITIL, ni que contrate un ingeniero, ni que exponga sus datos a una n
 | **Hardware** | Mini-PC x86 (appliance estándar) · VM (4 vCPU/8 GB) · Raspberry Pi 5 (**solo** como sonda remota) |
 
 > ⚠️ **Corrección a la premisa inicial.** La Raspberry Pi 5 **no** es adecuada como appliance
-> completo: el stack (GLPI + PostgreSQL + colectores + agente) supera cómodamente su presupuesto
+> completo: el stack (GLPI + MariaDB + colectores + agente) supera cómodamente su presupuesto
 > de RAM e I/O, y el ecosistema Docker ARM64 tiene huecos en imágenes de terceros. La Pi sí es
 > excelente en un rol acotado: **sonda de sitio remoto** (descubrimiento + túnel, sin ITSM local).
 > Ver [ADR-0007](docs/adr/ADR-0007-perfiles-de-hardware.md).

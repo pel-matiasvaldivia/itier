@@ -26,7 +26,7 @@ Hay que validar si aguanta el stack completo.
 
 ### Por qué la Pi no sostiene el stack completo
 
-1. **RAM.** El stack son GLPI (PHP-FPM + nginx), PostgreSQL, Zabbix Proxy, el runtime del
+1. **RAM.** El stack son GLPI (PHP-FPM + nginx), MariaDB, Zabbix Proxy, el runtime del
    agente y los servidores MCP. La guía de despliegue de GLPI 11 en Docker ya pide 2 GB
    solo para GLPI; sumado el resto, se llega al techo de la Pi sin margen operativo.
 

@@ -30,7 +30,7 @@ importante.
 **Alcance**
 - Appliance empaquetado: mini-PC con imagen reproducible, arranque verificado, disco cifrado
 - Enrolamiento y túnel mTLS saliente contra el plano de control
-- GLPI 11 + PostgreSQL desplegados y hardened
+- GLPI 11 + MariaDB desplegados y hardened
 - GLPI Agent: inventario de endpoints y descubrimiento SNMP de red
 - Inventario remoto sin agente (WinRM/SSH) para servidores
 - Plano de control mínimo: registro de appliances, salud de flota, actualizaciones firmadas

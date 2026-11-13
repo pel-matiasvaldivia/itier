@@ -14,7 +14,8 @@ sumar la capa agéntica.
 
 | Servicio        | Imagen                                   | Publicado en el host              | Rol |
 |-----------------|------------------------------------------|-----------------------------------|-----|
-| `db`            | `postgres:16-alpine`                     | **nada** (solo red interna)       | Un motor, dos bases: `glpi` y `zabbix`. |
+| `db`            | `postgres:16-alpine`                     | **nada** (solo red interna)       | PostgreSQL de Zabbix. |
+| `mariadb`       | `mariadb:11.4` (parametrizable)          | **nada** (solo red interna)       | MariaDB de GLPI (GLPI **no** soporta Postgres). |
 | `glpi`          | `glpi/glpi:11.0` (parametrizable)        | `${GLPI_HTTP_PORT:-8884}/tcp` (LAN) | CMDB, ITAM, tickets, catálogo. |
 | `zabbix-web`    | `zabbix/zabbix-web-nginx-pgsql`          | `${ZBX_WEB_PORT:-8885}/tcp` (LAN)   | Frontend de Zabbix. |
 | `zabbix-server` | `zabbix/zabbix-server-pgsql`             | `10051/tcp` (público)             | Recibe datos de los proxies de cada cliente. |
@@ -22,8 +23,9 @@ sumar la capa agéntica.
 
 Los frontends **publican su puerto** en el host y el proxy los alcanza por
 `WEB_BIND:puerto`. Con Cloudflare Tunnel en este host, `WEB_BIND=127.0.0.1`
-(solo loopback: nada queda expuesto en la red ni en internet). La base de datos
-vive en una red `interna` (`internal: true`) y **no publica ningún puerto**.
+(solo loopback: nada queda expuesto en la red ni en internet). Las bases de datos
+(Postgres y MariaDB) viven en una red `interna` (`internal: true`) y **no publican
+ningún puerto**.
 La consola habla con GLPI y Zabbix por esa red interna (nombres de servicio),
 no por los puertos publicados.
 
@@ -181,12 +183,12 @@ Publicá la consola en el túnel: hostname `itier-panel.pymesenlinea.com.ar` →
 
 ## ⚠ Puntos a verificar
 
-- **Imagen de GLPI 11.** Es reciente (salió 2025-10). Confirmá contra su
-  documentación: (1) que la imagen que fijes en `GLPI_IMAGE` soporte
-  **PostgreSQL**, y (2) los nombres exactos de sus variables de entorno
-  (`GLPI_DB_*`). Si la imagen elegida solo soporta MariaDB/MySQL, cambiá el
-  motor o la imagen antes de desplegar. Fijá la imagen por **digest**
-  (`glpi/glpi@sha256:...`) para builds reproducibles.
+- **Base de datos de GLPI: MariaDB (no Postgres).** GLPI 11 **no soporta
+  PostgreSQL**; requiere MySQL 8.0+ / MariaDB 10.6+
+  ([prerequisites](https://glpi-install.readthedocs.io/en/latest/prerequisites.html)).
+  Por eso GLPI corre sobre el contenedor `mariadb` y Zabbix sobre `db` (Postgres).
+  La imagen oficial `glpi/glpi` auto-instala cuando están las cinco `GLPI_DB_*`.
+  Fijá las imágenes por **digest** para builds reproducibles.
 - **Instalación inicial de GLPI.** Puede requerir completar el asistente web la
   primera vez (a través de su hostname) o un comando de consola. Revisá la doc de
   la imagen.

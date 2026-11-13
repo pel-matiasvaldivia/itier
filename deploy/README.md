@@ -48,7 +48,7 @@ local** en la LAN de cada cliente.
 
 | Carpeta            | Dónde corre           | Qué levanta | Fase |
 |--------------------|-----------------------|-------------|------|
-| [`vps/`](vps/)     | Tu VPS (NPM en otro VPS de la LAN) | PostgreSQL + GLPI + Zabbix (server y web) | 1 y 2 |
+| [`vps/`](vps/)     | Tu VPS (detrás de Cloudflare Tunnel o NPM) | GLPI + MariaDB + Zabbix + PostgreSQL + consola | 1 y 2 |
 | [`cliente/`](cliente/) | LAN de cada cliente | itier-agent (GHCR) + zabbix-proxy + glpi-agent | local |
 
 Cada carpeta tiene su propio `README.md`, `docker-compose.yml` y `.env.example`.

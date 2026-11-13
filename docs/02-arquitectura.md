@@ -114,7 +114,7 @@ graph LR
 |---|---|---|
 | **Colectores** | Inventario de hardware/software, descubrimiento SNMP de red, inventario remoto sin agente | GLPI Agent |
 | **Eventos** | Métricas, umbrales, disponibilidad, low-level discovery | Zabbix Proxy |
-| **CMDB / ITSM** | Elementos de configuración y sus relaciones, tickets, catálogo, contratos y garantías | GLPI 11 + PostgreSQL |
+| **CMDB / ITSM** | Elementos de configuración y sus relaciones, tickets, catálogo, contratos y garantías | GLPI 11 + MariaDB |
 | **Motor de reglas** | Primera línea determinista: correlación de eventos, deduplicación, supresión de ruido, disparo de playbooks conocidos | Reglas declarativas (YAML) |
 | **Bucle del agente** | Diagnóstico, correlación multi-sistema, planificación de remediación, redacción de tickets y comunicaciones | Anthropic SDK, tool runner |
 | **Motor de políticas** | Decide `permitir` / `aprobar` / `denegar` por acción, CI, criticidad y ventana horaria | OPA (Rego) o rulebook tipado |
@@ -247,7 +247,7 @@ de permiso — nunca ampliar el alcance de una existente.
 | **Virtual** | VM 4 vCPU / 8–16 GB / 100 GB en Proxmox, Hyper-V, VMware o nube del cliente | Stack completo | Cliente con virtualización propia |
 | **Grande** | Mini-PC i5/Ryzen, 32 GB, NVMe 512 GB | Stack completo + retención larga | 150–250+ dispositivos |
 
-**Por qué la Pi no es el appliance estándar:** el stack completo (GLPI + PostgreSQL +
+**Por qué la Pi no es el appliance estándar:** el stack completo (GLPI + MariaDB +
 Zabbix + colectores + agente) necesita más RAM e I/O de lo que la Pi ofrece cómodamente,
 y el ecosistema Docker ARM64 tiene huecos en imágenes de terceros que un x86 no tiene.
 Un mini-PC N100 cuesta lo mismo o poco más, consume ~10 W y elimina toda esa clase de

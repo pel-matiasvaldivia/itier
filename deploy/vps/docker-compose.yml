@@ -1,8 +1,9 @@
 # iTier — Fase 1 y 2 en el VPS propio. El stack se sirve detrás de un proxy que
 # termina TLS: Cloudflare Tunnel en ESTE host (recomendado), o NPM en otro VPS.
 #
-# Núcleo ITSM (GLPI) + eventos/métricas (Zabbix), sobre un único PostgreSQL con
-# dos bases (glpi y zabbix).
+# Núcleo ITSM (GLPI) + eventos/métricas (Zabbix). GLPI requiere MySQL/MariaDB
+# (NO soporta Postgres), así que corre sobre su propia MariaDB; Zabbix sobre
+# Postgres. Dos motores, cada uno con lo suyo.
 #
 # Topología: los frontends PUBLICAN su puerto en el host y el proxy los alcanza
 # por `WEB_BIND:puerto`:
@@ -33,12 +34,13 @@ x-comun: &comun
 
 services:
 
-  # ── Base de datos compartida ──────────────────────────────────────────────
+  # ── Base de datos de Zabbix (PostgreSQL) ──────────────────────────────────
   db:
     <<: *comun
     image: postgres:16-alpine
     environment:
-      # Base y rol de GLPI: los crea el propio entrypoint de Postgres.
+      # Superusuario de Postgres (lo usa el init de Zabbix). GLPI NO usa Postgres
+      # (requiere MySQL/MariaDB): tiene su propio contenedor `mariadb`.
       POSTGRES_DB: ${POSTGRES_DB:-glpi}
       POSTGRES_USER: ${POSTGRES_USER:-glpi}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?falta POSTGRES_PASSWORD}
@@ -56,6 +58,29 @@ services:
       interval: 10s
       timeout: 5s
       retries: 6
+
+  # ── Base de datos de GLPI (MariaDB) ───────────────────────────────────────
+  # GLPI 11 NO soporta PostgreSQL: requiere MySQL 8.0+ / MariaDB 10.6+
+  # (https://glpi-install.readthedocs.io/en/latest/prerequisites.html). Por eso
+  # tiene su propia base, separada del Postgres de Zabbix. El contenedor crea la
+  # base y el usuario de GLPI en el primer arranque.
+  mariadb:
+    <<: *comun
+    image: ${GLPI_DB_IMAGE:-mariadb:11.4}
+    environment:
+      MARIADB_DATABASE: ${GLPI_DB_NAME:-glpi}
+      MARIADB_USER: ${GLPI_DB_USER:-glpi}
+      MARIADB_PASSWORD: ${GLPI_DB_PASSWORD:?falta GLPI_DB_PASSWORD}
+      MARIADB_ROOT_PASSWORD: ${GLPI_DB_ROOT_PASSWORD:?falta GLPI_DB_ROOT_PASSWORD}
+      TZ: ${TZ:-America/Argentina/Buenos_Aires}
+    volumes:
+      - glpi_db:/var/lib/mysql
+    networks: [interna]
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
 
   # ── Arreglo de permisos de los volúmenes de GLPI ──────────────────────────
   # GLPI corre como usuario no-root; los volúmenes glpi_files/glpi_config nacen
@@ -86,17 +111,17 @@ services:
     # parametriza para poder fijar un digest/tag verificado sin editar el YAML.
     image: ${GLPI_IMAGE:-glpi/glpi:11.0}
     depends_on:
-      db: { condition: service_healthy }
+      mariadb: { condition: service_healthy }
       glpi-init: { condition: service_completed_successfully }
     environment:
-      # ⚠ VERIFICAR estos nombres contra la doc de la imagen que uses. GLPI
-      #   soporta PostgreSQL; confirmá que la imagen elegida también.
-      GLPI_DB_ENGINE: pgsql
-      GLPI_DB_HOST: db
-      GLPI_DB_PORT: "5432"
-      GLPI_DB_NAME: ${POSTGRES_DB:-glpi}
-      GLPI_DB_USER: ${POSTGRES_USER:-glpi}
-      GLPI_DB_PASSWORD: ${POSTGRES_PASSWORD:?falta POSTGRES_PASSWORD}
+      # Imagen oficial glpi/glpi: con estas 5 variables presentes, hace la
+      # auto-instalación en el primer arranque. GLPI usa MySQL/MariaDB (no
+      # Postgres); el puerto MySQL por defecto es 3306.
+      GLPI_DB_HOST: mariadb
+      GLPI_DB_PORT: "3306"
+      GLPI_DB_NAME: ${GLPI_DB_NAME:-glpi}
+      GLPI_DB_USER: ${GLPI_DB_USER:-glpi}
+      GLPI_DB_PASSWORD: ${GLPI_DB_PASSWORD:?falta GLPI_DB_PASSWORD}
       TZ: ${TZ:-America/Argentina/Buenos_Aires}
     volumes:
       - glpi_files:/var/glpi/files
@@ -209,6 +234,7 @@ networks:
 
 volumes:
   db_data:
+  glpi_db:
   glpi_files:
   glpi_config:
   consola_data:
