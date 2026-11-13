@@ -108,14 +108,18 @@ def alta_cliente(conn: sqlite3.Connection, cfg, actor: str, nombre: str, notas: 
 
 def bundle_env(cfg, cli: dict) -> str:
     """Fragmento de .env drop-in para deploy/cliente/ del appliance del cliente."""
-    glpi = cfg.public_glpi_url or "https://itsm.tu-dominio.com"
-    server = cfg.zbx_server_host or "tu-vps.tu-dominio.com"
+    glpi = cfg.public_glpi_url or "https://itier-itsm.tu-dominio.com"
+    server = cfg.zbx_server_host or "172.16.0.4"
     return (
         f"# ── Bundle de enrolamiento iTier — cliente: {cli['nombre']} ──\n"
         f"# Generado por la consola. Pegá estas líneas en deploy/cliente/.env del appliance,\n"
-        f"# y guardá la PSK (abajo) en el archivo ZBX_TLSPSKFILE.\n"
+        f"# guardá la PSK (abajo) en ./enc/proxy.psk y completá MESH_NODE_TOKEN con el\n"
+        f"# token del nodo de la malla de Cloudflare para este cliente.\n"
         f"ITIER_TENANT={cli['slug']}\n"
         f"ITIER_GLPI_URL={glpi}\n"
+        f"# Token del nodo mesh (Cloudflare Zero Trust → WARP Connector). Secreto, por cliente.\n"
+        f"MESH_NODE_TOKEN=\n"
+        f"# IP privada del server Zabbix dentro de la malla (no se expone a internet).\n"
         f"ZBX_SERVER_HOST={server}\n"
         f"ZBX_TLSCONNECT=psk\n"
         f"ZBX_TLSPSKIDENTITY={cli['psk_identity']}\n"

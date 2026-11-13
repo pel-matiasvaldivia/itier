@@ -171,7 +171,7 @@ cd deploy/vps
 #   ITIER_CONSOLE_SECRET      → openssl rand -hex 32
 #   ITIER_CONSOLE_ADMIN_PASSWORD → clave del admin inicial
 #   ITIER_PUBLIC_GLPI_URL     → URL pública de GLPI por el túnel (https://itier-itsm.pymesenlinea.com.ar)
-#   ITIER_ZBX_SERVER_HOST     → host DIRECTO del server Zabbix (IP/VPN; NO Cloudflare)
+#   ITIER_ZBX_SERVER_HOST     → IP del server Zabbix en la malla WARP (p. ej. 172.16.0.4; ADR-0009)
 nano .env
 
 docker compose pull consola && docker compose up -d consola   # baja la imagen de GHCR

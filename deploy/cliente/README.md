@@ -12,19 +12,30 @@ con el VPS **solo de forma saliente**: ningún puerto entrante.
 
 ## Piezas
 
-| Servicio       | Red              | Sentido del tráfico | Rol |
-|----------------|------------------|---------------------|-----|
-| `itier-agent`  | puente, solo salida | → API de GLPI (VPS), → LLM | Capa agéntica (imagen propia). Sin entrada. |
-| `zabbix-proxy` | `host`           | → servidor Zabbix del VPS (10051) | Recolecta la LAN y empuja al VPS. |
-| `glpi-agent`   | `host`           | → GLPI del VPS      | Inventario y descubrimiento de la LAN. |
+| Servicio          | Red                         | Sentido del tráfico | Rol |
+|-------------------|-----------------------------|---------------------|-----|
+| `cloudflare-mesh` | puente + interfaz WARP       | → malla de Cloudflare | Nodo de la malla: ruta privada hasta el server Zabbix del VPS. |
+| `zabbix-proxy`    | comparte la del nodo mesh    | → servidor Zabbix del VPS (10051) **por la malla** | Recolecta la LAN y empuja al VPS. |
+| `itier-agent`     | puente, solo salida          | → API de GLPI (VPS), → LLM (HTTPS) | Capa agéntica (imagen propia). Sin entrada. |
+| `glpi-agent`      | `host`                       | → GLPI del VPS (HTTPS) | Inventario y descubrimiento de la LAN. |
 
-`zabbix-proxy` y `glpi-agent` usan `network_mode: host` porque necesitan ver la
-LAN para monitorear e inventariar. El `itier-agent` **no**: queda aislado en una
-red puente de solo salida y no expone nada.
+**Dos caminos de salida, a propósito:**
+
+- **HTTP(S) → Cloudflare Tunnel.** GLPI y el LLM son endpoints HTTPS con hostname
+  público (p. ej. `https://itier-itsm.tu-dominio`); `itier-agent` y `glpi-agent`
+  los alcanzan así. No hay IP ni puerto expuestos del lado del cliente.
+- **TCP 10051 → malla WARP de Cloudflare.** El `zabbix-proxy` habla TCP crudo con
+  el servidor Zabbix, y eso **no** pasa por un túnel HTTP. En vez de abrir el
+  10051 público del VPS, el `cloudflare-mesh` da una ruta **privada y cifrada**
+  hasta el server (una IP de la malla, p. ej. `172.16.0.4`). El proxy comparte la
+  red del nodo mesh (`network_mode: service:cloudflare-mesh`), así sale por WARP.
+  Ver [ADR-0009](../../docs/adr/ADR-0009-transporte-proxy-zabbix-cloudflare-mesh.md).
+
+El `itier-agent` queda aislado en una red puente de solo salida y no expone nada.
 
 ## Requisitos de hardware
 
-- **Appliance estándar:** mini-PC x86 (N100, 16 GB RAM, NVMe). Corre las tres
+- **Appliance estándar:** mini-PC x86 (N100, 16 GB RAM, NVMe). Corre las cuatro
   piezas cómodo.
 - **Perfil sonda (Raspberry Pi 5):** solo recolección (proxy + inventario +
   túnel). La imagen del agente es multi-arch (amd64/arm64), pero el ITSM pesado
@@ -35,12 +46,19 @@ red puente de solo salida y no expone nada.
 ```sh
 cd deploy/cliente
 cp .env.example .env
-nano .env      # ITIER_TENANT, ITIER_GLPI_URL, credenciales, ZBX_SERVER_HOST
+nano .env      # pegá el bundle de la consola: ITIER_TENANT, ITIER_GLPI_URL,
+               # MESH_NODE_TOKEN, ZBX_SERVER_HOST (IP del mesh) y las 3 de PSK
 
-docker compose config
-docker compose up -d
+# PSK del proxy (del bundle). ./enc ya está montado en el proxy.
+mkdir -p enc && printf '%s' '<PSK-del-bundle>' > enc/proxy.psk && chmod 600 enc/proxy.psk
+
+docker compose config          # chequeo: sin "falta MESH_NODE_TOKEN / ITIER_TENANT / ..."
+docker compose up -d           # las cuatro piezas (el proxy espera al nodo mesh)
 docker compose ps
 ```
+
+> Para levantar **solo** el proxy y su nodo de red: `docker compose up -d zabbix-proxy`
+> (arrastra a `cloudflare-mesh` por la dependencia).
 
 ### Verificar el agente
 
@@ -71,8 +89,10 @@ Definí **al menos una** de las dos. Si faltan ambas, `/readyz` devuelve 503.
 
 ## Seguridad del proxy Zabbix
 
-El `zabbix-proxy` se conecta de forma saliente al VPS por 10051. En internet,
-**no dependas solo del firewall**: cifrá proxy↔servidor con PSK.
+El `zabbix-proxy` ya **no** sale a un 10051 público: va por la malla WARP, que
+cifra y aísla el transporte. Encima de eso, usamos **PSK** para que el servidor
+**autentique** al proxy (defensa en profundidad: la malla protege la red, la PSK
+la identidad). El 10051 del VPS puede quedar cerrado a internet.
 
 **Camino normal (con la consola de iTier).** Al dar de alta el cliente, la
 consola ya creó el proxy en el servidor Zabbix del VPS **con su PSK** y te armó
@@ -97,6 +117,23 @@ openssl rand -hex 32 > enc/proxy.psk && chmod 600 enc/proxy.psk
 
 ## ⚠ Puntos a verificar
 
+- **El VPS tiene que estar en la MISMA malla.** `ZBX_SERVER_HOST` es la IP del
+  servidor Zabbix **dentro** de la malla de Cloudflare. Si el VPS no está unido a
+  la malla (o esa IP es otra), el proxy no llega. Lo configurás del lado de
+  Cloudflare; el valor correcto viene en el bundle.
+- **Split-tunnel de la malla (clave para monitorear la LAN).** Como el proxy sale
+  por la interfaz WARP, la malla debe enrutar **solo** la subred del VPS por el
+  túnel y dejar que el resto (la LAN privada del cliente, rangos RFC1918) salga
+  **local**. Si no, el proxy intentaría sondear la LAN *a través* de Cloudflare y
+  fallaría. Revisá los *Split Tunnels* en el perfil de WARP.
+- **Agentes activos de Zabbix.** Con el proxy compartiendo la red del nodo mesh
+  (ya no `host`), el sondeo **saliente** (SNMP, chequeos pasivos, ping) funciona
+  por NAT; pero los equipos con *Zabbix agent (active)* que se conectan **hacia**
+  el proxy no lo alcanzan sin publicar puertos. Para Fase 1/2 (validar
+  proxy↔server y sondeo pasivo) no bloquea; si usás agentes activos, revisá la
+  exposición del 10051 del proxy en la LAN.
+- **`MESH_NODE_TOKEN` es secreto y por cliente.** Uno por nodo/cliente; vive solo
+  en el `.env`, nunca en git. Si se filtra, rotalo en el panel de Cloudflare.
 - **glpi-agent.** Confirmá el nombre de la imagen y sus variables de entorno
   contra la documentación oficial de glpi-agent; ajustá `GLPI_AGENT_IMAGE` y las
   claves `GLPI_AGENT_*` según corresponda. Si preferís, reemplazalo por un
@@ -105,4 +142,4 @@ openssl rand -hex 32 > enc/proxy.psk && chmod 600 enc/proxy.psk
   con Ansible, el `itier-agent` necesitará alcanzar hosts de la LAN. Ahí se
   revisita la red del servicio (hoy es solo-salida a propósito). Ese cambio se
   documentará como su propio ADR.
-- **Fijá imágenes por digest** para despliegues reproducibles.
+- **Fijá imágenes por digest** (incluida `MESH_IMAGE`) para despliegues reproducibles.

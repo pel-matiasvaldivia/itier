@@ -79,6 +79,7 @@ check("alta de cliente → detalle", r.url.path == "/clientes/prueba-srl", r.url
 det = r.text
 check("bundle tiene ITIER_TENANT", "ITIER_TENANT=prueba-srl" in det)
 check("bundle tiene PSK identity", "ZBX_TLSPSKIDENTITY=itier-prueba-srl" in det)
+check("bundle incluye MESH_NODE_TOKEN (malla Cloudflare)", "MESH_NODE_TOKEN=" in det)
 check("bundle muestra PSK (64 hex)", bool(re.search(r'id="bundle-psk">[0-9a-f]{64}<', det)))
 
 # 7) Agentes: panel + vincular

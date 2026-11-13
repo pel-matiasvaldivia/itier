@@ -54,6 +54,7 @@ ingress:
   - service: http_status:404
 
 # ⚠ El servidor Zabbix (10051/tcp) NO va acá: es TCP crudo y el túnel HTTP de
-#   Cloudflare no lo transporta. Los zabbix-proxy de los clientes deben alcanzar
-#   ese puerto por una vía directa (IP pública del VPS con firewall acotado, o
-#   una VPN). Es el valor de ITIER_ZBX_SERVER_HOST en el bundle de enrolamiento.
+#   Cloudflare no lo transporta. Los zabbix-proxy de los clientes lo alcanzan por
+#   la malla WARP de Cloudflare, a la IP PRIVADA del server dentro de la malla
+#   (ver ADR-0009) — ese es el valor de ITIER_ZBX_SERVER_HOST en el bundle. Así el
+#   10051 no se expone a internet. (Alternativa: IP pública con firewall acotado.)
