@@ -52,6 +52,17 @@ ESTADOS_TICKET = {
 }
 PRIORIDADES = {1: "Muy baja", 2: "Baja", 3: "Media", 4: "Alta", 5: "Muy alta", 6: "Mayor"}
 
+# ── Descubrimiento de red (SNMP): itemtypes de GLPI 11 + plugin GlpiInventory ──
+# ⚠ Itemtypes y campos confirmados contra el código fuente (core SNMPCredential y
+#   el plugin glpi-inventory, nov-2026), NO contra una instancia GLPI 11 viva. Si
+#   tu plugin/versión difiere, se ajusta todo acá (adaptador aislado, ADR-0001).
+IT_SNMPCRED = "SNMPCredential"                                 # core (Administración → Inventario)
+IT_IPRANGE = "PluginGlpiinventoryIPRange"                      # plugin GlpiInventory
+IT_IPRANGE_CRED = "PluginGlpiinventoryIPRange_SNMPCredential"  # link rango↔credencial
+_SNMP_VER_COD = {"1": 1, "2c": 2, "3": 3}                      # glpi_snmpcredentials.snmpversion
+_SNMP_AUTH_COD = {"MD5": 1, "SHA": 2, "SHA224": 3, "SHA256": 4, "SHA384": 5, "SHA512": 6}
+_SNMP_PRIV_COD = {"DES": 1, "AES": 2, "3DES": 3, "AES192": 4, "AES256": 5}
+
 
 class GLPIClient:
     def __init__(self, cfg):
@@ -162,6 +173,61 @@ class GLPIClient:
         if nuevo is None:
             raise AdapterError("GLPI", f"crear_entidad sin id en respuesta: {resp}")
         return int(nuevo)
+
+    # -- descubrimiento de red (SNMP) ---------------------------------------
+
+    @staticmethod
+    def _id_de(resp: Any) -> int | None:
+        if isinstance(resp, list):
+            resp = resp[0] if resp else {}
+        return resp.get("id") if isinstance(resp, dict) else None
+
+    def crear_credencial_snmp(
+        self, nombre: str, version: str, *, community: str | None = None,
+        username: str | None = None, auth_proto: str | None = None, auth_pass: str | None = None,
+        priv_proto: str | None = None, priv_pass: str | None = None,
+    ) -> int:
+        """Crea una credencial SNMP (core). Es global (no por entidad); por eso el
+        servicio prefija el nombre con el tenant, para ubicarla en la lista."""
+        if self.demo:
+            return 700 + (abs(hash(nombre)) % 99)
+        inp: dict[str, Any] = {"name": nombre, "snmpversion": _SNMP_VER_COD.get(version, 2)}
+        if version in ("1", "2c"):
+            inp["community"] = community or "public"
+        else:  # v3
+            inp["username"] = username or ""
+            if auth_proto:
+                inp["authentication"] = _SNMP_AUTH_COD.get(auth_proto.upper(), 2)
+            if auth_pass:
+                inp["auth_passphrase"] = auth_pass
+            if priv_proto:
+                inp["encryption"] = _SNMP_PRIV_COD.get(priv_proto.upper(), 2)
+            if priv_pass:
+                inp["priv_passphrase"] = priv_pass
+        cid = self._id_de(self._post(f"/{IT_SNMPCRED}", {"input": inp}))
+        if cid is None:
+            raise AdapterError("GLPI", "crear_credencial_snmp sin id en la respuesta")
+        return int(cid)
+
+    def crear_rango_ip(self, entity_id: int, nombre: str, ip_start: str, ip_end: str) -> int:
+        """Crea un rango de IP (plugin GlpiInventory), acotado a la entidad del cliente.
+        ⚠ ip_start/ip_end como string dotted-quad; confirmá el formato en tu plugin."""
+        if self.demo:
+            return 800 + (abs(hash(nombre)) % 99)
+        inp = {"name": nombre, "entities_id": entity_id, "ip_start": ip_start, "ip_end": ip_end}
+        rid = self._id_de(self._post(f"/{IT_IPRANGE}", {"input": inp}))
+        if rid is None:
+            raise AdapterError("GLPI", "crear_rango_ip sin id en la respuesta")
+        return int(rid)
+
+    def vincular_rango_credencial(self, range_id: int, cred_id: int, rank: int = 1) -> None:
+        if self.demo:
+            return
+        self._post(
+            f"/{IT_IPRANGE_CRED}",
+            {"input": {"plugin_glpiinventory_ipranges_id": range_id,
+                       "snmpcredentials_id": cred_id, "rank": rank}},
+        )
 
     # -- tickets -------------------------------------------------------------
 

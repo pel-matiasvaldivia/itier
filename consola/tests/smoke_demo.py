@@ -89,6 +89,30 @@ r = c.post("/clientes/prueba-srl/agentes/vincular",
            data={"hostid": "501", "host_label": "SRV-DC01", "csrf": csrf_de(ag)})
 check("vincular host → ok", r.status_code == 200 and "vinculado" in r.text.lower())
 
+# 7b) Descubrimiento de red: alta de rango + credencial SNMP (demo → aplicado)
+dsc = c.get("/clientes/prueba-srl/descubrimiento")
+check("descubrimiento: página carga", "Descubrimiento de red" in dsc.text)
+r = c.post("/clientes/prueba-srl/descubrimiento",
+           data={"nombre": "LAN oficina", "ip_start": "10.20.30.1", "ip_end": "10.20.30.254",
+                 "version": "2c", "community": "public", "csrf": csrf_de(dsc.text)})
+page = c.get("/clientes/prueba-srl/descubrimiento").text
+# Uso una IP que NO sea placeholder del form, así solo matchea la fila de la tabla.
+check("descubrimiento: rango aplicado en demo", "10.20.30.254" in page and "aplicado" in page)
+check("auditoria: registró descubrimiento.alta", "descubrimiento.alta" in c.get("/auditoria").text)
+# validación: IP inválida no crea el rango
+r = c.post("/clientes/prueba-srl/descubrimiento",
+           data={"nombre": "rango-malo", "ip_start": "999.0.0.1", "ip_end": "999.0.0.2",
+                 "version": "2c", "community": "public", "csrf": csrf_de(page)})
+check("descubrimiento: IP inválida rechazada", "rango-malo" not in c.get("/clientes/prueba-srl/descubrimiento").text)
+# validación: v3 sin usuario no crea el rango
+r = c.post("/clientes/prueba-srl/descubrimiento",
+           data={"nombre": "v3-sin-user", "ip_start": "10.0.0.1", "ip_end": "10.0.0.9",
+                 "version": "3", "username": "", "csrf": csrf_de(page)})
+check("descubrimiento: v3 sin usuario rechazado", "v3-sin-user" not in c.get("/clientes/prueba-srl/descubrimiento").text)
+# eliminar el rango creado (id 1 en la base demo fresca)
+r = c.post("/clientes/prueba-srl/descubrimiento/1/eliminar", data={"csrf": csrf_de(page)})
+check("descubrimiento: eliminar quita el rango", "10.20.30.254" not in c.get("/clientes/prueba-srl/descubrimiento").text)
+
 # 8) Tickets: lista + alta
 check("tickets lista demo", "No anda el correo" in c.get("/tickets").text)
 html = c.get("/tickets/nuevo").text

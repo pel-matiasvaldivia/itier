@@ -206,7 +206,10 @@ a mano** salvo excepción documentada; la fuente de verdad es el descubrimiento.
 
 **Configurar el descubrimiento (paso del operador, una vez por cliente).** Los
 rangos de IP y las credenciales SNMP **no** viven en el appliance: se definen en el
-server, en **GLPI → Administración → Inventario (plugin GlpiInventory)**:
+server. La vía recomendada es **desde la consola de iTier** (*Clientes → \<cliente\>
+→ Descubrimiento de red*): cargás los rangos y la credencial SNMP y la consola los
+crea en GLPI, en la entidad del cliente. Equivale a hacer, a mano, en
+**GLPI → Administración → Inventario (plugin GlpiInventory)**:
 
 1. Cargar los **rangos de IP** de la LAN del cliente a barrer.
 2. Cargar las **credenciales SNMP** (community v1/v2c, o usuario/claves v3) y

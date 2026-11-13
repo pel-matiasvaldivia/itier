@@ -1,0 +1,133 @@
+{% extends "base.html" %}
+{% block titulo %}Descubrimiento · {{ cli.nombre }}{% endblock %}
+{% block contenido %}
+  <div class="page-head">
+    <h1>Descubrimiento de red · {{ cli.nombre }}</h1>
+    <a class="btn" href="/clientes/{{ cli.slug }}">← Volver al cliente</a>
+  </div>
+
+  <div class="note">
+    Cargá los <strong>rangos de IP</strong> a barrer y una <strong>credencial SNMP</strong>.
+    La consola los crea en GLPI (credencial + rango del plugin GlpiInventory, en la
+    entidad de este cliente) y el <code>glpi-agent</code> del appliance toma el trabajo
+    al contactar al server. No hace falta entrar al dashboard de GLPI.
+  </div>
+
+  {% if not cli.glpi_entity_id %}
+  <div class="note note-bad">
+    Este cliente no tiene <strong>entidad GLPI</strong> (alta incompleta): no se puede
+    aplicar el descubrimiento hasta completar el alta. Revisá el detalle del cliente.
+  </div>
+  {% endif %}
+
+  <div class="card">
+    <h2>Rangos configurados</h2>
+    {% if rangos %}
+    <table class="tabla">
+      <thead><tr><th>Nombre</th><th>Rango</th><th>SNMP</th><th>Estado</th><th></th></tr></thead>
+      <tbody>
+        {% for r in rangos %}
+        <tr>
+          <td>{{ r.nombre }}</td>
+          <td><code>{{ r.ip_start }} – {{ r.ip_end }}</code></td>
+          <td>v{{ r.snmp_version }}</td>
+          <td>
+            {% if r.estado == 'aplicado' %}<span class="badge badge-activo">aplicado</span>
+            {% elif r.estado == 'error' %}<span class="badge badge-error">error</span>
+            {% else %}<span class="badge badge-provisionando">pendiente</span>{% endif %}
+            {% if r.estado == 'error' and r.detalle %}<div class="muted small">{{ r.detalle }}</div>{% endif %}
+          </td>
+          <td class="acciones">
+            {% if r.estado != 'aplicado' %}
+            <form method="post" action="/clientes/{{ cli.slug }}/descubrimiento/{{ r.id }}/reaplicar" class="inline">
+              <input type="hidden" name="csrf" value="{{ csrf }}">
+              <button class="btn btn-sm btn-primary" type="submit">Reintentar</button>
+            </form>
+            {% endif %}
+            <form method="post" action="/clientes/{{ cli.slug }}/descubrimiento/{{ r.id }}/eliminar" class="inline"
+                  onsubmit="return confirm('¿Eliminar el rango «{{ r.nombre }}» del registro? No borra lo creado en GLPI.');">
+              <input type="hidden" name="csrf" value="{{ csrf }}">
+              <button class="btn btn-sm" type="submit">Eliminar</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p class="muted">Todavía no hay rangos de descubrimiento para este cliente.</p>
+    {% endif %}
+  </div>
+
+  <div class="card">
+    <h2>Agregar rango</h2>
+    <form method="post" action="/clientes/{{ cli.slug }}/descubrimiento" class="form">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <div class="row">
+        <label>Nombre <input type="text" name="nombre" placeholder="LAN oficina" required></label>
+        <label>IP inicio <input type="text" name="ip_start" placeholder="192.168.1.1" required></label>
+        <label>IP fin <input type="text" name="ip_end" placeholder="192.168.1.254" required></label>
+        <label>Versión SNMP
+          <select name="version" id="snmp-version">
+            <option value="2c" selected>v2c</option>
+            <option value="1">v1</option>
+            <option value="3">v3</option>
+          </select>
+        </label>
+      </div>
+
+      <fieldset id="snmp-com" class="subform">
+        <legend>SNMP v1 / v2c</legend>
+        <label>Community <input type="text" name="community" placeholder="public"></label>
+      </fieldset>
+
+      <fieldset id="snmp-v3" class="subform" hidden>
+        <legend>SNMP v3</legend>
+        <div class="row">
+          <label>Usuario <input type="text" name="username" placeholder="monitor"></label>
+          <label>Auth
+            <select name="auth_proto">
+              <option value="">(ninguno)</option>
+              <option value="SHA" selected>SHA</option>
+              <option value="MD5">MD5</option>
+              <option value="SHA256">SHA256</option>
+            </select>
+          </label>
+          <label>Clave auth <input type="password" name="auth_pass" autocomplete="new-password"></label>
+        </div>
+        <div class="row">
+          <label>Privacidad
+            <select name="priv_proto">
+              <option value="">(ninguna)</option>
+              <option value="AES" selected>AES</option>
+              <option value="DES">DES</option>
+            </select>
+          </label>
+          <label>Clave priv <input type="password" name="priv_pass" autocomplete="new-password"></label>
+        </div>
+      </fieldset>
+
+      <button class="btn btn-primary" type="submit" {% if not cli.glpi_entity_id %}disabled{% endif %}>
+        Agregar y aplicar en GLPI
+      </button>
+    </form>
+    <p class="muted small">Los secretos SNMP (community / claves v3) se guardan cifrables en el
+      volumen de la consola, igual que la PSK, y se envían a GLPI. No se registran en la auditoría.</p>
+  </div>
+
+  <script>
+    (function () {
+      var sel = document.getElementById('snmp-version');
+      var com = document.getElementById('snmp-com');
+      var v3 = document.getElementById('snmp-v3');
+      if (!sel || !com || !v3) return;
+      function toggle() {
+        var es3 = sel.value === '3';
+        v3.hidden = !es3;
+        com.hidden = es3;
+      }
+      sel.addEventListener('change', toggle);
+      toggle();
+    })();
+  </script>
+{% endblock %}

@@ -21,6 +21,10 @@ roadmap (`docs/06`) menciona en todas las fases. Diseño en
   appliance. Los nombres calzan con `deploy/cliente/docker-compose.yml`.
 - **Agentes de Zabbix.** Estado del proxy del cliente y de sus hosts; **vincular**
   un host al proxy y grupo del cliente.
+- **Descubrimiento de red (SNMP).** Por cliente, cargás los **rangos de IP** a
+  barrer y una **credencial SNMP** (v1/v2c o v3); la consola los crea en GLPI
+  (SNMPCredential del core + IPRange del plugin GlpiInventory, en la entidad del
+  cliente) y el `glpi-agent` del appliance toma el trabajo. Sin entrar a GLPI.
 - **Tickets de GLPI.** Listar, ver, crear y asignar. El Tablero muestra los
   recientes con técnico asignado.
 - **Portal del cliente** (`/portal`). Superficie **separada y acotada por tenant**:

@@ -135,12 +135,13 @@ tres cosas que alimentan el CMDB de GLPI:
 
 > ⚠ Los **rangos y las credenciales SNMP no van en el appliance**. El agente las
 > recibe del server al contactarlo. Así no hay secretos SNMP regados por cada LAN y
-> el scope de descubrimiento se maneja central (en GLPI, y a futuro desde la consola).
+> el scope de descubrimiento se maneja central.
 
-**Paso del operador, una vez por cliente** (ver `docs/07` §6.1): en GLPI →
-Administración → Inventario (GlpiInventory): cargar los rangos de IP, cargar las
-credenciales SNMP y **asociarlas** a los rangos, y autorizar al agente (aparece con
-el tag `itier-<tenant>`). Desde ahí el descubrimiento es automático.
+**Paso del operador, una vez por cliente — desde la consola de iTier:** en
+*Clientes → \<cliente\> → Descubrimiento de red* cargás los rangos de IP y la
+credencial SNMP (v1/v2c o v3); la consola los crea en GLPI, en la entidad del
+cliente, y los deja listos para el barrido. (También se puede a mano en GLPI →
+Administración → Inventario / GlpiInventory.) Ver `docs/07` §6.1.
 
 El endpoint por defecto es `ITIER_GLPI_URL` + `/plugins/glpiinventory/`; si tu ruta
 difiere, fijá `ITIER_GLPI_INVENTORY_URL` explícito.

@@ -52,6 +52,32 @@ CREATE TABLE IF NOT EXISTS clients (
     created_by      TEXT    NOT NULL
 );
 
+-- Descubrimiento de red por cliente: rangos de IP + credencial SNMP que la
+-- consola empuja a GLPI (SNMPCredential del core + IPRange del plugin
+-- GlpiInventory). Guarda los ids que devolvió GLPI y el estado del push, para
+-- reintentar si GLPI/el plugin fallan (igual que el alta de cliente).
+-- ⚠ Incluye secretos SNMP (community / passphrases v3): mismo cuidado que la PSK.
+CREATE TABLE IF NOT EXISTS discovery_ranges (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    client_id       INTEGER NOT NULL,
+    nombre          TEXT    NOT NULL,
+    ip_start        TEXT    NOT NULL,
+    ip_end          TEXT    NOT NULL,
+    snmp_version    TEXT    NOT NULL,          -- '1' | '2c' | '3'
+    snmp_community  TEXT,                      -- v1/v2c (secreto)
+    snmp_username   TEXT,                      -- v3
+    snmp_auth_proto TEXT,                      -- v3: MD5|SHA|SHA256|...
+    snmp_auth_pass  TEXT,                      -- v3 (secreto)
+    snmp_priv_proto TEXT,                      -- v3: DES|AES|...
+    snmp_priv_pass  TEXT,                      -- v3 (secreto)
+    glpi_cred_id    TEXT,                      -- id de SNMPCredential en GLPI
+    glpi_range_id   TEXT,                      -- id de PluginGlpiinventoryIPRange en GLPI
+    estado          TEXT    NOT NULL DEFAULT 'pendiente',  -- pendiente|aplicado|error
+    detalle         TEXT,
+    created_at      TEXT    NOT NULL,
+    created_by      TEXT    NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS audit_log (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
     decision_id TEXT    NOT NULL,
