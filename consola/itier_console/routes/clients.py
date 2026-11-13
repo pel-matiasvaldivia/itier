@@ -61,3 +61,51 @@ def detalle(request: Request, slug: str, user: dict = Depends(require_user), con
     cfg = request.app.state.cfg
     bundle = onboarding.bundle_env(cfg, cli)
     return render(request, "clientes_detalle.html", cli=cli, bundle=bundle)
+
+
+@router.post("/clientes/{slug}/reintentar")
+def reintentar(
+    request: Request,
+    slug: str,
+    csrf: str = Form(""),
+    user: dict = Depends(require_user),
+    conn: sqlite3.Connection = Depends(get_db),
+):
+    cli = onboarding.obtener_cliente_por_slug(conn, slug)
+    if not cli:
+        flash(request, "Cliente no encontrado.", "error")
+        return RedirectResponse("/clientes", status_code=303)
+    if not security.verificar_csrf(request.session, csrf):
+        flash(request, "Sesión expirada, reintentá.", "error")
+        return RedirectResponse(f"/clientes/{slug}", status_code=303)
+    try:
+        cli = onboarding.reprovisionar(conn, request.app.state.cfg, user["user"], cli["id"])
+    except ServiceError as e:
+        flash(request, e.mensaje, "error")
+        return RedirectResponse(f"/clientes/{slug}", status_code=303)
+    flash(request, f"«{cli['nombre']}» quedó aprovisionado.", "ok")
+    return RedirectResponse(f"/clientes/{slug}", status_code=303)
+
+
+@router.post("/clientes/{slug}/eliminar")
+def eliminar(
+    request: Request,
+    slug: str,
+    csrf: str = Form(""),
+    user: dict = Depends(require_user),
+    conn: sqlite3.Connection = Depends(get_db),
+):
+    cli = onboarding.obtener_cliente_por_slug(conn, slug)
+    if not cli:
+        flash(request, "Cliente no encontrado.", "error")
+        return RedirectResponse("/clientes", status_code=303)
+    if not security.verificar_csrf(request.session, csrf):
+        flash(request, "Sesión expirada, reintentá.", "error")
+        return RedirectResponse(f"/clientes/{slug}", status_code=303)
+    try:
+        onboarding.eliminar_cliente(conn, user["user"], cli["id"])
+    except ServiceError as e:
+        flash(request, e.mensaje, "error")
+        return RedirectResponse(f"/clientes/{slug}", status_code=303)
+    flash(request, f"Registro de «{cli['nombre']}» eliminado (GLPI/Zabbix no se tocaron).", "ok")
+    return RedirectResponse("/clientes", status_code=303)

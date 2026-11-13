@@ -101,6 +101,17 @@ check("auditoria: registró alta de cliente", "cliente.alta" in aud)
 check("auditoria: registró vinculación", "agente.vinculado" in aud)
 check("auditoria: registró alta de ticket", "ticket.creado" in aud)
 
+# 9b) Reintentar aprovisionamiento (idempotente sobre un cliente ya activo)
+det = c.get("/clientes/prueba-srl").text
+r = c.post("/clientes/prueba-srl/reintentar", data={"csrf": csrf_de(det)})
+check("reintentar deja el cliente OK", r.url.path == "/clientes/prueba-srl" and "aprovisionado" in r.text.lower())
+
+# 9c) Eliminar el registro del cliente
+det = c.get("/clientes/prueba-srl").text
+r = c.post("/clientes/prueba-srl/eliminar", data={"csrf": csrf_de(det)})
+check("eliminar lleva a la lista", r.url.path == "/clientes", r.url.path)
+check("eliminar quitó el cliente", "Prueba SRL" not in c.get("/clientes").text)
+
 # 10) Logout
 c.post("/logout", data={"csrf": csrf_de(c.get("/").text)})
 check("logout: / vuelve a /login", c.get("/").url.path == "/login")

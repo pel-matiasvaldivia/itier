@@ -18,6 +18,30 @@
     </table>
   </div>
 
+  {% if cli.estado != 'activo' %}
+  <div class="note note-bad">
+    Este cliente no quedó aprovisionado por completo (estado: <strong>{{ cli.estado }}</strong>).
+    Corregí permisos/tokens en GLPI/Zabbix y <strong>reintentá</strong>.
+  </div>
+  {% endif %}
+
+  <div class="card">
+    <h2>Acciones</h2>
+    <div class="acciones">
+      <form method="post" action="/clientes/{{ cli.slug }}/reintentar" class="inline">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <button class="btn btn-primary" type="submit">Reintentar aprovisionamiento</button>
+      </form>
+      <form method="post" action="/clientes/{{ cli.slug }}/eliminar" class="inline"
+            onsubmit="return confirm('¿Eliminar el registro local de {{ cli.nombre }}? No borra la entidad/grupo/proxy en GLPI/Zabbix.');">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <button class="btn" type="submit">Eliminar registro</button>
+      </form>
+    </div>
+    <p class="muted small">«Reintentar» crea solo lo que falte (reusa la PSK). «Eliminar» quita
+      únicamente el registro de la consola; lo que haya quedado en GLPI/Zabbix se borra allí.</p>
+  </div>
+
   <div class="card">
     <h2>Bundle de enrolamiento</h2>
     <p class="muted">Pegá esto en <code>deploy/cliente/.env</code> del appliance del cliente y levantá el stack. Los nombres calzan con <code>deploy/cliente/docker-compose.yml</code>.</p>

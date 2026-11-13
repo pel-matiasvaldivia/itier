@@ -121,3 +121,83 @@ def bundle_env(cfg, cli: dict) -> str:
         f"ZBX_TLSPSKIDENTITY={cli['psk_identity']}\n"
         f"ZBX_TLSPSKFILE=/var/lib/zabbix/enc/proxy.psk\n"
     )
+
+
+def reprovisionar(conn: sqlite3.Connection, cfg, actor: str, cid: int) -> dict:
+    """Reintenta el alta de un cliente que quedó incompleto (estado=error).
+
+    Crea SOLO las piezas que falten (entidad GLPI / grupo / proxy), reusando la
+    PSK ya generada, y actualiza el registro. Idempotente: si GLPI/Zabbix ya
+    tenían algo, los adaptadores lo reutilizan.
+    """
+    cli = obtener_cliente(conn, cid)
+    if not cli:
+        raise ServiceError("Cliente no encontrado.")
+
+    nombre, slug = cli["nombre"], cli["slug"]
+    entity_id = cli.get("glpi_entity_id") or None
+    groupid = cli.get("zbx_hostgroup_id") or None
+    proxyid = cli.get("zbx_proxy_id") or None
+    proxy_name = cli.get("zbx_proxy_name") or f"itier-{slug}"
+    psk_identity = cli.get("psk_identity") or f"itier-{slug}"
+    psk_key = cli.get("psk_key") or secrets.token_hex(32)
+    grupo_nombre = f"iTier/{nombre}"
+
+    error = None
+    try:
+        if not entity_id:
+            with glpi_mod.cliente(cfg) as g:
+                entity_id = g.crear_entidad(nombre)
+        with zbx_mod.cliente(cfg) as z:
+            if not groupid:
+                groupid = z.crear_grupo(grupo_nombre)
+            if not proxyid:
+                proxyid = z.crear_proxy(proxy_name, psk_identity, psk_key)
+        estado = "activo"
+    except AdapterError as e:
+        estado = "error"
+        error = str(e)
+
+    conn.execute(
+        "UPDATE clients SET glpi_entity_id=?, zbx_hostgroup_id=?, zbx_proxy_id=?, "
+        "zbx_proxy_name=?, psk_identity=?, psk_key=?, estado=? WHERE id=?",
+        (
+            str(entity_id) if entity_id is not None else None,
+            str(groupid) if groupid is not None else None,
+            str(proxyid) if proxyid is not None else None,
+            proxy_name, psk_identity, psk_key, estado, cid,
+        ),
+    )
+    conn.commit()
+    audit.registrar(conn, actor, "cliente.reintento", {
+        "cliente": nombre, "slug": slug, "glpi_entity_id": entity_id,
+        "zbx_hostgroup_id": groupid, "zbx_proxy_id": proxyid,
+        "estado": estado, "error": error,
+    })
+
+    if error:
+        raise ServiceError(
+            f"Reintento parcial de «{nombre}»: {error}. Revisá permisos/tokens y volvé a intentar.",
+            cliente_id=cid,
+        )
+    return obtener_cliente(conn, cid)
+
+
+def eliminar_cliente(conn: sqlite3.Connection, actor: str, cid: int) -> dict:
+    """Borra SOLO el registro local del cliente (no toca GLPI ni Zabbix).
+
+    Pensado para limpiar altas fallidas y volver a crearlas. Las entidades/grupos/
+    proxies que hayan quedado en GLPI/Zabbix hay que borrarlos allí a mano.
+    """
+    cli = obtener_cliente(conn, cid)
+    if not cli:
+        raise ServiceError("Cliente no encontrado.")
+    conn.execute("DELETE FROM clients WHERE id=?", (cid,))
+    conn.commit()
+    audit.registrar(conn, actor, "cliente.eliminado", {
+        "cliente": cli["nombre"], "slug": cli["slug"],
+        "glpi_entity_id": cli.get("glpi_entity_id"),
+        "zbx_proxy_id": cli.get("zbx_proxy_id"),
+        "nota": "solo registro local; GLPI/Zabbix no se tocaron",
+    })
+    return cli
