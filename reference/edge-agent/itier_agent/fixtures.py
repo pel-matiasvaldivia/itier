@@ -27,6 +27,17 @@ class DatosDemo:
     def get_ci_obj(self, ci_id: str) -> CI | None:
         return _CIS.get(ci_id)
 
+    def ci_por_host(self, host: str) -> str | None:
+        """Traduce el nombre de host de Zabbix al id de CI de GLPI (correlación de
+        CMDB). En producción esto es una consulta a GLPI; acá, un mapeo por nombre.
+        Devuelve None si no hay correspondencia."""
+        if not host:
+            return None
+        for ci in _CIS.values():
+            if ci.nombre == host:
+                return ci.id
+        return None
+
     def get_ci(self, ci_id: str) -> dict:
         ci = _CIS.get(ci_id)
         if not ci:

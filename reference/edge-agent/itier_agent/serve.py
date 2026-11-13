@@ -73,14 +73,30 @@ def _arrancar_bucle(parar: "threading.Event") -> str:
         return "esqueleto"
 
     from .audit import Auditoria
-    from .events import FuenteDemo
+    from .events import FuenteDemo, FuenteZabbix
     from .fixtures import DatosDemo
     from .runner import Runner
 
     tenant = os.environ.get("ITIER_TENANT", "demo")
     auditoria = Auditoria(tenant=tenant)
     datos = DatosDemo()
-    fuente = FuenteDemo()
+
+    # Fuente de eventos: Zabbix real si hay URL+token; si no, la fuente demo.
+    zbx_url = os.environ.get("ITIER_ZBX_URL")
+    zbx_token = os.environ.get("ITIER_ZBX_TOKEN")
+    if zbx_url and zbx_token:
+        from .zabbix import ZabbixEventos
+
+        cli = ZabbixEventos(url=zbx_url, token=zbx_token, grupo=os.environ.get("ITIER_ZBX_GROUP"))
+        # resolver host→CI: correlación de CMDB (hoy vía el mapeo demo; en prod,
+        # una consulta a GLPI). Si no mapea, deja el nombre del host como pista.
+        fuente = FuenteZabbix(
+            cli, resolver_ci=lambda p: datos.ci_por_host(p.get("host") or "") or (p.get("host") or "")
+        )
+        fuente_desc = f"Zabbix real ({zbx_url})"
+    else:
+        fuente = FuenteDemo()
+        fuente_desc = "DEMO (definí ITIER_ZBX_URL + ITIER_ZBX_TOKEN para el Zabbix real)"
 
     agente = None
     tiene_llm = any(os.environ.get(k) for k in _LLM)
@@ -110,10 +126,8 @@ def _arrancar_bucle(parar: "threading.Event") -> str:
     intervalo = float(os.environ.get("ITIER_AGENT_INTERVALO_S", "60"))
 
     log.warning(
-        "Bucle de eventos ACTIVO (modo=%s) con FUENTE DEMO: procesa eventos de "
-        "ejemplo, NO el Zabbix real. La fuente real (events.FuenteZabbix) se "
-        "cablea con el adaptador de Zabbix del edge. Ver reference/README.",
-        modo,
+        "Bucle de eventos ACTIVO (modo=%s, fuente=%s). Ver reference/README.",
+        modo, fuente_desc,
     )
     threading.Thread(
         target=runner.bucle, args=(fuente, intervalo, parar),

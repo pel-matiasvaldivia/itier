@@ -40,6 +40,11 @@ jobs:
         # intocables) y el runner (dedup, tormenta, triage, despacho). Sin LLM.
         run: python reference/edge-agent/tests/test_fase3.py
 
+      - name: Test del cliente de Zabbix (camino real, HTTP simulado)
+        # problem.get + event.get (Bearer, filtro por grupo) y el mapeo a Evento,
+        # con httpx.MockTransport. No requiere un Zabbix real.
+        run: python reference/edge-agent/tests/test_zabbix.py
+
   # ── Consola (plano de control): compila y corre el smoke test en modo demo ─
   consola:
     runs-on: ubuntu-latest

@@ -14,6 +14,7 @@ decisiones que definen el producto.
 | [`edge-agent/itier_agent/agent.py`](edge-agent/itier_agent/agent.py) | El bucle agéntico con el tool runner del SDK | [ADR-0002](../docs/adr/ADR-0002-razonamiento-fuera-del-borde.md) |
 | [`edge-agent/itier_agent/events.py`](edge-agent/itier_agent/events.py) | Ingesta de eventos del monitoreo: contrato de fuente, fuente demo y `FuenteZabbix` | [ADR-0006](../docs/adr/ADR-0006-autonomia-graduada.md) |
 | [`edge-agent/itier_agent/runner.py`](edge-agent/itier_agent/runner.py) | **El bucle de Fase 3**: ingesta → dedup → despacho al agente (o triage offline) | [ADR-0006](../docs/adr/ADR-0006-autonomia-graduada.md) |
+| [`edge-agent/itier_agent/zabbix.py`](edge-agent/itier_agent/zabbix.py) | Cliente de eventos de Zabbix (`problem.get` + `event.get`), la fuente real del bucle | [ADR-0001](../docs/adr/ADR-0001-nucleo-itsm-glpi.md) |
 
 ## Lo que hay que mirar
 
@@ -63,17 +64,25 @@ esqueleto, como en Fase 1/2. Variables:
 ITIER_AGENT_LOOP=1                 # activa el bucle (opt-in)
 ITIER_AGENT_INTERVALO_S=60         # cada cuánto consulta la fuente
 ITIER_POLICY_CATALOG / _TENANT     # rutas del catálogo firmado y la política del tenant
+ITIER_ZBX_URL / ITIER_ZBX_TOKEN    # servidor Zabbix (API) + token → usa la fuente real
+ITIER_ZBX_GROUP                    # host group del tenant, para acotar los problemas
 ```
 
-Hoy el bucle usa una **fuente demo**; sin clave de LLM corre en **OFFLINE** (tria y deja
-el evento en auditoría, sin inventar diagnóstico). La fuente real se cablea con
-`events.FuenteZabbix` + el adaptador de Zabbix del edge.
+**Fuente de eventos:** si están `ITIER_ZBX_URL` + `ITIER_ZBX_TOKEN`, el bucle lee los
+problemas activos del servidor Zabbix (`zabbix.py`: `problem.get` + `event.get`, acotado
+al `ITIER_ZBX_GROUP` del tenant) y los mapea a eventos. Si no, usa la **fuente demo**.
+Sin clave de LLM corre en **OFFLINE** (tria y deja el evento en auditoría, sin inventar
+diagnóstico).
+
+> La correlación host→CI (`DatosDemo.ci_por_host`) es hoy un mapeo por nombre; en
+> producción es una consulta a GLPI. Un host sin correspondencia deja su nombre como
+> pista para que el agente lo busque en la CMDB.
 
 ## Lo que falta para producción
 
-- **Fuente real de eventos:** `events.FuenteZabbix` necesita el adaptador de Zabbix del
-  edge (hoy el bucle corre con una fuente demo), más apertura/cierre de tickets de GLPI
-  por evento
+- **Correlación de CMDB y tickets:** `zabbix.py` ya lee los problemas del servidor; falta
+  la resolución host→CI real contra GLPI (hoy es un mapeo por nombre) y la apertura/cierre
+  de tickets de GLPI por evento
 - Servidores MCP reales (acá las tools son funciones locales; en producción son procesos
   MCP separados con su propio límite de privilegio)
 - Adaptador de GLPI contra la API v2 con OAuth2
