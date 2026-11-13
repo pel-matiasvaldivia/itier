@@ -82,6 +82,14 @@ El agente entra, pero **no toca nada**. Solo observa y recomienda.
 - Contabilidad de tokens y costo por decisión
 - UI de propuestas que separa visualmente **evidencia verificada** de **inferencia del modelo**
 
+> **Estado del esqueleto (`reference/edge-agent`).** Ya son ejecutables y están testeados
+> de forma determinista (sin clave de LLM, en CI): el **motor de políticas** (L0–L4, techos
+> y techos duros), el **bucle de razonamiento** con el tool runner del SDK, y el **bucle de
+> eventos** (`events.py` + `runner.py`): ingesta, deduplicación, guard de tormenta por CI,
+> y triage con auditoría encadenada. Falta para producción: cablear la **fuente real de
+> Zabbix** (`FuenteZabbix` + adaptador del edge), la apertura de tickets por evento, los
+> servidores MCP reales y el ejecutor de Ansible. Ver [`reference/README.md`](../reference/README.md).
+
 **Criterio de salida**
 - ≥ 80% de las recomendaciones calificadas como "correctas y accionables" por el técnico
 - Costo real de API dentro del ±30% del modelo estimado

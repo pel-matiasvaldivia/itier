@@ -30,10 +30,15 @@ jobs:
       - name: Compilar todo el paquete (chequeo de sintaxis)
         run: python -m compileall -q reference/edge-agent/itier_agent
 
-      - name: Demo sin clave (motor de políticas + auditoría)
+      - name: Demo sin clave (motor de políticas + auditoría + bucle de eventos)
         # Sin ANTHROPIC_API_KEY la demo corre solo la parte determinista y
         # omite el bucle del LLM; sirve como smoke test en CI.
         run: python -m itier_agent.demo
+
+      - name: Tests de Fase 3 (motor de políticas + bucle de eventos, offline)
+        # Aserciones sobre el motor de políticas (niveles L0–L4, techos, CIs
+        # intocables) y el runner (dedup, tormenta, triage, despacho). Sin LLM.
+        run: python reference/edge-agent/tests/test_fase3.py
 
   # ── Consola (plano de control): compila y corre el smoke test en modo demo ─
   consola:

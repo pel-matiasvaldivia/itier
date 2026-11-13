@@ -13,8 +13,10 @@ import os
 from pathlib import Path
 
 from .audit import Auditoria
+from .events import FuenteDemo
 from .fixtures import DatosDemo, _CIS
 from .policy import MotorDePoliticas
+from .runner import Runner
 
 RAIZ = Path(__file__).resolve().parents[3]
 CATALOGO = RAIZ / "reference" / "policy" / "acciones.yaml"
@@ -104,6 +106,30 @@ def demo_auditoria() -> None:
     print(f"  Tras alterar la entrada 1: {'✅' if ok else '❌'} {motivo}")
 
 
+def demo_bucle_eventos() -> None:
+    """La capa de Fase 3: ingesta de eventos, dedup y triage, SIN LLM."""
+    _sep("BUCLE DE EVENTOS (Fase 3) — ingesta, dedup y triage (offline, sin LLM)")
+
+    aud = Auditoria(tenant="acme-sa")
+    runner = Runner(auditoria=aud, datos=DatosDemo(), agente=None)  # OFFLINE
+    salidas = runner.correr(FuenteDemo())
+
+    for s in salidas:
+        linea = f"\n  {s['evento']} → {s['accion'].upper()}"
+        if s.get("ci"):
+            linea += f"   ci={s['ci']}"
+        if s.get("ticket"):
+            linea += f"   ticket={s['ticket']}"
+        print(linea)
+        if s.get("motivo"):
+            print(f"    motivo: {s['motivo']}")
+
+    print(f"\n  {len(salidas)} eventos: el duplicado se omite, los demás se trían.")
+    print("  auditoría:", " · ".join(e["tipo"] for e in aud))
+    ok, motivo = aud.verificar()
+    print(f"  {'✅' if ok else '❌'} {motivo}")
+
+
 def demo_agente() -> None:
     _sep("BUCLE DEL AGENTE — diagnóstico sobre un evento real")
 
@@ -147,6 +173,7 @@ def main() -> None:
     print("╚══════════════════════════════════════════════════════════════════════╝")
     demo_politicas()
     demo_auditoria()
+    demo_bucle_eventos()
     demo_agente()
     print()
 
