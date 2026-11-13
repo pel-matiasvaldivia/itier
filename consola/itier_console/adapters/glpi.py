@@ -167,21 +167,25 @@ class GLPIClient:
             if entity_id is not None:
                 t = [x for x in t if x["entities_id"] == entity_id]
             return t
-        params = {"range": f"0-{limit - 1}", "sort": "19", "order": "DESC", "expand_dropdowns": "true"}
-        if entity_id is not None:
-            # ⚠ GLPI 11: confirmar criterio de filtrado por entidad.
-            params["criteria[0][field]"] = "80"  # entidad
-            params["criteria[0][searchtype]"] = "equals"
-            params["criteria[0][value]"] = str(entity_id)
+        # GLPI 11 (motor api.php/v1) valida `sort` como NOMBRE de campo, no como
+        # el ID de opción de búsqueda de GLPI 10, y rechaza varios parámetros del
+        # estilo viejo. Para ser robustos entre versiones pedimos crudo y
+        # ordenamos/filtramos del lado de la consola (los volúmenes son chicos).
+        params = {"range": f"0-{limit - 1}"}
         try:
             datos = self._get("/Ticket", params=params)
         except AdapterError as e:
-            # GLPI devuelve 400 ERROR_RANGE_EXCEED_TOTAL cuando el rango pedido
-            # supera el total (p. ej. install nuevo sin tickets): es lista vacía.
+            # Install nuevo sin tickets: GLPI responde 400 ERROR_RANGE_EXCEED_TOTAL
+            # (el rango supera el total) → lista vacía.
             if "RANGE_EXCEED_TOTAL" in str(e):
                 return []
             raise
-        return datos if isinstance(datos, list) else []
+        if not isinstance(datos, list):
+            return []
+        if entity_id is not None:
+            datos = [t for t in datos if str(t.get("entities_id")) == str(entity_id)]
+        datos.sort(key=lambda t: t.get("id", 0) or 0, reverse=True)
+        return datos
 
     def ver_ticket(self, ticket_id: int) -> dict:
         if self.demo:

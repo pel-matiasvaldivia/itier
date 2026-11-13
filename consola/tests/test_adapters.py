@@ -66,7 +66,10 @@ def handler(request: httpx.Request) -> httpx.Response:
             return httpx.Response(201, json={"id": 77})
         if TICKET_EMPTY:
             return httpx.Response(400, json=["ERROR_RANGE_EXCEED_TOTAL", "Range exceed total count"])
-        return httpx.Response(200, json=[{"id": 1042, "name": "demo", "status": 2, "priority": 3, "entities_id": 2}])
+        return httpx.Response(200, json=[
+            {"id": 1042, "name": "a", "status": 2, "priority": 3, "entities_id": 2},
+            {"id": 1050, "name": "b", "status": 1, "priority": 4, "entities_id": 3},
+        ])
     # ── Zabbix (api_jsonrpc.php) ──
     if p.endswith("/api_jsonrpc.php"):
         m = body.get("method")
@@ -114,7 +117,9 @@ with glpi_mod.cliente(cfg) as g:
     eid = g.crear_entidad("Cliente X")
     check("glpi.crear_entidad parsea id", eid == 42, eid)
     tks = g.listar_tickets()
-    check("glpi.listar_tickets parsea", len(tks) == 1 and tks[0]["id"] == 1042)
+    check("glpi.listar_tickets ordena por id desc", len(tks) == 2 and tks[0]["id"] == 1050)
+    tks2 = g.listar_tickets(entity_id=2)
+    check("glpi.listar_tickets filtra por entidad client-side", len(tks2) == 1 and tks2[0]["id"] == 1042)
     tid = g.crear_ticket("Asunto", "cuerpo", 2, 4)
     check("glpi.crear_ticket parsea id", tid == 77, tid)
 
