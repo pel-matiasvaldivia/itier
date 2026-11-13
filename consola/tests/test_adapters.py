@@ -32,6 +32,7 @@ from itier_console.config import Config  # noqa: E402
 
 fails = []
 captured = []
+TICKET_EMPTY = False  # cuando True, GET /Ticket simula el 400 de rango vacío
 
 
 def check(nombre, cond, extra=""):
@@ -63,6 +64,8 @@ def handler(request: httpx.Request) -> httpx.Response:
     if "/Ticket" in p:
         if request.method == "POST":
             return httpx.Response(201, json={"id": 77})
+        if TICKET_EMPTY:
+            return httpx.Response(400, json=["ERROR_RANGE_EXCEED_TOTAL", "Range exceed total count"])
         return httpx.Response(200, json=[{"id": 1042, "name": "demo", "status": 2, "priority": 3, "entities_id": 2}])
     # ── Zabbix (api_jsonrpc.php) ──
     if p.endswith("/api_jsonrpc.php"):
@@ -152,6 +155,12 @@ hupd = next((r for r in captured if r["body"].get("method") == "host.update"), N
 check("zbx: host.update asigna proxyid y grupos",
       hupd and hupd["body"]["params"]["proxyid"] == "9"
       and any(g["groupid"] == "5" for g in hupd["body"]["params"]["groups"]))
+
+# ── GLPI: lista de tickets vacía (install nuevo) → el 400 se trata como [] ────
+TICKET_EMPTY = True
+with glpi_mod.cliente(cfg) as g:
+    check("glpi.listar_tickets tolera el 400 de rango vacío", g.listar_tickets() == [])
+TICKET_EMPTY = False
 
 httpx.Client = _real_Client  # type: ignore[assignment]
 print("\nRESULTADO:", "TODO OK" if not fails else f"{len(fails)} FALLAS: {fails}")

@@ -173,7 +173,14 @@ class GLPIClient:
             params["criteria[0][field]"] = "80"  # entidad
             params["criteria[0][searchtype]"] = "equals"
             params["criteria[0][value]"] = str(entity_id)
-        datos = self._get("/Ticket", params=params)
+        try:
+            datos = self._get("/Ticket", params=params)
+        except AdapterError as e:
+            # GLPI devuelve 400 ERROR_RANGE_EXCEED_TOTAL cuando el rango pedido
+            # supera el total (p. ej. install nuevo sin tickets): es lista vacía.
+            if "RANGE_EXCEED_TOTAL" in str(e):
+                return []
+            raise
         return datos if isinstance(datos, list) else []
 
     def ver_ticket(self, ticket_id: int) -> dict:
