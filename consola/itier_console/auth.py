@@ -28,12 +28,15 @@ def _finalizar_login(request: Request, user: sqlite3.Row) -> None:
     request.session["uid"] = int(user["id"])
     request.session["user"] = user["username"]
     request.session["is_admin"] = bool(user["is_admin"])
+    request.session["client_id"] = user["client_id"]
     request.session["must_change"] = bool(user["must_change_pw"])
     request.session["stage"] = "authed"
 
 
 def _destino_post_login(request: Request) -> str:
-    return "/cambiar-clave" if request.session.get("must_change") else "/"
+    if request.session.get("must_change"):
+        return "/cambiar-clave"
+    return "/portal" if request.session.get("client_id") else "/"
 
 
 # ── Login (primer factor) ───────────────────────────────────────────────────
@@ -215,7 +218,7 @@ def cambiar_clave_post(
     request.session["must_change"] = False
     audit.registrar(conn, user["username"], "clave.cambiada", {})
     flash(request, "Contraseña actualizada.", "ok")
-    return RedirectResponse("/", status_code=303)
+    return RedirectResponse(_destino_post_login(request), status_code=303)
 
 
 # ── Logout ──────────────────────────────────────────────────────────────────

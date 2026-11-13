@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <title>{% block titulo %}Portal · iTier{% endblock %}</title>
+  <link rel="stylesheet" href="/static/app.css">
+</head>
+<body class="app">
+  <header class="topbar">
+    <a class="brand" href="/portal">i<span>Tier</span> <small>portal</small></a>
+    <div class="topbar-right">
+      {% if demo %}<span class="chip chip-demo">demo</span>{% endif %}
+      <span class="who">{% if cli is defined and cli %}{{ cli.nombre }}{% else %}{{ user.user }}{% endif %}</span>
+      <form method="post" action="/logout" class="inline">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <button class="btn btn-ghost btn-sm" type="submit">Salir</button>
+      </form>
+    </div>
+  </header>
+
+  <div class="shell">
+    <nav class="sidebar">
+      <a href="/portal" class="{{ 'on' if ruta == '/portal' else '' }}">Inicio</a>
+      <a href="/portal/tickets" class="{{ 'on' if ruta.startswith('/portal/tickets') else '' }}">Mis tickets</a>
+      <a href="/portal/equipos" class="{{ 'on' if ruta.startswith('/portal/equipos') else '' }}">Mis equipos</a>
+    </nav>
+
+    <main class="content">
+      {% include "_flash.html" %}
+      {% block contenido %}{% endblock %}
+    </main>
+  </div>
+
+  <script src="/static/app.js" defer></script>
+</body>
+</html>

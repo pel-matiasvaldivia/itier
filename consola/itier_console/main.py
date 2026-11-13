@@ -21,11 +21,12 @@ from starlette.middleware.sessions import SessionMiddleware
 from . import security
 from .config import Config
 from .db import connect, init_db
-from .deps import AuthRequired, CambioClaveRequerido, BASE, flash
+from .deps import AccesoConsola, AccesoPortal, AuthRequired, CambioClaveRequerido, BASE, flash
 from .routes import agents as r_agents
 from .routes import audit as r_audit
 from .routes import clients as r_clients
 from .routes import dashboard as r_dashboard
+from .routes import portal as r_portal
 from .routes import tickets as r_tickets
 from . import auth as r_auth
 
@@ -84,6 +85,14 @@ def create_app() -> FastAPI:
         flash(request, "Cambiá la contraseña inicial para continuar.", "info")
         return RedirectResponse("/cambiar-clave", status_code=303)
 
+    @app.exception_handler(AccesoPortal)
+    async def _acceso_portal(request: Request, _exc: AccesoPortal):
+        return RedirectResponse("/portal", status_code=303)
+
+    @app.exception_handler(AccesoConsola)
+    async def _acceso_consola(request: Request, _exc: AccesoConsola):
+        return RedirectResponse("/", status_code=303)
+
     @app.get("/healthz")
     async def healthz():
         return JSONResponse({"status": "ok"})
@@ -94,6 +103,7 @@ def create_app() -> FastAPI:
     app.include_router(r_agents.router)
     app.include_router(r_tickets.router)
     app.include_router(r_audit.router)
+    app.include_router(r_portal.router)
 
     log.info("Consola de iTier lista (demo=%s, glpi=%s, zabbix=%s).",
              cfg.demo, cfg.glpi_configurado, cfg.zbx_configurado)

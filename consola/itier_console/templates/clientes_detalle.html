@@ -43,6 +43,46 @@
   </div>
 
   <div class="card">
+    <h2>Usuarios del portal</h2>
+    <p class="muted">Accesos para que el cliente entre a <code>/portal</code> (ve solo su empresa: sus tickets y equipos).</p>
+    {% if usuarios %}
+    <table class="tabla">
+      <thead><tr><th>Usuario</th><th>2FA</th><th>Último ingreso</th><th></th></tr></thead>
+      <tbody>
+        {% for u in usuarios %}
+        <tr>
+          <td>{{ u.username }}</td>
+          <td>{% if u.totp_confirmed %}<span class="dot ok"></span>activo{% else %}<span class="dot warn"></span>pendiente{% endif %}</td>
+          <td class="muted">{{ u.last_login or '—' }}</td>
+          <td class="acciones">
+            <form method="post" action="/clientes/{{ cli.slug }}/portal-usuarios/{{ u.id }}/eliminar" class="inline"
+                  onsubmit="return confirm('¿Eliminar el acceso de {{ u.username }}?');">
+              <input type="hidden" name="csrf" value="{{ csrf }}">
+              <button class="btn btn-sm" type="submit">Eliminar</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p class="muted">Todavía no hay usuarios de portal para este cliente.</p>
+    {% endif %}
+
+    <form method="post" action="/clientes/{{ cli.slug }}/portal-usuarios" class="form row" style="margin-top:1rem">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <label>Usuario
+        <input type="text" name="username" placeholder="contacto@cliente" required>
+      </label>
+      <label>Contraseña temporal <span class="muted small">(mín. 10)</span>
+        <input type="text" name="password" required>
+      </label>
+      <button class="btn btn-primary" type="submit">Crear acceso</button>
+    </form>
+    <p class="muted small">El cliente cambia la clave y enrola su 2FA en el primer ingreso.</p>
+  </div>
+
+  <div class="card">
     <h2>Bundle de enrolamiento</h2>
     <p class="muted">Pegá esto en <code>deploy/cliente/.env</code> del appliance del cliente y levantá el stack. Los nombres calzan con <code>deploy/cliente/docker-compose.yml</code>.</p>
 

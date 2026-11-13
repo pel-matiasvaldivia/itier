@@ -111,14 +111,32 @@ def crear_usuario(
     *,
     is_admin: bool = False,
     must_change_pw: bool = False,
+    client_id: int | None = None,
 ) -> int:
     cur = conn.execute(
-        "INSERT INTO users(username, password_hash, is_admin, must_change_pw, created_at) "
-        "VALUES (?, ?, ?, ?, ?)",
-        (username, hash_password(password), int(is_admin), int(must_change_pw), _now_iso()),
+        "INSERT INTO users(username, password_hash, is_admin, must_change_pw, created_at, client_id) "
+        "VALUES (?, ?, ?, ?, ?, ?)",
+        (username, hash_password(password), int(is_admin), int(must_change_pw), _now_iso(), client_id),
     )
     conn.commit()
     return int(cur.lastrowid)
+
+
+def listar_usuarios_cliente(conn: sqlite3.Connection, client_id: int) -> list[sqlite3.Row]:
+    return conn.execute(
+        "SELECT * FROM users WHERE client_id = ? ORDER BY username", (client_id,)
+    ).fetchall()
+
+
+def eliminar_usuario(conn: sqlite3.Connection, uid: int) -> None:
+    conn.execute("DELETE FROM users WHERE id = ?", (uid,))
+    conn.commit()
+
+
+def eliminar_usuarios_de_cliente(conn: sqlite3.Connection, client_id: int) -> int:
+    cur = conn.execute("DELETE FROM users WHERE client_id = ?", (client_id,))
+    conn.commit()
+    return cur.rowcount
 
 
 def set_totp_secret(conn: sqlite3.Connection, uid: int, secret: str) -> None:

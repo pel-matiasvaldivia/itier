@@ -1,0 +1,32 @@
+{% extends "portal_base.html" %}
+{% block titulo %}Mis tickets · Portal iTier{% endblock %}
+{% block contenido %}
+  <div class="page-head"><h1>Mis tickets</h1>
+    <a class="btn btn-primary" href="/portal/tickets/nuevo">+ Abrir un ticket</a>
+  </div>
+
+  <div class="card">
+    {% if error %}<div class="note note-bad">No pudimos leer tus tickets ahora mismo. Reintentá en un momento.</div>{% endif %}
+    {% if tickets %}
+    <table class="tabla">
+      <thead><tr><th>#</th><th>Asunto</th><th>Estado</th><th>Prioridad</th><th>Fecha</th></tr></thead>
+      <tbody>
+        {% for t in tickets %}
+        <tr>
+          <td><a href="/portal/tickets/{{ t.id }}">{{ t.id }}</a></td>
+          <td><a href="/portal/tickets/{{ t.id }}">{{ t.name }}</a></td>
+          <td><span class="badge">{{ t.estado_label }}</span></td>
+          <td>{{ t.prioridad_label }}</td>
+          <td class="muted nowrap">{{ t.date or '—' }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% elif not error %}
+    <div class="empty">
+      <p>Todavía no abriste ningún ticket.</p>
+      <a class="btn btn-primary" href="/portal/tickets/nuevo">Abrir el primero</a>
+    </div>
+    {% endif %}
+  </div>
+{% endblock %}

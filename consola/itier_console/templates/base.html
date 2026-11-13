@@ -23,12 +23,14 @@
   </header>
 
   <div class="shell">
+    {% if not user.client_id %}
     <nav class="sidebar">
       <a href="/" class="{{ 'on' if ruta == '/' else '' }}">Tablero</a>
       <a href="/clientes" class="{{ 'on' if ruta.startswith('/clientes') else '' }}">Clientes</a>
       <a href="/tickets" class="{{ 'on' if ruta.startswith('/tickets') else '' }}">Tickets</a>
       <a href="/auditoria" class="{{ 'on' if ruta.startswith('/auditoria') else '' }}">Auditoría</a>
     </nav>
+    {% endif %}
 
     <main class="content">
       {% include "_flash.html" %}

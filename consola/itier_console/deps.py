@@ -28,6 +28,14 @@ class CambioClaveRequerido(Exception):
     """El usuario tiene una clave inicial que debe cambiar antes de continuar."""
 
 
+class AccesoPortal(Exception):
+    """Un usuario de portal (cliente) intentó una ruta de operador → va al portal."""
+
+
+class AccesoConsola(Exception):
+    """Un operador intentó una ruta del portal → va a la consola."""
+
+
 def get_config(request: Request):
     return request.app.state.cfg
 
@@ -43,14 +51,34 @@ def get_db(request: Request) -> Iterator[sqlite3.Connection]:
 def sesion_usuario(request: Request) -> dict | None:
     s = request.session
     if s.get("stage") == "authed" and s.get("uid"):
-        return {"uid": s["uid"], "user": s.get("user"), "is_admin": bool(s.get("is_admin"))}
+        return {
+            "uid": s["uid"],
+            "user": s.get("user"),
+            "is_admin": bool(s.get("is_admin")),
+            "client_id": s.get("client_id"),
+        }
     return None
 
 
 def require_user(request: Request) -> dict:
+    """Guard de rutas de OPERADOR (consola)."""
     u = sesion_usuario(request)
     if not u:
         raise AuthRequired()
+    if u.get("client_id"):
+        raise AccesoPortal()  # un cliente no entra a la consola de operador
+    if request.session.get("must_change") and request.url.path not in ("/cambiar-clave", "/logout"):
+        raise CambioClaveRequerido()
+    return u
+
+
+def require_cliente(request: Request) -> dict:
+    """Guard de rutas del PORTAL (cliente). Devuelve el usuario con su client_id."""
+    u = sesion_usuario(request)
+    if not u:
+        raise AuthRequired()
+    if not u.get("client_id"):
+        raise AccesoConsola()  # un operador usa la consola, no el portal
     if request.session.get("must_change") and request.url.path not in ("/cambiar-clave", "/logout"):
         raise CambioClaveRequerido()
     return u

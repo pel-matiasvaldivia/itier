@@ -45,6 +45,17 @@ def _cmd_add(conn, args) -> None:
     print(f"Usuario «{args.user}» creado (admin={args.admin}). Enrolará el 2FA en el primer login.")
 
 
+def _cmd_add_cliente(conn, args) -> None:
+    if security.obtener_usuario(conn, args.user):
+        sys.exit(f"El usuario «{args.user}» ya existe.")
+    row = conn.execute("SELECT id, nombre FROM clients WHERE slug = ?", (args.client,)).fetchone()
+    if not row:
+        sys.exit(f"No existe el cliente con slug «{args.client}». Revisá en la consola.")
+    pw = _pedir_password(args.password)
+    security.crear_usuario(conn, args.user, pw, must_change_pw=True, client_id=int(row["id"]))
+    print(f"Usuario de portal «{args.user}» creado para «{row['nombre']}». Cambia clave + enrola 2FA al entrar.")
+
+
 def _cmd_passwd(conn, args) -> None:
     u = security.obtener_usuario(conn, args.user)
     if not u:
@@ -98,6 +109,11 @@ def main() -> None:
     p.add_argument("--admin", action="store_true")
     p.add_argument("--force-change", action="store_true", help="exigir cambio de clave en el primer login")
 
+    p = sub.add_parser("add-cliente", help="crear un usuario de PORTAL atado a un cliente")
+    p.add_argument("--user", required=True)
+    p.add_argument("--client", required=True, help="slug del cliente (ver en la consola)")
+    p.add_argument("--password", help="si se omite, se pide de forma interactiva")
+
     p = sub.add_parser("passwd", help="restablecer la contraseña")
     p.add_argument("--user", required=True)
     p.add_argument("--password")
@@ -121,6 +137,8 @@ def main() -> None:
     try:
         if args.cmd == "add":
             _cmd_add(conn, args)
+        elif args.cmd == "add-cliente":
+            _cmd_add_cliente(conn, args)
         elif args.cmd == "passwd":
             _cmd_passwd(conn, args)
         elif args.cmd == "reset-2fa":

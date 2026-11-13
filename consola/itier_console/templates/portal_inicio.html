@@ -1,0 +1,30 @@
+{% extends "portal_base.html" %}
+{% block titulo %}Inicio · Portal iTier{% endblock %}
+{% block contenido %}
+  <div class="page-head"><h1>Hola, {{ cli.nombre }}</h1>
+    <a class="btn btn-primary" href="/portal/tickets/nuevo">+ Abrir un ticket</a>
+  </div>
+
+  <section class="tiles">
+    <div class="tile">
+      <div class="tile-k">Tickets abiertos</div>
+      <div class="tile-v big">{{ abiertos if abiertos is not none else '—' }}</div>
+      <div class="tile-s"><a href="/portal/tickets">Ver mis tickets →</a></div>
+    </div>
+    <div class="tile">
+      <div class="tile-k">Equipos monitoreados</div>
+      <div class="tile-v big">{% if hosts_total is not none %}{{ hosts_ok }}/{{ hosts_total }}{% else %}—{% endif %}</div>
+      <div class="tile-s">{% if hosts_total is not none %}disponibles · <a href="/portal/equipos">ver estado →</a>{% else %}<a href="/portal/equipos">ver equipos →</a>{% endif %}</div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>¿Necesitás ayuda?</h2>
+    <p class="muted">Abrí un ticket y nuestro equipo lo toma. Podés seguir el avance desde acá.</p>
+    <div class="quick">
+      <a href="/portal/tickets/nuevo">Abrir un ticket →</a>
+      <a href="/portal/tickets">Ver mis tickets →</a>
+      <a href="/portal/equipos">Estado de mis equipos →</a>
+    </div>
+  </section>
+{% endblock %}

@@ -42,6 +42,7 @@ que aprenda ITIL, ni que contrate un ingeniero, ni que exponga sus datos a una n
 | [05 · Modelo de costos](docs/05-modelo-de-costos.md) | Costo real por cliente/mes y pricing sugerido |
 | [06 · Roadmap](docs/06-roadmap.md) | Fases, hitos y criterios de salida |
 | [07 · Manual de operaciones](docs/07-manual-operativo.md) | Procesos y procedimientos para operar la plataforma (onboarding, incidentes, cambios, autonomía) |
+| [08 · Modelo operativo y de negocio](docs/08-modelo-operativo-y-negocio.md) | Circuito, roles/accesos (operador vs cliente), planes y adopción |
 | [ADRs](docs/adr/) | Decisiones de arquitectura, con alternativas descartadas |
 
 ## Estructura del repositorio

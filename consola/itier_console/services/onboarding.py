@@ -23,7 +23,7 @@ import secrets
 import sqlite3
 from datetime import datetime, timezone
 
-from .. import audit
+from .. import audit, security
 from ..adapters import AdapterError, glpi as glpi_mod, zabbix as zbx_mod
 from . import ServiceError, slugify
 
@@ -192,12 +192,15 @@ def eliminar_cliente(conn: sqlite3.Connection, actor: str, cid: int) -> dict:
     cli = obtener_cliente(conn, cid)
     if not cli:
         raise ServiceError("Cliente no encontrado.")
+    # Borra también los usuarios de portal de ese cliente (quedarían huérfanos).
+    n_usuarios = security.eliminar_usuarios_de_cliente(conn, cid)
     conn.execute("DELETE FROM clients WHERE id=?", (cid,))
     conn.commit()
     audit.registrar(conn, actor, "cliente.eliminado", {
         "cliente": cli["nombre"], "slug": cli["slug"],
         "glpi_entity_id": cli.get("glpi_entity_id"),
         "zbx_proxy_id": cli.get("zbx_proxy_id"),
+        "usuarios_portal_borrados": n_usuarios,
         "nota": "solo registro local; GLPI/Zabbix no se tocaron",
     })
     return cli

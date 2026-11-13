@@ -21,7 +21,12 @@ roadmap (`docs/06`) menciona en todas las fases. Diseño en
   appliance. Los nombres calzan con `deploy/cliente/docker-compose.yml`.
 - **Agentes de Zabbix.** Estado del proxy del cliente y de sus hosts; **vincular**
   un host al proxy y grupo del cliente.
-- **Tickets de GLPI.** Listar, ver, crear y asignar.
+- **Tickets de GLPI.** Listar, ver, crear y asignar. El Tablero muestra los
+  recientes con técnico asignado.
+- **Portal del cliente** (`/portal`). Superficie **separada y acotada por tenant**:
+  un usuario de portal ve **solo su empresa** (sus tickets y equipos), nunca las
+  rutas del operador ni datos de otros clientes. El operador crea los accesos
+  desde el detalle del cliente. Ver [`docs/08`](../docs/08-modelo-operativo-y-negocio.md).
 - **Auditoría.** Bitácora append-only encadenada por hash (toda acción que cambia
   estado queda sellada; una edición del pasado rompe la cadena — OWASP ASI10).
 
@@ -92,12 +97,18 @@ En NPM (en el otro VPS): *Proxy Host* → `http://<IP-LAN-de-este-host>:8083`
 
 ```sh
 # En el contenedor:  docker compose exec consola itier-console-admin <cmd>
-itier-console-admin add --user ana --admin     # pide la clave; enrola 2FA al entrar
+itier-console-admin add --user ana --admin     # operador; pide la clave; enrola 2FA al entrar
+itier-console-admin add-cliente --user contacto@acme --client acme   # usuario de PORTAL
 itier-console-admin passwd --user ana          # restablecer contraseña
 itier-console-admin reset-2fa --user ana       # si perdió el segundo factor
 itier-console-admin disable --user ana
 itier-console-admin list
 ```
+
+Los usuarios de **portal** también se crean desde la UI: en el detalle del
+cliente, sección **"Usuarios del portal"**. Entran por `/portal` (ven solo su
+empresa) y, como cualquier usuario, cambian la clave y enrolan 2FA al primer
+ingreso.
 
 ## Seguridad
 

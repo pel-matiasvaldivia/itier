@@ -108,7 +108,43 @@ det = c.get("/clientes/prueba-srl").text
 r = c.post("/clientes/prueba-srl/reintentar", data={"csrf": csrf_de(det)})
 check("reintentar deja el cliente OK", r.url.path == "/clientes/prueba-srl" and "aprovisionado" in r.text.lower())
 
-# 9c) Eliminar el registro del cliente
+# 9b-bis) Portal del cliente: aislamiento por tenant
+# El operador crea un usuario de portal para prueba-srl.
+det = c.get("/clientes/prueba-srl").text
+r = c.post("/clientes/prueba-srl/portal-usuarios",
+           data={"username": "cliente1", "password": "clave-portal-1", "csrf": csrf_de(det)})
+check("operador crea usuario de portal", r.url.path == "/clientes/prueba-srl" and "cliente1" in r.text)
+
+# El cliente entra en una sesión nueva: login + 2FA + cambio de clave inicial.
+pc = TestClient(app, follow_redirects=True)
+html = pc.get("/login").text
+r = pc.post("/login", data={"username": "cliente1", "password": "clave-portal-1", "csrf": csrf_de(html)})
+check("cliente: login → enrolar 2FA", r.url.path == "/login/2fa/enrolar", r.url.path)
+m = re.search(r'class="codebox"><code>([^<]+)</code>', r.text)
+csecret = m.group(1) if m else ""
+r = pc.post("/login/2fa/enrolar", data={"code": pyotp.TOTP(csecret).now(), "csrf": csrf_de(r.text)})
+if r.url.path == "/cambiar-clave":
+    r = pc.post("/cambiar-clave", data={"actual": "", "nueva": "clave-nueva-portal",
+                                        "repetir": "clave-nueva-portal", "csrf": csrf_de(r.text)})
+check("cliente: entra al portal", r.url.path == "/portal", r.url.path)
+check("cliente: ve su panel de tickets", pc.get("/portal/tickets").status_code == 200)
+check("cliente: ve sus equipos", pc.get("/portal/equipos").status_code == 200)
+check("cliente: /clientes (operador) lo manda al portal", pc.get("/clientes").url.path == "/portal")
+
+# El cliente abre un ticket desde el portal (entidad forzada a la suya).
+html = pc.get("/portal/tickets/nuevo").text
+r = pc.post("/portal/tickets/nuevo", data={"titulo": "No tengo internet", "contenido": "desde hoy",
+                                           "prioridad": "4", "csrf": csrf_de(html)})
+check("cliente: abre un ticket", r.url.path.startswith("/portal/tickets/") and "No tengo internet" in r.text, r.url.path)
+check("cliente: su ticket aparece en su lista", "No tengo internet" in pc.get("/portal/tickets").text)
+
+# IDOR: no puede ver un ticket de OTRA entidad (demo 1042, entidad 2).
+check("cliente: bloqueado de tickets de otra entidad (IDOR)", pc.get("/portal/tickets/1042").url.path == "/portal/tickets")
+
+# El operador NO entra al portal.
+check("operador: /portal lo manda a la consola", c.get("/portal").url.path == "/")
+
+# 9c) Eliminar el registro del cliente (también borra sus usuarios de portal)
 det = c.get("/clientes/prueba-srl").text
 r = c.post("/clientes/prueba-srl/eliminar", data={"csrf": csrf_de(det)})
 check("eliminar lleva a la lista", r.url.path == "/clientes", r.url.path)

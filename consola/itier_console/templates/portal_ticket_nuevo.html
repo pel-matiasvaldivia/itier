@@ -1,0 +1,25 @@
+{% extends "portal_base.html" %}
+{% block titulo %}Abrir un ticket · Portal iTier{% endblock %}
+{% block contenido %}
+  <div class="page-head"><h1>Abrir un ticket</h1></div>
+  <div class="card narrow">
+    <form method="post" action="/portal/tickets/nuevo" class="form">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <label>¿Qué necesitás? (asunto)
+        <input type="text" name="titulo" placeholder="Ej: no anda la impresora de recepción" autofocus required>
+      </label>
+      <label>Contanos un poco más
+        <textarea name="contenido" rows="5" placeholder="Qué pasa, desde cuándo, a quién afecta…"></textarea>
+      </label>
+      <label>Urgencia
+        <select name="prioridad">
+          <option value="2">Baja</option>
+          <option value="3" selected>Media</option>
+          <option value="4">Alta</option>
+          <option value="5">Muy alta</option>
+        </select>
+      </label>
+      <button class="btn btn-primary" type="submit">Enviar</button>
+    </form>
+  </div>
+{% endblock %}

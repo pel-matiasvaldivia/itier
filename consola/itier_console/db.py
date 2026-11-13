@@ -30,7 +30,10 @@ CREATE TABLE IF NOT EXISTS users (
     failed_count  INTEGER NOT NULL DEFAULT 0,
     locked_until  TEXT,
     created_at    TEXT    NOT NULL,
-    last_login    TEXT
+    last_login    TEXT,
+    -- NULL = usuario operador (consola). Con valor = usuario del PORTAL, atado a
+    -- ese cliente (ve solo su empresa). Ver docs/08.
+    client_id     INTEGER
 );
 
 CREATE TABLE IF NOT EXISTS clients (
@@ -74,11 +77,21 @@ def connect(path: str) -> sqlite3.Connection:
     return conn
 
 
+def _migrar(conn: sqlite3.Connection) -> None:
+    """Migraciones idempotentes para bases ya creadas (CREATE IF NOT EXISTS no
+    altera tablas existentes)."""
+    cols = {r["name"] for r in conn.execute("PRAGMA table_info(users)").fetchall()}
+    if "client_id" not in cols:
+        conn.execute("ALTER TABLE users ADD COLUMN client_id INTEGER")
+    conn.commit()
+
+
 def init_db(path: str) -> None:
-    """Crea el esquema si no existe. Idempotente."""
+    """Crea el esquema si no existe y aplica migraciones. Idempotente."""
     conn = connect(path)
     try:
         conn.executescript(SCHEMA)
         conn.commit()
+        _migrar(conn)
     finally:
         conn.close()

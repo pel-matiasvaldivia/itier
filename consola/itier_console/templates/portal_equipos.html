@@ -1,0 +1,39 @@
+{% extends "portal_base.html" %}
+{% block titulo %}Mis equipos · Portal iTier{% endblock %}
+{% block contenido %}
+  <div class="page-head"><h1>Mis equipos</h1></div>
+
+  <div class="card">
+    <h2>Sonda de monitoreo</h2>
+    {% if proxy %}
+      <p>{% if proxy.visto %}<span class="dot ok"></span>Conectada{% else %}<span class="dot warn"></span>Aún no reportó{% endif %}</p>
+    {% else %}
+      <p class="muted">Todavía no hay una sonda activa. La estamos preparando.</p>
+    {% endif %}
+  </div>
+
+  <div class="card">
+    <h2>Equipos monitoreados</h2>
+    {% if error %}<div class="note note-bad">No pudimos leer el estado ahora mismo. Reintentá en un momento.</div>{% endif %}
+    {% if hosts %}
+    <table class="tabla">
+      <thead><tr><th>Equipo</th><th>Nombre</th><th>Estado</th></tr></thead>
+      <tbody>
+        {% for h in hosts %}
+        <tr>
+          <td><code>{{ h.host }}</code></td>
+          <td>{{ h.name }}</td>
+          <td>
+            {% if h.available == '1' %}<span class="dot ok"></span>Disponible
+            {% elif h.available == '2' %}<span class="dot bad"></span>Con problemas
+            {% else %}<span class="dot warn"></span>Sin datos{% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% elif not error %}
+    <p class="muted">Cuando tu sonda empiece a descubrir equipos, aparecen acá.</p>
+    {% endif %}
+  </div>
+{% endblock %}
