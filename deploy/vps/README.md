@@ -64,12 +64,22 @@ loopback. Por eso `WEB_BIND=127.0.0.1`: nada queda expuesto en la red del VPS.
 | Hostname | Servicio local | Qué sirve |
 |---|---|---|
 | `itier.pymesenlinea.com.ar` | `http://localhost:8082` | Landing pública (`landing/`) |
-| `panel.itier.pymesenlinea.com.ar` | `http://localhost:8083` | **Consola / dashboard** |
-| `itsm.itier.pymesenlinea.com.ar` | `http://localhost:8884` | GLPI (lo usan los clientes) |
-| `zabbix.itier.pymesenlinea.com.ar` | `http://localhost:8885` | Zabbix web (opcional) |
+| `itier-panel.pymesenlinea.com.ar` | `http://localhost:8083` | **Consola / dashboard** |
+| `itier-itsm.pymesenlinea.com.ar` | `http://localhost:8884` | GLPI (lo usan los clientes) |
+| `itier-zabbix.pymesenlinea.com.ar` | `http://localhost:8885` | Zabbix web (opcional) |
 
 GLPI necesita hostname propio porque los clientes (glpi-agent y el agente) lo
 alcanzan por internet. Zabbix web es opcional: la consola ya opera Zabbix.
+
+> **⚠ Usá subdominios de UN solo nivel.** El certificado gratis de Cloudflare
+> (Universal SSL) cubre `pymesenlinea.com.ar` y `*.pymesenlinea.com.ar` — **un
+> nivel**. Por eso `itier.pymesenlinea.com.ar` anda, pero un nombre anidado como
+> `panel.itier.pymesenlinea.com.ar` (dos niveles) da
+> **`ERR_SSL_VERSION_OR_CIPHER_MISMATCH`**: no existe cert para ese host y nunca
+> se emite esperando. Por eso la consola/GLPI/Zabbix van como `itier-panel`,
+> `itier-itsm`, `itier-zabbix` (un nivel). Si querés los nombres anidados,
+> necesitás **Advanced Certificate Manager** (pago) con un cert para
+> `*.itier.pymesenlinea.com.ar`.
 
 ### Ingress
 
@@ -84,7 +94,7 @@ reglas del ejemplo [`cloudflared/config.example.yml`](cloudflared/config.example
 
 La consola funciona bien detrás del túnel: Cloudflare le llega por HTTPS (cookies
 `Secure`), uvicorn confía en `X-Forwarded-Proto`. **Accedé solo por el dominio
-HTTPS** (`panel.…`); si probás `http://IP:8083` directo, la cookie de sesión no
+HTTPS** (`itier-panel.…`); si probás `http://IP:8083` directo, la cookie de sesión no
 viaja y el login “no anda”.
 
 > ⚠ El servidor Zabbix (`10051`) **no** pasa por el túnel (ver sección siguiente).
@@ -112,13 +122,13 @@ Distinto de la web: el `zabbix-proxy` de cada cliente se conecta desde
 La consola (servicio `consola`) habla con GLPI y Zabbix **por la red interna del
 stack** (`http://glpi` y `http://zabbix-web:8080`): no salen sus APIs a la LAN ni
 a internet. Solo publica su propio puerto (`${CONSOLE_PORT:-8083}`, en loopback)
-para que el túnel la alcance, y se sirve en `panel.itier.pymesenlinea.com.ar`.
+para que el túnel la alcance, y se sirve en `itier-panel.pymesenlinea.com.ar`.
 Lo único manual es **generar los tokens de API** dentro de GLPI y Zabbix y
 ponerlos en `.env`.
 
 ### 1) Token de API de GLPI
 
-Entrá a GLPI (por su hostname, ej. `https://itsm.itier.pymesenlinea.com.ar`) como administrador:
+Entrá a GLPI (por su hostname, ej. `https://itier-itsm.pymesenlinea.com.ar`) como administrador:
 
 1. **Configuración → General → pestaña API:** activá *Habilitar la API REST* y
    anotá la *URL de la API*. Asegurate de que exista un **cliente de API** con
@@ -135,7 +145,7 @@ Entrá a GLPI (por su hostname, ej. `https://itsm.itier.pymesenlinea.com.ar`) co
 
 ### 2) Token de API de Zabbix
 
-Entrá a Zabbix (por su hostname, ej. `https://zabbix.itier.pymesenlinea.com.ar`, o por la consola) como *Super admin*:
+Entrá a Zabbix (por su hostname, ej. `https://itier-zabbix.pymesenlinea.com.ar`, o por la consola) como *Super admin*:
 
 1. **Usuarios → Tokens de API → Crear token**, asignado a un usuario con permisos
    para **crear grupos de hosts y proxies** (*Super admin*). Copiá el token: se
@@ -150,14 +160,14 @@ cd deploy/vps
 # En .env, además de los tokens:
 #   ITIER_CONSOLE_SECRET      → openssl rand -hex 32
 #   ITIER_CONSOLE_ADMIN_PASSWORD → clave del admin inicial
-#   ITIER_PUBLIC_GLPI_URL     → URL pública de GLPI por el túnel (https://itsm.itier.pymesenlinea.com.ar)
+#   ITIER_PUBLIC_GLPI_URL     → URL pública de GLPI por el túnel (https://itier-itsm.pymesenlinea.com.ar)
 #   ITIER_ZBX_SERVER_HOST     → host DIRECTO del server Zabbix (IP/VPN; NO Cloudflare)
 nano .env
 
 docker compose up -d --build     # ahora también construye la imagen de la consola
 ```
 
-Publicá la consola en el túnel: hostname `panel.itier.pymesenlinea.com.ar` →
+Publicá la consola en el túnel: hostname `itier-panel.pymesenlinea.com.ar` →
 `http://localhost:8083` (ver [Detrás de Cloudflare Tunnel](#detrás-de-cloudflare-tunnel)).
 
 ### 4) Primer login y verificación

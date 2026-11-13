@@ -1,5 +1,14 @@
 # Ejemplo de ingress de Cloudflare Tunnel para iTier (cloudflared en ESTE VPS).
 #
+# ⚠ TLS / nombres de host — IMPORTANTE:
+#   El certificado gratis de Cloudflare (Universal SSL) cubre el dominio y UN
+#   solo nivel de subdominio: `pymesenlinea.com.ar` y `*.pymesenlinea.com.ar`.
+#   Por eso `itier.pymesenlinea.com.ar` (1 nivel) anda, pero `panel.itier...`
+#   (2 niveles) da ERR_SSL_VERSION_OR_CIPHER_MISMATCH: no hay cert para ese nombre.
+#   → Usá subdominios de UN nivel (prefijo `itier-`), como abajo. Si querés los
+#     nombres anidados (`panel.itier...`), hace falta Advanced Certificate Manager
+#     (pago) con un cert para `*.itier.pymesenlinea.com.ar`.
+#
 # Dos formas de configurar el túnel; usá la que corresponda a cómo lo creaste:
 #
 # A) Túnel ADMINISTRADO REMOTAMENTE (lo corrés con token: `cloudflared tunnel
@@ -11,9 +20,9 @@
 # B) Túnel ADMINISTRADO LOCALMENTE (config.yml). Copiá este archivo a
 #    /etc/cloudflared/config.yml, ajustá tunnel/credentials, y creá los DNS:
 #      cloudflared tunnel route dns <tunel> itier.pymesenlinea.com.ar
-#      cloudflared tunnel route dns <tunel> panel.itier.pymesenlinea.com.ar
-#      cloudflared tunnel route dns <tunel> itsm.itier.pymesenlinea.com.ar
-#      cloudflared tunnel route dns <tunel> zabbix.itier.pymesenlinea.com.ar
+#      cloudflared tunnel route dns <tunel> itier-panel.pymesenlinea.com.ar
+#      cloudflared tunnel route dns <tunel> itier-itsm.pymesenlinea.com.ar
+#      cloudflared tunnel route dns <tunel> itier-zabbix.pymesenlinea.com.ar
 #
 # Requisito: en deploy/vps/.env → WEB_BIND=127.0.0.1 (y la landing con
 # LANDING_BIND=127.0.0.1), para que los servicios escuchen solo en loopback y
@@ -28,17 +37,17 @@ ingress:
     service: http://localhost:8082
 
   # Consola / dashboard (plano de control)
-  - hostname: panel.itier.pymesenlinea.com.ar
+  - hostname: itier-panel.pymesenlinea.com.ar
     service: http://localhost:8083
 
   # GLPI — lo necesitan los clientes (inventario glpi-agent + API del agente).
   # Debe ser público; por eso tiene su propio hostname.
-  - hostname: itsm.itier.pymesenlinea.com.ar
+  - hostname: itier-itsm.pymesenlinea.com.ar
     service: http://localhost:8884
 
   # Zabbix web — OPCIONAL (la consola ya opera Zabbix). Quitalo si no querés
   # exponer el dashboard nativo.
-  - hostname: zabbix.itier.pymesenlinea.com.ar
+  - hostname: itier-zabbix.pymesenlinea.com.ar
     service: http://localhost:8885
 
   # Regla final obligatoria: todo lo demás, 404.
