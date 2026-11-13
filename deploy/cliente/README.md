@@ -72,21 +72,28 @@ Definí **al menos una** de las dos. Si faltan ambas, `/readyz` devuelve 503.
 ## Seguridad del proxy Zabbix
 
 El `zabbix-proxy` se conecta de forma saliente al VPS por 10051. En internet,
-**no dependas solo del firewall**: activá PSK/TLS entre proxy y servidor.
+**no dependas solo del firewall**: cifrá proxy↔servidor con PSK.
 
-1. Generá una clave:
+**Camino normal (con la consola de iTier).** Al dar de alta el cliente, la
+consola ya creó el proxy en el servidor Zabbix del VPS **con su PSK** y te armó
+el *bundle de enrolamiento*. En el appliance solo tenés que:
+
+1. Pegar el fragmento `.env` del bundle (ya trae `ZBX_TLSCONNECT=psk`,
+   `ZBX_TLSPSKIDENTITY=itier-<tenant>` y `ZBX_TLSPSKFILE=/var/lib/zabbix/enc/proxy.psk`).
+2. Guardar la PSK del bundle en `./enc/proxy.psk` (el compose ya monta `./enc`
+   en `/var/lib/zabbix/enc`, en solo-lectura):
    ```sh
-   openssl rand -hex 32 > proxy.psk
+   mkdir -p enc && printf '%s' '<PSK-del-bundle>' > enc/proxy.psk && chmod 600 enc/proxy.psk
    ```
-2. Montala en el contenedor (agregá un volumen que la deje en
-   `/var/lib/zabbix/enc/proxy.psk`) y completá en `.env`:
-   ```
-   ZBX_TLSCONNECT=psk
-   ZBX_TLSPSKIDENTITY=itier-<tenant>
-   ZBX_TLSPSKFILE=/var/lib/zabbix/enc/proxy.psk
-   ```
-3. Registrá el proxy y su PSK en el servidor Zabbix del VPS con la misma
-   identidad y clave.
+
+No hay que registrar nada más en el servidor: lo hizo la consola en el alta.
+
+**Sin consola (a mano).** Generás la clave vos, la dejás en `./enc/proxy.psk`,
+completás esas tres variables en `.env`, y registrás el proxy y su PSK en el
+servidor Zabbix del VPS con la **misma identidad y clave**:
+```sh
+openssl rand -hex 32 > enc/proxy.psk && chmod 600 enc/proxy.psk
+```
 
 ## ⚠ Puntos a verificar
 

@@ -65,6 +65,10 @@ services:
       ZBX_TLSPSKFILE: ${ZBX_TLSPSKFILE:-}
     volumes:
       - zbx_data:/var/lib/zabbix
+      # PSK del proxy (del bundle de la consola): dejá el archivo en ./enc/proxy.psk
+      # y queda disponible en /var/lib/zabbix/enc/proxy.psk (lo apunta ZBX_TLSPSKFILE).
+      # Si no usás PSK, la carpeta queda vacía y no estorba.
+      - ./enc:/var/lib/zabbix/enc:ro
     security_opt: [no-new-privileges:true]
     logging:
       driver: json-file
