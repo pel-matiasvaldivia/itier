@@ -19,7 +19,7 @@ sumar la capa agéntica.
 | `glpi`          | `glpi/glpi:11.0` (parametrizable)        | `${GLPI_HTTP_PORT:-8884}/tcp` (LAN) | CMDB, ITAM, tickets, catálogo. |
 | `zabbix-web`    | `zabbix/zabbix-web-nginx-pgsql`          | `${ZBX_WEB_PORT:-8885}/tcp` (LAN)   | Frontend de Zabbix. |
 | `zabbix-server` | `zabbix/zabbix-server-pgsql`             | `10051/tcp` (público)             | Recibe datos de los proxies de cada cliente. |
-| `consola`       | `itier-console` (build local)            | `${CONSOLE_PORT:-8083}/tcp` (LAN) | Plano de control: opera GLPI+Zabbix por API (login 2FA). |
+| `consola`       | `itier-console` (GHCR, construida en CI)  | `${CONSOLE_PORT:-8083}/tcp` (LAN) | Plano de control: opera GLPI+Zabbix por API (login 2FA). |
 
 Los frontends **publican su puerto** en el host y el proxy los alcanza por
 `WEB_BIND:puerto`. Con Cloudflare Tunnel en este host, `WEB_BIND=127.0.0.1`
@@ -46,9 +46,17 @@ cp .env.example .env
 nano .env
 
 docker compose config      # valida el YAML y la interpolación de variables
-docker compose up -d --build
+docker compose pull        # baja las imágenes (consola desde GHCR; el VPS NO compila)
+docker compose up -d
 docker compose ps
 ```
+
+> La imagen de la consola se construye en CI y se publica en GHCR
+> (`.github/workflows/build-console.yml`); el VPS solo hace `pull`. Si el paquete
+> de GHCR es privado, autenticate una vez: `docker login ghcr.io` con un token con
+> `read:packages`. Pineá el tag/digest en `CONSOLE_IMAGE` del `.env` (en la rama
+> de trabajo, `:latest` no existe: usá el tag de la rama, ej.
+> `…/itier-console:claude-agentic-ai-itsm-tipcii`).
 
 En el primer arranque, `init/10-init-zabbix.sh` crea el rol y la base
 `zabbix`. **Solo corre con el volumen de datos vacío**: si ya inicializaste
@@ -166,7 +174,7 @@ cd deploy/vps
 #   ITIER_ZBX_SERVER_HOST     → host DIRECTO del server Zabbix (IP/VPN; NO Cloudflare)
 nano .env
 
-docker compose up -d --build     # ahora también construye la imagen de la consola
+docker compose pull consola && docker compose up -d consola   # baja la imagen de GHCR
 ```
 
 Publicá la consola en el túnel: hostname `itier-panel.pymesenlinea.com.ar` →

@@ -180,12 +180,13 @@ services:
   # ── Consola de operación: el plano de control (ADR-0008) ──────────────────
   # Web única que opera GLPI y Zabbix POR LA RED INTERNA (por nombre de servicio:
   # http://glpi y http://zabbix-web:8080), sin salir al host ni exponer sus APIs.
-  # Publica su propio puerto en `publica` para que NPM (en el otro VPS) la alcance.
+  # Publica su propio puerto en `publica` para que el proxy (Cloudflare/NPM) la alcance.
+  # La IMAGEN se construye en CI (.github/workflows/build-console.yml) y se publica
+  # en GHCR: el VPS solo hace `pull`, NO compila. Pineá un tag/digest en CONSOLE_IMAGE.
   # Los tokens de API se generan DENTRO de GLPI/Zabbix: ver deploy/vps/README.md.
   consola:
     <<: *comun
-    build: ../../consola
-    image: ${CONSOLE_IMAGE:-itier-console:local}
+    image: ${CONSOLE_IMAGE:-ghcr.io/pel-matiasvaldivia/itier-console:latest}
     depends_on:
       glpi: { condition: service_started }
       zabbix-web: { condition: service_started }

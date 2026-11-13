@@ -69,9 +69,10 @@ Cada carpeta tiene su propio `README.md`, `docker-compose.yml` y `.env.example`.
   NPM (o tunelizalos con WireGuard si la LAN no es de confianza).
 - **La base de datos no ve internet ni se publica.** Vive en una red
   `internal: true` y no expone puertos: solo la alcanzan los contenedores del stack.
-- **La imagen del agente sale de CI.** `.github/workflows/build-agent.yml`
-  construye y publica `ghcr.io/pel-matiasvaldivia/itier-agent` multi-arch
-  (amd64 + arm64). El cliente solo la consume.
+- **Las imágenes propias salen de CI.** `build-agent.yml` publica
+  `ghcr.io/pel-matiasvaldivia/itier-agent` multi-arch (amd64 + arm64) y
+  `build-console.yml` publica `…/itier-console` (amd64). Ni el VPS ni el cliente
+  compilan: solo hacen `pull`.
 
 ## Nota sobre esta fase vs. el diseño de borde
 
