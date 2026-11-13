@@ -194,9 +194,33 @@ autonomía definida.
 
 ### 6.1 Cómo entra el inventario
 
-`glpi-agent` (y descubrimiento SNMP/WinRM/SSH) alimenta el CMDB de GLPI de forma
-automática. Regla: **no se cargan CIs a mano** salvo excepción documentada; la fuente
-de verdad es el descubrimiento.
+`glpi-agent` alimenta el CMDB de GLPI de forma automática. Regla: **no se cargan CIs
+a mano** salvo excepción documentada; la fuente de verdad es el descubrimiento.
+
+**Tres fuentes, una sola dirección (saliente, ADR-0005):**
+
+- **Inventario local** del appliance y, vía WinRM/SSH, de servidores.
+- **Netdiscovery + netinventory (SNMP):** barrido de rangos IP que encuentra e
+  inventaría lo no gestionable — switches, routers, impresoras, APs, UPS.
+- Todo lo empuja el agente hacia el endpoint de GLPI; el appliance no abre puertos.
+
+**Configurar el descubrimiento (paso del operador, una vez por cliente).** Los
+rangos de IP y las credenciales SNMP **no** viven en el appliance: se definen en el
+server, en **GLPI → Administración → Inventario (plugin GlpiInventory)**:
+
+1. Cargar los **rangos de IP** de la LAN del cliente a barrer.
+2. Cargar las **credenciales SNMP** (community v1/v2c, o usuario/claves v3) y
+   **asociarlas** a esos rangos — sin asociarlas, el descubrimiento no trae nada.
+3. Autorizar el **agente del cliente** (aparece con el tag `itier-<tenant>`) y
+   habilitarle las tareas *network discovery* y *network inventory (SNMP)*.
+
+El appliance (`deploy/cliente/`) ya viene con esas tareas activas; lo único por
+cliente es este alta de rangos/credenciales. A partir de ahí el agente toma el
+trabajo solo, en cada contacto con el server, y se curan los CIs en §6.2.
+
+> ⚠ **GLPI 11 + GlpiInventory.** El descubrimiento SNMP de red usa el plugin
+> **GlpiInventory**. Confirmá que esté instalado y sea compatible con tu GLPI 11
+> antes de depender de esta vía (el inventario local no lo necesita).
 
 ### 6.2 Curación y clasificación de criticidad 🔒 (paso clave)
 

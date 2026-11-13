@@ -111,17 +111,27 @@ services:
       driver: json-file
       options: { max-size: "10m", max-file: "3" }
 
-  # ── Agente de inventario de GLPI (LAN → VPS) ──────────────────────────────
-  # ⚠ VERIFICAR imagen y variables contra la doc de glpi-agent antes de usar.
+  # ── Agente de GLPI: inventario de la LAN + descubrimiento SNMP (LAN → VPS) ──
+  # Imagen propia (deploy/cliente/glpi-agent/, publicada en GHCR; no hay imagen
+  # oficial del agente). Corre como daemon, solo saliente, sin httpd. Los RANGOS
+  # de IP y las CREDENCIALES SNMP se definen en el server (plugin GlpiInventory),
+  # no acá: el agente pide su trabajo al contactar al server. Ver README.
   glpi-agent:
-    image: ${GLPI_AGENT_IMAGE:-glpi/glpi-agent:latest}
+    image: ${GLPI_AGENT_IMAGE:-ghcr.io/pel-matiasvaldivia/itier-glpi-agent:latest}
     restart: unless-stopped
-    network_mode: host
+    network_mode: host          # ve la LAN para inventariar y barrer por SNMP
+    init: true                  # reaper de señales para el daemon (PID 1)
     environment:
-      # URL del servidor GLPI del VPS que recibe el inventario (HTTPS público).
-      GLPI_AGENT_SERVER: ${ITIER_GLPI_URL:?falta ITIER_GLPI_URL}
-      # Identificador del equipo/agente en GLPI.
-      GLPI_AGENT_HOSTNAME: itier-${ITIER_TENANT:?falta ITIER_TENANT}
+      ITIER_TENANT: ${ITIER_TENANT:?falta ITIER_TENANT}
+      # URL pública de GLPI (por el túnel). El agente deriva el endpoint de
+      # inventario como <ITIER_GLPI_URL>/plugins/glpiinventory/ salvo que fijes
+      # ITIER_GLPI_INVENTORY_URL explícito.
+      ITIER_GLPI_URL: ${ITIER_GLPI_URL:?falta ITIER_GLPI_URL}
+      ITIER_GLPI_INVENTORY_URL: ${ITIER_GLPI_INVENTORY_URL:-}
+      # Tareas: inventario local + descubrimiento de red + inventario SNMP.
+      GLPI_AGENT_TASKS: ${GLPI_AGENT_TASKS:-inventory,netdiscovery,netinventory}
+      GLPI_AGENT_DELAYTIME: ${GLPI_AGENT_DELAYTIME:-60}
+      GLPI_AGENT_EXTRA: ${GLPI_AGENT_EXTRA:-}
     security_opt: [no-new-privileges:true]
     logging:
       driver: json-file

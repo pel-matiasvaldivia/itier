@@ -115,6 +115,36 @@ servidor Zabbix del VPS con la **misma identidad y clave**:
 openssl rand -hex 32 > enc/proxy.psk && chmod 600 enc/proxy.psk
 ```
 
+## Descubrimiento de red (SNMP) e inventario
+
+El `glpi-agent` es una **imagen propia** (`glpi-agent/`, publicada en GHCR; no hay
+imagen oficial del agente). Corre como **daemon, solo saliente, sin httpd**, y hace
+tres cosas que alimentan el CMDB de GLPI:
+
+- **Inventario local** del appliance (y, con WinRM/SSH, de servidores).
+- **Netdiscovery**: barre rangos de IP y encuentra lo que hay en la LAN.
+- **Netinventory (SNMP)**: inventaría lo no gestionable — switches, routers,
+  impresoras, APs, UPS.
+
+**Dónde se configura qué:**
+
+| Qué | Dónde | Por qué |
+|---|---|---|
+| Que el agente **corra** esas tareas y a qué endpoint enviar | **Acá** (`.env`: `GLPI_AGENT_TASKS`, `ITIER_GLPI_URL`) | Es config del appliance |
+| **Rangos de IP** a barrer y **credenciales SNMP** | **En el server** (GLPI → GlpiInventory) | El agente pide su trabajo al contactar al server (encaja con "solo saliente") |
+
+> ⚠ Los **rangos y las credenciales SNMP no van en el appliance**. El agente las
+> recibe del server al contactarlo. Así no hay secretos SNMP regados por cada LAN y
+> el scope de descubrimiento se maneja central (en GLPI, y a futuro desde la consola).
+
+**Paso del operador, una vez por cliente** (ver `docs/07` §6.1): en GLPI →
+Administración → Inventario (GlpiInventory): cargar los rangos de IP, cargar las
+credenciales SNMP y **asociarlas** a los rangos, y autorizar al agente (aparece con
+el tag `itier-<tenant>`). Desde ahí el descubrimiento es automático.
+
+El endpoint por defecto es `ITIER_GLPI_URL` + `/plugins/glpiinventory/`; si tu ruta
+difiere, fijá `ITIER_GLPI_INVENTORY_URL` explícito.
+
 ## ⚠ Puntos a verificar
 
 - **El VPS tiene que estar en la MISMA malla.** `ZBX_SERVER_HOST` es la IP del
@@ -134,10 +164,15 @@ openssl rand -hex 32 > enc/proxy.psk && chmod 600 enc/proxy.psk
   exposición del 10051 del proxy en la LAN.
 - **`MESH_NODE_TOKEN` es secreto y por cliente.** Uno por nodo/cliente; vive solo
   en el `.env`, nunca en git. Si se filtra, rotalo en el panel de Cloudflare.
-- **glpi-agent.** Confirmá el nombre de la imagen y sus variables de entorno
-  contra la documentación oficial de glpi-agent; ajustá `GLPI_AGENT_IMAGE` y las
-  claves `GLPI_AGENT_*` según corresponda. Si preferís, reemplazalo por un
-  agente instalado directamente en cada equipo del cliente.
+- **Plugin GlpiInventory en GLPI 11.** El descubrimiento SNMP de red se apoya en
+  el plugin **GlpiInventory** del server. GLPI 11 es reciente: confirmá que el
+  plugin esté instalado y sea compatible, y que el endpoint
+  `…/plugins/glpiinventory/` responda, antes de depender de esta vía. El
+  inventario local (del appliance y por WinRM/SSH) **no** necesita el plugin.
+- **Alcance SNMP del agente.** El `glpi-agent` va en `network_mode: host`, así que
+  ve la LAN para barrer por SNMP. Si querés que el appliance descubra una subred
+  que no es la suya directa, revisá ruteo/VLAN. Para descubrir equipos detrás de
+  WinRM/SSH, cargá esas credenciales también en GlpiInventory.
 - **Reachability para remediación (Fase 3+).** Cuando llegue el bucle agéntico
   con Ansible, el `itier-agent` necesitará alcanzar hosts de la LAN. Ahí se
   revisita la red del servicio (hoy es solo-salida a propósito). Ese cambio se
