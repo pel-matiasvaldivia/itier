@@ -251,7 +251,7 @@ def clave_reporte(conn: sqlite3.Connection, cli: dict) -> str:
 
 
 _MAX_EQUIPOS = 2000
-_VALORES = {"activo", "detenido", "ausente", "ok", "sin_respuesta", "omitido", "pendiente"}
+_VALORES = {"activo", "detenido", "ausente", "ok", "sin_respuesta", "dns_no_resuelve", "omitido", "pendiente"}
 
 
 def registrar_equipo(conn: sqlite3.Connection, clave: str, ip_origen: str, datos: dict) -> bool:
