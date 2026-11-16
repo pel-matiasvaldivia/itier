@@ -63,6 +63,20 @@ _SNMP_VER_COD = {"1": 1, "2c": 2, "3": 3}                      # glpi_snmpcreden
 _SNMP_AUTH_COD = {"MD5": 1, "SHA": 2, "SHA224": 3, "SHA256": 4, "SHA384": 5, "SHA512": 6}
 _SNMP_PRIV_COD = {"DES": 1, "AES": 2, "3DES": 3, "AES192": 4, "AES256": 5}
 
+# ── Criticidad (curación de CMDB): business criticity de GLPI ──────────────
+# ⚠ Itemtype del dropdown confirmado como BusinessCriticity (CommonTreeDropdown);
+#   el campo en el ítem es businesscriticities_id. Confirmá contra tu GLPI 11.
+#   Es la MISMA criticidad que el agente de borde lee (reference/.../datos.py).
+IT_BUSINESSCRIT = "BusinessCriticity"
+CRITICIDADES = {"critica": "Crítica", "alta": "Alta", "media": "Media", "baja": "Baja"}
+
+_DEMO_CIS = [
+    {"itemtype": "Computer", "id": "501", "name": "SRV-DC01", "entities_id": 2, "criticidad": "Crítica"},
+    {"itemtype": "Computer", "id": "502", "name": "SRV-FILE01", "entities_id": 2, "criticidad": "Alta"},
+    {"itemtype": "Computer", "id": "503", "name": "PC-RECEPCION", "entities_id": 2, "criticidad": ""},
+    {"itemtype": "Computer", "id": "601", "name": "SRV-APP", "entities_id": 3, "criticidad": ""},
+]
+
 
 class GLPIClient:
     def __init__(self, cfg):
@@ -228,6 +242,65 @@ class GLPIClient:
             {"input": {"plugin_glpiinventory_ipranges_id": range_id,
                        "snmpcredentials_id": cred_id, "rank": rank}},
         )
+
+    # -- criticidad (curación de CMDB) --------------------------------------
+
+    def listar_cis(self, entity_id) -> list[dict]:
+        """CIs (computers) de una entidad, con su criticidad actual (para curar)."""
+        if self.demo:
+            return [dict(c) for c in _DEMO_CIS if str(c["entities_id"]) == str(entity_id)]
+        if entity_id in (None, ""):
+            return []
+        try:
+            comps = self._get("/Computer", params={"range": "0-500"})
+        except AdapterError as e:
+            if "RANGE_EXCEED_TOTAL" in str(e):
+                return []
+            raise
+        if not isinstance(comps, list):
+            return []
+        comps = [c for c in comps if str(c.get("entities_id")) == str(entity_id)]
+        nombres: dict[str, str] = {}  # id de business criticity → nombre (valor actual)
+        try:
+            for x in self._get(f"/{IT_BUSINESSCRIT}", params={"range": "0-200"}) or []:
+                if isinstance(x, dict):
+                    nombres[str(x.get("id"))] = x.get("name") or ""
+        except AdapterError:
+            pass
+        return [{"itemtype": "Computer", "id": str(c.get("id")), "name": c.get("name"),
+                 "criticidad": nombres.get(str(c.get("businesscriticities_id")), "")}
+                for c in comps]
+
+    def _criticidad_id(self, nombre: str) -> int:
+        """Id del valor de business criticity en GLPI (lo crea si no existe)."""
+        if self.demo:
+            return 900 + (abs(hash(nombre)) % 99)
+        try:
+            for x in self._get(f"/{IT_BUSINESSCRIT}", params={"range": "0-200"}) or []:
+                if isinstance(x, dict) and (x.get("name") or "") == nombre:
+                    return int(x["id"])
+        except AdapterError:
+            pass
+        cid = self._id_de(self._post(f"/{IT_BUSINESSCRIT}", {"input": {"name": nombre}}))
+        if cid is None:
+            raise AdapterError("GLPI", "no se pudo crear el valor de criticidad")
+        return int(cid)
+
+    def fijar_criticidad(self, itemtype: str, items_id: str, criticidad: str) -> dict:
+        """Escribe la criticidad del CI en GLPI (campo businesscriticities_id). Es la
+        fuente que lee el agente de borde para el techo de autonomía."""
+        nombre = CRITICIDADES.get(criticidad)
+        if not nombre:
+            raise AdapterError("GLPI", f"criticidad inválida: {criticidad}")
+        if self.demo:
+            for c in _DEMO_CIS:
+                if c["itemtype"] == itemtype and str(c["id"]) == str(items_id):
+                    c["criticidad"] = nombre
+            return {"ok": True, "criticidad": nombre}
+        crit_id = self._criticidad_id(nombre)
+        self._put(f"/{itemtype}/{items_id}",
+                  {"input": {"id": int(items_id), "businesscriticities_id": crit_id}})
+        return {"ok": True, "criticidad": nombre}
 
     # -- tickets -------------------------------------------------------------
 

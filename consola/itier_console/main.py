@@ -25,6 +25,7 @@ from .deps import AccesoConsola, AccesoPortal, AuthRequired, CambioClaveRequerid
 from .routes import agents as r_agents
 from .routes import audit as r_audit
 from .routes import clients as r_clients
+from .routes import curacion as r_curacion
 from .routes import dashboard as r_dashboard
 from .routes import discovery as r_discovery
 from .routes import portal as r_portal
@@ -103,6 +104,7 @@ def create_app() -> FastAPI:
     app.include_router(r_clients.router)
     app.include_router(r_agents.router)
     app.include_router(r_discovery.router)
+    app.include_router(r_curacion.router)
     app.include_router(r_tickets.router)
     app.include_router(r_audit.router)
     app.include_router(r_portal.router)

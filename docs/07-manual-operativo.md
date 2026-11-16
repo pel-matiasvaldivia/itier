@@ -231,6 +231,11 @@ La **criticidad de cada CI alimenta directamente el techo de autonomía** del ag
 (ver [§12](#proc-aut--niveles-de-autonomía-y-aprobaciones)). Por eso este paso es de
 seguridad, no cosmético.
 
+> **Desde la consola de iTier:** *Clientes → \<cliente\> → Criticidad (CMDB)*. La
+> consola lista los CIs del cliente y clasificás cada uno; se guarda en el campo
+> *business criticity* de GLPI, que es la **misma fuente** que lee el agente de borde
+> (`reference/edge-agent/.../datos.py`). Una sola fuente de verdad: la CMDB.
+
 1. Revisar los CIs descubiertos y descartar duplicados/fantasmas.
 2. Asignar **criticidad** a cada CI según su impacto en el negocio:
 

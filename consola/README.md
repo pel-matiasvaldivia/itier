@@ -25,6 +25,10 @@ roadmap (`docs/06`) menciona en todas las fases. Diseño en
   barrer y una **credencial SNMP** (v1/v2c o v3); la consola los crea en GLPI
   (SNMPCredential del core + IPRange del plugin GlpiInventory, en la entidad del
   cliente) y el `glpi-agent` del appliance toma el trabajo. Sin entrar a GLPI.
+- **Criticidad (curación de CMDB).** Por cliente, clasificás la **criticidad** de
+  cada CI (crítica/alta/media/baja). Se guarda en GLPI (*business criticity*) y es
+  la **fuente que lee el agente de borde** para fijar su techo de autonomía
+  (crítica→L2, alta→L3). Ver [`docs/07` §6.2](../docs/07-manual-operativo.md).
 - **Tickets de GLPI.** Listar, ver, crear y asignar. El Tablero muestra los
   recientes con técnico asignado.
 - **Portal del cliente** (`/portal`). Superficie **separada y acotada por tenant**:

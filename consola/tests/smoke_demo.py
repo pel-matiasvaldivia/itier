@@ -113,6 +113,20 @@ check("descubrimiento: v3 sin usuario rechazado", "v3-sin-user" not in c.get("/c
 r = c.post("/clientes/prueba-srl/descubrimiento/1/eliminar", data={"csrf": csrf_de(page)})
 check("descubrimiento: eliminar quita el rango", "10.20.30.254" not in c.get("/clientes/prueba-srl/descubrimiento").text)
 
+# 7c) Curación de criticidad (CMDB): la página carga y se fija una criticidad
+cr = c.get("/clientes/prueba-srl/criticidad")
+check("criticidad: página carga", "Criticidad (CMDB)" in cr.text)
+r = c.post("/clientes/prueba-srl/criticidad",
+           data={"itemtype": "Computer", "items_id": "501", "nombre": "SRV-DC01",
+                 "criticidad": "critica", "csrf": csrf_de(cr.text)})
+check("criticidad: se fija (vuelve a la página)", r.url.path.endswith("/criticidad"), r.url.path)
+check("auditoria: registró criticidad.fijada", "criticidad.fijada" in c.get("/auditoria").text)
+# criticidad inválida no rompe ni registra
+r = c.post("/clientes/prueba-srl/criticidad",
+           data={"itemtype": "Computer", "items_id": "501", "nombre": "X",
+                 "criticidad": "inexistente", "csrf": csrf_de(cr.text)})
+check("criticidad inválida se rechaza sin romper", r.url.path.endswith("/criticidad"))
+
 # 8) Tickets: lista + alta
 check("tickets lista demo", "No anda el correo" in c.get("/tickets").text)
 html = c.get("/tickets/nuevo").text

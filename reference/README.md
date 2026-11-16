@@ -98,10 +98,10 @@ OFFLINE, le agrega un seguimiento con el triage; con LLM, el agente lo enriquece
 ## Lo que falta para producción
 
 - **Completar el adaptador de datos del agente:** `datos.py` ya usa GLPI/Zabbix reales para
-  CMDB, criticidad/roles, métricas, ciclo de vida y tickets. Falta la evidencia por `/search`
-  (tickets similares, KB, búsqueda de CIs), el grafo de impacto y el colector de logs; y fijar
-  la **fuente de criticidad/roles** desde la curación de la CMDB (docs/07 §6.2) — hoy se deriva
-  de un campo de GLPI + heurística por nombre + un default conservador
+  CMDB, criticidad, métricas, ciclo de vida y tickets. La **criticidad se cura desde la consola**
+  (Clientes → cliente → Criticidad → *business criticity* de GLPI, que el borde lee; docs/07 §6.2).
+  Falta: curar también los **roles** (hoy heurística por nombre), la evidencia por `/search`
+  (tickets similares, KB, búsqueda de CIs), el grafo de impacto y el colector de logs
 - Servidores MCP reales (acá las tools son funciones locales; en producción son procesos
   MCP separados con su propio límite de privilegio)
 - Adaptador de GLPI contra la API v2 con OAuth2

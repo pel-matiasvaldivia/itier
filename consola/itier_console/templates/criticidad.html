@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block titulo %}Criticidad · {{ cli.nombre }}{% endblock %}
+{% block contenido %}
+  <div class="page-head">
+    <h1>Criticidad (CMDB) · {{ cli.nombre }}</h1>
+    <a class="btn" href="/clientes/{{ cli.slug }}">← Volver al cliente</a>
+  </div>
+
+  <div class="note">
+    La criticidad de cada CI <strong>fija el techo de autonomía</strong> del agente
+    (docs/07 §6.2): es de seguridad, no cosmético. Se guarda en GLPI (<em>business
+    criticity</em>) y es la misma fuente que lee el agente de borde.
+    <strong>crítica → L2</strong> (siempre pide aprobación), <strong>alta → L3</strong>,
+    media/baja → L4.
+  </div>
+
+  {% if error %}<div class="note note-bad">No se pudo consultar GLPI: {{ error }}</div>{% endif %}
+  {% if not cli.glpi_entity_id %}
+  <div class="note note-bad">Este cliente no tiene entidad GLPI; completá el alta primero.</div>
+  {% endif %}
+
+  <div class="card">
+    <h2>Elementos de configuración</h2>
+    {% if cis %}
+    <table class="tabla">
+      <thead><tr><th>CI</th><th>Criticidad</th></tr></thead>
+      <tbody>
+        {% for c in cis %}
+        <tr>
+          <td><code>{{ c.name }}</code></td>
+          <td class="acciones">
+            <form method="post" action="/clientes/{{ cli.slug }}/criticidad" class="inline">
+              <input type="hidden" name="csrf" value="{{ csrf }}">
+              <input type="hidden" name="itemtype" value="{{ c.itemtype }}">
+              <input type="hidden" name="items_id" value="{{ c.id }}">
+              <input type="hidden" name="nombre" value="{{ c.name }}">
+              <select name="criticidad">
+                <option value="" disabled {% if not c.criticidad_clave %}selected{% endif %}>— sin clasificar —</option>
+                {% for n in niveles %}
+                <option value="{{ n }}" {% if c.criticidad_clave == n %}selected{% endif %}>{{ n }}</option>
+                {% endfor %}
+              </select>
+              <button class="btn btn-sm btn-primary" type="submit">Guardar</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p class="muted">No hay CIs en la entidad de este cliente (o GLPI no devolvió equipos todavía).</p>
+    {% endif %}
+  </div>
+{% endblock %}

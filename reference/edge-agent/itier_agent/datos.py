@@ -13,10 +13,11 @@ Honestidad de alcance (todo marcado ⚠, aislado acá):
 El id de CI sigue la convención "{itemtype}:{items_id}" de GLPI (p. ej.
 "Computer:42"), que es lo que produce el resolver de FuenteZabbix con GLPI real.
 
-⚠ CRITICIDAD/ROLES alimentan el techo de autonomía (seguridad). Acá se derivan de
-  un campo de GLPI (business criticity) y de heurísticas por nombre, con un
-  **default conservador**. En producción deberían venir de la curación de la CMDB
-  (ver docs/07 §6.2); confirmá la fuente antes de subir la autonomía.
+⚠ CRITICIDAD/ROLES alimentan el techo de autonomía (seguridad). La CRITICIDAD se
+  lee del campo *business criticity* de GLPI, que el operador **cura desde la
+  consola** (Clientes → <cliente> → Criticidad; docs/07 §6.2) — esa es la fuente de
+  verdad en la CMDB. Si un CI no está clasificado, se usa un **default conservador**.
+  Los ROLES todavía se derivan por heurística de nombre (pendiente de curar también).
 """
 
 from __future__ import annotations

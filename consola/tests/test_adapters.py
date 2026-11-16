@@ -78,6 +78,17 @@ def handler(request: httpx.Request) -> httpx.Response:
             {"id": 1042, "name": "a", "status": 2, "priority": 3, "entities_id": 2},
             {"id": 1050, "name": "b", "status": 1, "priority": 4, "entities_id": 3},
         ])
+    # ── GLPI: criticidad (curación de CMDB) ──
+    if "/BusinessCriticity" in p:
+        if request.method == "POST":
+            return httpx.Response(201, json={"id": 90})
+        return httpx.Response(200, json=[{"id": "5", "name": "Crítica"}, {"id": "6", "name": "Alta"}])
+    if "/Computer/" in p and request.method == "PUT":
+        return httpx.Response(200, json={"id": 501})
+    if p.endswith("/Computer") and request.method == "GET":
+        return httpx.Response(200, json=[
+            {"id": 501, "name": "SRV-DC01", "entities_id": 2, "businesscriticities_id": 5},
+            {"id": 601, "name": "SRV-APP", "entities_id": 3, "businesscriticities_id": 0}])
     # ── Zabbix (api_jsonrpc.php) ──
     if p.endswith("/api_jsonrpc.php"):
         m = body.get("method")
@@ -170,6 +181,18 @@ hupd = next((r for r in captured if r["body"].get("method") == "host.update"), N
 check("zbx: host.update asigna proxyid y grupos",
       hupd and hupd["body"]["params"]["proxyid"] == "9"
       and any(g["groupid"] == "5" for g in hupd["body"]["params"]["groups"]))
+
+# ── GLPI: criticidad (curación de CMDB) ──────────────────────────────────────
+captured.clear()
+with glpi_mod.cliente(cfg) as g:
+    cis = g.listar_cis(2)
+    check("glpi.listar_cis filtra por entidad", len(cis) == 1 and cis[0]["name"] == "SRV-DC01", str(cis))
+    check("glpi.listar_cis resuelve el nombre de criticidad actual", cis[0]["criticidad"] == "Crítica", cis[0].get("criticidad"))
+    r = g.fijar_criticidad("Computer", "501", "critica")
+    check("glpi.fijar_criticidad devuelve el nombre GLPI", r.get("criticidad") == "Crítica", str(r))
+put = next((x for x in captured if x["path"].endswith("/Computer/501") and x["method"] == "PUT"), None)
+check("glpi.fijar_criticidad hace PUT con businesscriticities_id",
+      put and "businesscriticities_id" in put["body"]["input"], str(put["body"]) if put else "—")
 
 # ── GLPI: lista de tickets vacía (install nuevo) → el 400 se trata como [] ────
 TICKET_EMPTY = True
