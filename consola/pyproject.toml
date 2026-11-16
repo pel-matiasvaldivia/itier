@@ -27,4 +27,4 @@ build-backend = "setuptools.build_meta"
 include = ["itier_console*"]
 
 [tool.setuptools.package-data]
-itier_console = ["templates/**/*.html", "static/**/*"]
+itier_console = ["templates/**/*.html", "static/**/*", "deploy_templates/*"]

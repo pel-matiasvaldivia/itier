@@ -4,6 +4,7 @@
   <div class="page-head">
     <h1>{{ cli.nombre }}</h1>
     <div class="acciones">
+      <a class="btn btn-primary" href="/clientes/{{ cli.slug }}/instaladores">Instaladores →</a>
       <a class="btn" href="/clientes/{{ cli.slug }}/criticidad">Criticidad (CMDB) →</a>
       <a class="btn" href="/clientes/{{ cli.slug }}/descubrimiento">Descubrimiento de red →</a>
       <a class="btn" href="/clientes/{{ cli.slug }}/agentes">Agentes de Zabbix →</a>
@@ -87,7 +88,19 @@
   </div>
 
   <div class="card">
-    <h2>Bundle de enrolamiento</h2>
+    <h2>Despliegue en el cliente</h2>
+    <p>
+      {% if cli.enrolado_at and cli.enrolado_estado == 'ok' %}<span class="dot ok"></span>Appliance instalado
+        (<code>{{ cli.enrolado_host }}</code>, {{ cli.enrolado_ip or 'IP —' }}) · {{ cli.enrolado_at }}.
+      {% elif cli.enrolado_at %}<span class="dot warn"></span>La última instalación reportó un error ({{ cli.enrolado_at }}).
+      {% else %}<span class="dot warn"></span>Appliance todavía sin instalar.{% endif %}
+    </p>
+    <p class="muted">Los instaladores ya vienen con todos los valores de este cliente: un comando para el
+      appliance y un instalador para los equipos Windows.</p>
+    <div class="acciones"><a class="btn btn-primary" href="/clientes/{{ cli.slug }}/instaladores">Ir a instaladores →</a></div>
+
+    <details style="margin-top:1rem">
+      <summary class="muted small">Configuración manual (avanzado)</summary>
     <p class="muted">Pegá esto en <code>deploy/cliente/.env</code> del appliance del cliente y levantá el stack. Los nombres calzan con <code>deploy/cliente/docker-compose.yml</code>.</p>
 
     <div class="bundle-head">
@@ -108,5 +121,6 @@
       <code>mkdir -p enc &amp;&amp; printf '%s' '&lt;PSK&gt;' &gt; enc/proxy.psk &amp;&amp; chmod 600 enc/proxy.psk</code>
       y montá <code>enc/proxy.psk</code> en <code>/var/lib/zabbix/enc/proxy.psk</code>.
     </div>
+  </details>
   </div>
 {% endblock %}

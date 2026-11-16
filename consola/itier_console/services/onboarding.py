@@ -198,6 +198,7 @@ def eliminar_cliente(conn: sqlite3.Connection, actor: str, cid: int) -> dict:
         raise ServiceError("Cliente no encontrado.")
     # Borra también los usuarios de portal de ese cliente (quedarían huérfanos).
     n_usuarios = security.eliminar_usuarios_de_cliente(conn, cid)
+    conn.execute("DELETE FROM enroll_tokens WHERE client_id=?", (cid,))  # enlaces de instalación
     conn.execute("DELETE FROM clients WHERE id=?", (cid,))
     conn.commit()
     audit.registrar(conn, actor, "cliente.eliminado", {

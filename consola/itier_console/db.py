@@ -49,7 +49,28 @@ CREATE TABLE IF NOT EXISTS clients (
     estado          TEXT    NOT NULL DEFAULT 'provisionando',
     notas           TEXT,
     created_at      TEXT    NOT NULL,
-    created_by      TEXT    NOT NULL
+    created_by      TEXT    NOT NULL,
+    -- Enrolamiento automatizado: token del nodo mesh de Cloudflare (secreto, por
+    -- cliente) y lo que el appliance reportó al instalarse ("llamó a casa").
+    mesh_token      TEXT,
+    enrolado_at     TEXT,
+    enrolado_host   TEXT,
+    enrolado_ip     TEXT,
+    enrolado_estado TEXT
+);
+
+-- Enlaces de instalación del appliance: token de un solo propósito, con
+-- vencimiento y usos acotados. Se guarda SOLO el hash (el token se muestra una vez).
+CREATE TABLE IF NOT EXISTS enroll_tokens (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    client_id   INTEGER NOT NULL,
+    token_hash  TEXT    NOT NULL UNIQUE,
+    created_at  TEXT    NOT NULL,
+    created_by  TEXT    NOT NULL,
+    expires_at  TEXT    NOT NULL,
+    max_usos    INTEGER NOT NULL DEFAULT 3,
+    usos        INTEGER NOT NULL DEFAULT 0,
+    revocado    INTEGER NOT NULL DEFAULT 0
 );
 
 -- Descubrimiento de red por cliente: rangos de IP + credencial SNMP que la
@@ -109,6 +130,10 @@ def _migrar(conn: sqlite3.Connection) -> None:
     cols = {r["name"] for r in conn.execute("PRAGMA table_info(users)").fetchall()}
     if "client_id" not in cols:
         conn.execute("ALTER TABLE users ADD COLUMN client_id INTEGER")
+    ccols = {r["name"] for r in conn.execute("PRAGMA table_info(clients)").fetchall()}
+    for col in ("mesh_token", "enrolado_at", "enrolado_host", "enrolado_ip", "enrolado_estado"):
+        if col not in ccols:
+            conn.execute(f"ALTER TABLE clients ADD COLUMN {col} TEXT")
     conn.commit()
 
 

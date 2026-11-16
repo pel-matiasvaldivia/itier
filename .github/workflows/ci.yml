@@ -101,6 +101,11 @@ jobs:
           docker compose config >/dev/null
           echo "deploy/cliente OK"
 
+      - name: La plantilla embebida en la consola coincide con deploy/cliente
+        # El instalador que genera la consola lleva embebido este compose: no
+        # puede divergir del de deploy/cliente.
+        run: diff -u deploy/cliente/docker-compose.yml consola/itier_console/deploy_templates/docker-compose.yml
+
       - name: Validar compose de la consola
         run: |
           cd consola

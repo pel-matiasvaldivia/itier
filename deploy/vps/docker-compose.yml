@@ -212,6 +212,10 @@ services:
       # Dirección pública del server Zabbix (host o host:puerto) que marcan los
       # zabbix-proxy de los clientes. Va en el bundle de enrolamiento.
       ITIER_ZBX_SERVER_HOST: ${ITIER_ZBX_SERVER_HOST:-}
+      # URL pública de la consola: con ella se arma el comando de instalación
+      # del appliance (curl <consola>/enrolar/<token>/install.sh | sudo bash).
+      ITIER_CONSOLE_PUBLIC_URL: ${ITIER_CONSOLE_PUBLIC_URL:-}
+      ITIER_ZBX_AGENT_MSI_URL: ${ITIER_ZBX_AGENT_MSI_URL:-}
       TZ: ${TZ:-America/Argentina/Buenos_Aires}
     volumes:
       - consola_data:/data

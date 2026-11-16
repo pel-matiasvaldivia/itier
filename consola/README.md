@@ -19,6 +19,14 @@ roadmap (`docs/06`) menciona en todas las fases. Diseño en
   el **grupo de hosts** y el **proxy con PSK** en Zabbix, y genera el **bundle de
   enrolamiento** (fragmento de `.env` + PSK) que se pega en `deploy/cliente/` del
   appliance. Los nombres calzan con `deploy/cliente/docker-compose.yml`.
+- **Instaladores preconfigurados** (enrolamiento automatizado). Por cliente, la
+  consola entrega todo listo: un **comando de una línea** para el appliance
+  (`curl …/enrolar/<token>/install.sh | sudo bash`: instala Docker, escribe compose +
+  `.env` + PSK, deja el servicio `itier.service` y reporta a la consola) y un
+  **instalador `.ps1` para equipos Windows** (GLPI Agent + Zabbix Agent 2 como
+  servicios). El enlace vence, tiene usos acotados, es revocable y queda auditado.
+  Requiere `ITIER_CONSOLE_PUBLIC_URL`. El único dato externo es el token del nodo
+  mesh de Cloudflare, que se carga una vez por cliente.
 - **Agentes de Zabbix.** Estado del proxy del cliente y de sus hosts; **vincular**
   un host al proxy y grupo del cliente.
 - **Descubrimiento de red (SNMP).** Por cliente, cargás los **rangos de IP** a
@@ -137,6 +145,11 @@ ingreso.
 - **API de Zabbix 7.0.** `adapters/zabbix.py` usa `proxy.create` con `name` +
   `operating_mode` y PSK, y `host.get` con disponibilidad a nivel de interfaz.
   Confirmá contra tu versión exacta.
+- **Instalador de Windows.** `windows.ps1.tmpl` no se pudo probar en un Windows real:
+  verificá las propiedades MSI (GLPI Agent: `SERVER/TAG/EXECMODE/RUNNOW`; Zabbix
+  Agent 2: `SERVER/SERVERACTIVE/HOSTNAME/HOSTMETADATA`) y que la URL del MSI de
+  Zabbix (`ITIER_ZBX_AGENT_MSI_URL`) exista. La asignación a la entidad por tag y
+  el autoregistro por metadata se configuran en GLPI/Zabbix.
 - **Rollback del alta.** Si un paso externo falla, el cliente queda con
   `estado=error` y lo ya creado, para reintentar/limpiar a mano. No hay
   compensación automática entre sistemas (es deliberado en v1).
@@ -154,8 +167,9 @@ consola/
 │   ├── audit.py           bitácora encadenada por hash
 │   ├── cli.py             administración de operadores
 │   ├── adapters/          glpi.py, zabbix.py (API + modo demo)
-│   ├── services/          onboarding, agents, tickets
+│   ├── services/          onboarding, enrolamiento, agents, tickets
 │   ├── routes/            dashboard, clients, agents, tickets, audit
+│   ├── deploy_templates/  compose del cliente + plantillas de instaladores
 │   ├── templates/         Jinja2 (tema claro)
 │   └── static/            app.css, app.js
 ├── Dockerfile  ·  docker-compose.yml  ·  .env.example  ·  pyproject.toml

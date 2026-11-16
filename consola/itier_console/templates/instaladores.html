@@ -1,0 +1,116 @@
+{% extends "base.html" %}
+{% block titulo %}Instaladores · {{ cli.nombre }} · Consola de iTier{% endblock %}
+{% block contenido %}
+  <div class="page-head">
+    <h1>Instaladores — {{ cli.nombre }}</h1>
+    <div class="acciones"><a class="btn" href="/clientes/{{ cli.slug }}">← Volver al cliente</a></div>
+  </div>
+
+  <div class="card">
+    <h2>Estado del appliance</h2>
+    {% if cli.enrolado_at %}
+      <p>
+        {% if cli.enrolado_estado == 'ok' %}<span class="dot ok"></span><strong>Instalado</strong>
+        {% else %}<span class="dot warn"></span><strong>La instalación reportó un error</strong>{% endif %}
+        — equipo <code>{{ cli.enrolado_host or '—' }}</code>, IP en la LAN <code>{{ cli.enrolado_ip or '—' }}</code>,
+        último reporte {{ cli.enrolado_at }}.
+      </p>
+    {% else %}
+      <p class="muted"><span class="dot warn"></span>Todavía no se instaló (el appliance avisa solo cuando termina).</p>
+    {% endif %}
+  </div>
+
+  {% if faltantes %}
+  <div class="note note-bad">
+    Para generar el instalador del appliance falta: {{ faltantes | join('; ') }}.
+  </div>
+  {% endif %}
+
+  <div class="card">
+    <h2>1 · Token del nodo mesh (Cloudflare)</h2>
+    <p class="muted">Es el único dato que no nace en la consola: se crea en Cloudflare Zero Trust
+      (un nodo por cliente). Pegalo una vez y queda incluido en el instalador.</p>
+    <form method="post" action="/clientes/{{ cli.slug }}/instaladores/mesh-token" class="form row">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <label>Token del nodo
+        <input type="password" name="mesh_token" autocomplete="off"
+               placeholder="{% if cli.mesh_token %}•••••••• (cargado — pegá otro para reemplazarlo){% else %}eyJ…{% endif %}" required>
+      </label>
+      <button class="btn btn-primary" type="submit">Guardar</button>
+    </form>
+    <p class="small">{% if cli.mesh_token %}<span class="dot ok"></span>Token cargado.{% else %}<span class="dot warn"></span>Sin token.{% endif %}</p>
+  </div>
+
+  <div class="card">
+    <h2>2 · Appliance del cliente (Linux)</h2>
+    <p class="muted">Un solo comando en el equipo del cliente (VM o mini-PC con Debian/Ubuntu). Instala Docker si
+      falta, escribe toda la configuración, deja el stack como servicio (<code>itier.service</code>) y avisa a
+      esta consola cuando termina. No hay nada que editar a mano.</p>
+
+    {% if comando %}
+      <div class="bundle-head">
+        <span class="bundle-t">Ejecutar como root en el equipo del cliente</span>
+        <button class="btn btn-sm" type="button" data-copy="#cmd-instalar">Copiar</button>
+      </div>
+      <pre class="codeblock" id="cmd-instalar">{{ comando }}</pre>
+      <div class="note small"><strong>Copialo ahora:</strong> no se vuelve a mostrar. Vence en {{ ttl_h }} h y
+        sirve para {{ max_usos }} descargas. El instalador contiene secretos del cliente.</div>
+    {% endif %}
+
+    <div class="acciones">
+      <form method="post" action="/clientes/{{ cli.slug }}/instaladores/enlace" class="inline">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <button class="btn btn-primary" type="submit" {% if faltantes %}disabled{% endif %}>Generar comando de instalación</button>
+      </form>
+      {% if not faltantes %}
+      <a class="btn" href="/clientes/{{ cli.slug }}/instaladores/appliance.sh">Descargar instalador (.sh)</a>
+      {% endif %}
+    </div>
+    <p class="muted small">El archivo descargable sirve si el equipo no llega a la consola; se copia y se corre con
+      <code>sudo bash itier-{{ cli.slug }}-appliance.sh</code>. Contiene secretos: entregalo por un canal seguro.</p>
+
+    {% if enlaces %}
+    <table class="tabla">
+      <thead><tr><th>Enlace</th><th>Creado</th><th>Vence</th><th>Usos</th><th>Estado</th><th></th></tr></thead>
+      <tbody>
+        {% for e in enlaces %}
+        <tr>
+          <td>#{{ e.id }}</td>
+          <td class="muted">{{ e.created_at }} · {{ e.created_by }}</td>
+          <td class="muted">{{ e.expires_at }}</td>
+          <td>{{ e.usos }}/{{ e.max_usos }}</td>
+          <td>{% if e.vigente %}<span class="dot ok"></span>vigente{% elif e.revocado %}revocado{% else %}vencido/agotado{% endif %}</td>
+          <td class="acciones">
+            {% if e.vigente %}
+            <form method="post" action="/clientes/{{ cli.slug }}/instaladores/enlace/{{ e.id }}/revocar" class="inline">
+              <input type="hidden" name="csrf" value="{{ csrf }}">
+              <button class="btn btn-sm" type="submit">Revocar</button>
+            </form>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% endif %}
+  </div>
+
+  <div class="card">
+    <h2>3 · Equipos Windows del cliente</h2>
+    <p class="muted">Instala <strong>GLPI Agent</strong> (inventario, con el tag <code>itier-{{ cli.slug }}</code>) y
+      <strong>Zabbix Agent 2</strong> (monitoreo, hacia el proxy del appliance) como servicios, en silencio.
+      Se distribuye por GPO, RMM o pendrive. No contiene secretos.</p>
+    <div class="acciones">
+      <a class="btn btn-primary" href="/clientes/{{ cli.slug }}/instaladores/windows.ps1">Descargar instalador (.ps1)</a>
+    </div>
+    <div class="bundle-head">
+      <span class="bundle-t">En cada equipo, PowerShell como Administrador</span>
+      <button class="btn btn-sm" type="button" data-copy="#cmd-windows">Copiar</button>
+    </div>
+    <pre class="codeblock" id="cmd-windows">powershell -ExecutionPolicy Bypass -File .\itier-{{ cli.slug }}-windows.ps1{% if not cli.enrolado_ip %} -ProxyHost &lt;IP-del-appliance&gt;{% endif %}</pre>
+    <p class="muted small">
+      {% if cli.enrolado_ip %}El instalador ya apunta el agente de Zabbix al appliance (<code>{{ cli.enrolado_ip }}</code>).
+      {% else %}Cuando el appliance se instale y reporte su IP, el instalador la trae incluida; mientras tanto pasala con <code>-ProxyHost</code>.{% endif %}
+    </p>
+  </div>
+{% endblock %}

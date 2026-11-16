@@ -41,7 +41,48 @@ El `itier-agent` queda aislado en una red puente de solo salida y no expone nada
   túnel). La imagen del agente es multi-arch (amd64/arm64), pero el ITSM pesado
   no vive acá. Ver ADR-0007.
 
-## Puesta en marcha
+## Requisitos del equipo
+
+- **VM o equipo físico** con Debian/Ubuntu (x86_64 o arm64) y salida a internet.
+  Es el camino soportado.
+- **No recomendado: contenedor LXC** (p. ej. Proxmox). Docker dentro de LXC falla
+  con `open sysctl net.ipv4.ip_unprivileged_port_start ... permission denied` y la
+  malla necesita `/dev/net/tun`. Si no hay alternativa, en el host Proxmox agregá a
+  `/etc/pve/lxc/<id>.conf` y reiniciá el contenedor (⚠ relaja el aislamiento):
+
+  ```
+  features: nesting=1,keyctl=1
+  lxc.apparmor.profile: unconfined
+  lxc.mount.entry: /dev/null sys/module/apparmor/parameters/enabled none bind 0 0
+  lxc.cgroup2.devices.allow: c 10:200 rwm
+  lxc.mount.entry: /dev/net/tun dev/net/tun none bind,create=file
+  ```
+
+## Instalación automática (recomendada)
+
+Todo sale preconfigurado de la consola: **Clientes → \<cliente\> → Instaladores**.
+
+1. Cargá el **token del nodo mesh** de Cloudflare del cliente (único dato externo).
+2. **Generar comando de instalación** y ejecutarlo como root en el equipo del cliente:
+
+   ```sh
+   curl -fsSL https://<consola>/enrolar/<token>/install.sh | sudo bash
+   ```
+
+   El instalador trae embebidos el compose, el `.env` completo y la PSK; instala
+   Docker si falta, deja el stack en `/opt/itier` como servicio (`itier.service`) y
+   le avisa a la consola cómo quedó. El enlace vence (24 h), tiene usos acotados y
+   es revocable. Si el equipo no llega a la consola, descargá el `.sh` y copialo.
+3. **Equipos Windows**: descargá `itier-<tenant>-windows.ps1` y corrélo como
+   Administrador (o distribuilo por GPO/RMM). Instala GLPI Agent y Zabbix Agent 2
+   como servicios; el agente de Zabbix reporta al proxy del appliance (puerto
+   `10051` publicado en la LAN).
+
+Operación: `systemctl status itier` · `cd /opt/itier && docker compose logs -f`.
+Para actualizar o reparar, volvé a correr el instalador (es idempotente).
+
+## Puesta en marcha manual (avanzado)
+
 
 ```sh
 cd deploy/cliente

@@ -28,6 +28,7 @@ from .routes import clients as r_clients
 from .routes import curacion as r_curacion
 from .routes import dashboard as r_dashboard
 from .routes import discovery as r_discovery
+from .routes import enrolamiento as r_enrolamiento
 from .routes import portal as r_portal
 from .routes import tickets as r_tickets
 from . import auth as r_auth
@@ -104,6 +105,7 @@ def create_app() -> FastAPI:
     app.include_router(r_clients.router)
     app.include_router(r_agents.router)
     app.include_router(r_discovery.router)
+    app.include_router(r_enrolamiento.router)
     app.include_router(r_curacion.router)
     app.include_router(r_tickets.router)
     app.include_router(r_audit.router)

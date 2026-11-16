@@ -1,0 +1,146 @@
+# iTier — lado del cliente, en modo local (una instancia por cliente).
+#
+# Corre en la LAN de cada cliente (mini-PC x86 del appliance, o la sonda
+# Raspberry Pi del perfil reducido; ver docs/adr/ADR-0007). Cuatro piezas:
+#
+#   cloudflare-mesh → nodo de la malla WARP de Cloudflare. Da una ruta privada y
+#                     cifrada hasta el servidor Zabbix del VPS SIN exponer su IP
+#                     ni el puerto 10051 a internet. El zabbix-proxy sale por él.
+#   zabbix-proxy    → recolecta la LAN y empuja, de forma SALIENTE, al servidor
+#                     Zabbix del VPS (10051) por el mesh, a su IP privada.
+#   itier-agent     → la capa agéntica (imagen propia desde GHCR). Solo SALIDA:
+#                     habla con la API de GLPI del VPS y con el LLM por HTTPS
+#                     público (Cloudflare Tunnel). Sin puertos entrantes (ADR-0005).
+#                     En Fase 1/2 corre como esqueleto: valida config y expone
+#                     health; el bucle de eventos llega en Fase 3.
+#   glpi-agent      → inventario/descubrimiento de la LAN hacia GLPI del VPS (HTTPS).
+#
+# ¿Por qué el mesh solo para Zabbix? El tráfico HTTP(S) de GLPI y del LLM viaja
+# por el Cloudflare Tunnel (hostnames públicos, ya configurado). Pero el 10051
+# del proxy Zabbix es TCP crudo y NO pasa por un túnel HTTP; en vez de abrir el
+# 10051 público del VPS, lo llevamos por la malla WARP. Ver docs/adr/ADR-0009.
+#
+# Copiá .env.example a .env y completá los valores (incluido MESH_NODE_TOKEN).
+
+name: itier-cliente
+
+services:
+
+  # ── Malla WARP de Cloudflare (gateway de red del proxy) ────────────────────
+  # Levanta una interfaz WARP y enruta el tráfico del zabbix-proxy hasta la IP
+  # privada del servidor Zabbix dentro de la malla. Necesita capacidades de red
+  # (NET_ADMIN/NET_RAW, /dev/net/tun) por diseño; por eso va aislado en su propio
+  # contenedor y el proxy comparte SU red (network_mode: service:cloudflare-mesh).
+  cloudflare-mesh:
+    image: ${MESH_IMAGE:-cloudflare/mesh:latest}
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    environment:
+      # Token del NODO de la malla para ESTE cliente (secreto; sale del panel de
+      # Cloudflare — Zero Trust → WARP Connector / mesh). Va solo en el .env.
+      MESH_NODE_TOKEN: ${MESH_NODE_TOKEN:?falta MESH_NODE_TOKEN}
+      SRCNAT_ENABLED: "true"
+    sysctls:
+      net.ipv4.ip_forward: "1"
+      net.ipv6.conf.all.forwarding: "1"
+      net.ipv6.conf.default.forwarding: "1"
+    # El zabbix-proxy comparte ESTA red, así que su 10051 se publica acá: es por
+    # donde los agentes Zabbix de los equipos de la LAN le reportan al proxy.
+    ports:
+      - "${ZBX_PROXY_PORT:-10051}:10051"
+    volumes:
+      - mesh_data:/var/lib/cloudflare-warp
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
+
+  # ── Proxy de Zabbix (LAN → VPS por la malla) ──────────────────────────────
+  zabbix-proxy:
+    image: zabbix/zabbix-proxy-sqlite3:${ZABBIX_VERSION:-alpine-7.0-latest}
+    restart: unless-stopped
+    # Comparte la red del nodo mesh: su salida al server Zabbix va por WARP.
+    # (Con network_mode: service:* el proxy NO declara `ports` ni `networks`.)
+    network_mode: "service:cloudflare-mesh"
+    depends_on:
+      - cloudflare-mesh
+    environment:
+      # Debe coincidir con el proxy que la consola dio de alta en el server.
+      ZBX_HOSTNAME: itier-${ITIER_TENANT:?falta ITIER_TENANT}
+      # IP PRIVADA del server Zabbix dentro de la malla de Cloudflare (no pública).
+      ZBX_SERVER_HOST: ${ZBX_SERVER_HOST:-172.16.0.4}
+      ZBX_SERVER_PORT: "10051"
+      # PSK: autentica y cifra proxy↔server (defensa en profundidad sobre la malla).
+      ZBX_TLSCONNECT: ${ZBX_TLSCONNECT:-unencrypted}
+      ZBX_TLSPSKIDENTITY: ${ZBX_TLSPSKIDENTITY:-}
+      ZBX_TLSPSKFILE: ${ZBX_TLSPSKFILE:-}
+    volumes:
+      - zbx_data:/var/lib/zabbix
+      # PSK del proxy (del bundle de la consola): dejá el archivo en ./enc/proxy.psk
+      # y queda disponible en /var/lib/zabbix/enc/proxy.psk (lo apunta ZBX_TLSPSKFILE).
+      # Si no usás PSK, la carpeta queda vacía y no estorba.
+      - ./enc:/var/lib/zabbix/enc:ro
+    security_opt: [no-new-privileges:true]
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
+
+  # ── Capa agéntica (imagen propia) ─────────────────────────────────────────
+  itier-agent:
+    image: ${ITIER_AGENT_IMAGE:-ghcr.io/pel-matiasvaldivia/itier-agent:latest}
+    restart: unless-stopped
+    environment:
+      ITIER_TENANT: ${ITIER_TENANT:?falta ITIER_TENANT}
+      # API de GLPI del VPS por HTTPS público (Cloudflare Tunnel). Ej: https://itier-itsm.tu-dominio
+      ITIER_GLPI_URL: ${ITIER_GLPI_URL:?falta ITIER_GLPI_URL}
+      # Inferencia: en producción, el gateway del plano de control custodia la
+      # clave (ITIER_LLM_GATEWAY). En "modo local" de Fase 1/2 se admite la
+      # clave directa (ANTHROPIC_API_KEY). Definí AL MENOS una.
+      ITIER_LLM_GATEWAY: ${ITIER_LLM_GATEWAY:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      ITIER_LOG_LEVEL: ${ITIER_LOG_LEVEL:-INFO}
+    # Endurecimiento: sin privilegios nuevos, FS de solo lectura + tmpfs.
+    security_opt: [no-new-privileges:true]
+    read_only: true
+    tmpfs: [/tmp]
+    # Sin `ports:` — cero entrada. El health (:8080) lo usa el HEALTHCHECK de la
+    # imagen internamente. Para depurar en la máquina, descomentá y atalo a
+    # loopback: publica solo en 127.0.0.1, nunca a la LAN.
+    # ports:
+    #   - "127.0.0.1:8080:8080"
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
+
+  # ── Agente de GLPI: inventario de la LAN + descubrimiento SNMP (LAN → VPS) ──
+  # Imagen propia (deploy/cliente/glpi-agent/, publicada en GHCR; no hay imagen
+  # oficial del agente). Corre como daemon, solo saliente, sin httpd. Los RANGOS
+  # de IP y las CREDENCIALES SNMP se definen en el server (plugin GlpiInventory),
+  # no acá: el agente pide su trabajo al contactar al server. Ver README.
+  glpi-agent:
+    image: ${GLPI_AGENT_IMAGE:-ghcr.io/pel-matiasvaldivia/itier-glpi-agent:latest}
+    restart: unless-stopped
+    network_mode: host          # ve la LAN para inventariar y barrer por SNMP
+    init: true                  # reaper de señales para el daemon (PID 1)
+    environment:
+      ITIER_TENANT: ${ITIER_TENANT:?falta ITIER_TENANT}
+      # URL pública de GLPI (por el túnel). El agente deriva el endpoint de
+      # inventario como <ITIER_GLPI_URL>/plugins/glpiinventory/ salvo que fijes
+      # ITIER_GLPI_INVENTORY_URL explícito.
+      ITIER_GLPI_URL: ${ITIER_GLPI_URL:?falta ITIER_GLPI_URL}
+      ITIER_GLPI_INVENTORY_URL: ${ITIER_GLPI_INVENTORY_URL:-}
+      # Tareas: inventario local + descubrimiento de red + inventario SNMP.
+      GLPI_AGENT_TASKS: ${GLPI_AGENT_TASKS:-inventory,netdiscovery,netinventory}
+      GLPI_AGENT_DELAYTIME: ${GLPI_AGENT_DELAYTIME:-60}
+      GLPI_AGENT_EXTRA: ${GLPI_AGENT_EXTRA:-}
+    security_opt: [no-new-privileges:true]
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
+
+volumes:
+  mesh_data:
+  zbx_data:

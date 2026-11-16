@@ -62,6 +62,17 @@ class Config:
 
     http_timeout_s: float
 
+    # -- Enrolamiento automatizado (instaladores por cliente) ----------------
+    # URL pública de la consola (la que alcanza el appliance del cliente), para
+    # armar el comando de instalación. Si falta, se deduce del request.
+    console_public_url: str | None = None
+    # Vigencia (horas) y usos máximos de un enlace de instalación.
+    enroll_ttl_h: int = 24
+    enroll_max_usos: int = 3
+    # MSI de los agentes para puestos Windows (instalador .ps1).
+    glpi_agent_msi_url: str = ""
+    zbx_agent_msi_url: str = ""
+
     @classmethod
     def from_env(cls) -> "Config":
         demo = _bool(os.environ.get("ITIER_CONSOLE_DEMO"), False)
@@ -104,6 +115,15 @@ class Config:
             zbx_password=os.environ.get("ITIER_ZBX_PASSWORD") or None,
             zbx_server_host=os.environ.get("ITIER_ZBX_SERVER_HOST") or None,
             http_timeout_s=float(os.environ.get("ITIER_CONSOLE_HTTP_TIMEOUT", "6")),
+            console_public_url=(os.environ.get("ITIER_CONSOLE_PUBLIC_URL") or "").rstrip("/") or None,
+            enroll_ttl_h=int(os.environ.get("ITIER_ENROLL_TTL_H", "24")),
+            enroll_max_usos=int(os.environ.get("ITIER_ENROLL_MAX_USOS", "3")),
+            glpi_agent_msi_url=os.environ.get("ITIER_GLPI_AGENT_MSI_URL") or (
+                "https://github.com/glpi-project/glpi-agent/releases/download/1.21/GLPI-Agent-1.21-x64.msi"),
+            # ⚠ Fijá la versión menor que exista en cdn.zabbix.com (misma mayor que el server).
+            zbx_agent_msi_url=os.environ.get("ITIER_ZBX_AGENT_MSI_URL") or (
+                "https://cdn.zabbix.com/zabbix/binaries/stable/7.0/7.0.22/"
+                "zabbix_agent2-7.0.22-windows-amd64-openssl.msi"),
         )
 
     # -- ayudas de estado ----------------------------------------------------

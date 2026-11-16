@@ -47,6 +47,10 @@ services:
       net.ipv4.ip_forward: "1"
       net.ipv6.conf.all.forwarding: "1"
       net.ipv6.conf.default.forwarding: "1"
+    # El zabbix-proxy comparte ESTA red, así que su 10051 se publica acá: es por
+    # donde los agentes Zabbix de los equipos de la LAN le reportan al proxy.
+    ports:
+      - "${ZBX_PROXY_PORT:-10051}:10051"
     volumes:
       - mesh_data:/var/lib/cloudflare-warp
     restart: unless-stopped
