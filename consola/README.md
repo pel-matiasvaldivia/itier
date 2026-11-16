@@ -23,7 +23,8 @@ roadmap (`docs/06`) menciona en todas las fases. Diseño en
   consola entrega todo listo, sin cargar nada a mano:
   - **Appliance:** comando de una línea (`curl …/enrolar/<token>/install.sh | sudo bash`)
     que instala Docker, escribe compose + `.env` + PSK, deja `itier.service` y
-    reporta a la consola. El token mesh de Cloudflare es **común** (`ITIER_MESH_NODE_TOKEN`).
+    reporta a la consola. El túnel a Zabbix (Cloudflare Tunnel + Access, ADR-0010)
+    es **común a todos los clientes**: se configura una vez en la consola.
   - **Equipos Windows:** enlace de descarga que se **envía por correo** al cliente
     (SMTP opcional) → instalador `.cmd` de doble clic que se autoeleva (UAC) e
     instala GLPI Agent + Zabbix Agent 2 en silencio; y `.ps1` para GPO/RMM.

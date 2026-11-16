@@ -27,26 +27,16 @@
   {% endif %}
 
   <div class="card">
-    <h2>1 · Token del nodo mesh (Cloudflare)</h2>
-    {% if mesh_global and not cli.mesh_token %}
-      <p><span class="dot ok"></span>Se usa el <strong>token común del VPS</strong> (<code>ITIER_MESH_NODE_TOKEN</code>).
-        No hay que cargar nada para este cliente.</p>
-    {% elif cli.mesh_token %}
-      <p><span class="dot ok"></span>Este cliente usa un <strong>token propio</strong>{% if mesh_global %} (reemplaza al común del VPS){% endif %}.</p>
+    <h2>1 · Túnel seguro al servidor Zabbix</h2>
+    {% if tunel_ok %}
+      <p><span class="dot ok"></span>Configurado: los appliances llegan al servidor Zabbix por
+        <code>{{ tunel_host }}</code> (Cloudflare Tunnel + Access). Es común a todos los clientes:
+        no hay nada que cargar acá.</p>
     {% else %}
-      <p><span class="dot warn"></span>Sin token. Definí <code>ITIER_MESH_NODE_TOKEN</code> en la consola (vale para
-        todos los clientes) o cargá uno propio para este cliente.</p>
+      <p><span class="dot bad"></span>Falta configurar el túnel en la consola (una sola vez, vale para todos los
+        clientes): <code>ITIER_ZBX_TUNNEL_HOSTNAME</code>, <code>ITIER_CF_ACCESS_CLIENT_ID</code> y
+        <code>ITIER_CF_ACCESS_CLIENT_SECRET</code>. Ver <code>deploy/vps/README.md</code>.</p>
     {% endif %}
-    <details>
-      <summary class="muted small">Usar un token propio para este cliente (opcional)</summary>
-      <form method="post" action="/clientes/{{ cli.slug }}/instaladores/mesh-token" class="form row" style="margin-top:.75rem">
-        <input type="hidden" name="csrf" value="{{ csrf }}">
-        <label>Token del nodo <span class="muted small">(vacío = volver al común)</span>
-          <input type="password" name="mesh_token" autocomplete="off" placeholder="eyJ…">
-        </label>
-        <button class="btn" type="submit">Guardar</button>
-      </form>
-    </details>
   </div>
 
   <div class="card">

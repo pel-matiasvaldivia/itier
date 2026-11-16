@@ -50,7 +50,7 @@ CREATE TABLE IF NOT EXISTS clients (
     notas           TEXT,
     created_at      TEXT    NOT NULL,
     created_by      TEXT    NOT NULL,
-    -- Enrolamiento automatizado: token del nodo mesh de Cloudflare (secreto, por
+    -- Enrolamiento automatizado: (mesh_token: en desuso desde ADR-0010; se conserva por compatibilidad) (por
     -- cliente) y lo que el appliance reportó al instalarse ("llamó a casa").
     mesh_token      TEXT,
     enrolado_at     TEXT,

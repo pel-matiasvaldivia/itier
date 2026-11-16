@@ -2,7 +2,6 @@
 
   Operador (sesión + 2FA):
     GET  /clientes/{slug}/instaladores                  página con todo preconfigurado
-    POST /clientes/{slug}/instaladores/mesh-token       guarda el token del nodo mesh
     POST /clientes/{slug}/instaladores/enlace           genera el comando de una línea
     POST /clientes/{slug}/instaladores/enlace/{id}/revocar
     GET  /clientes/{slug}/instaladores/appliance.sh     descarga el instalador Linux
@@ -113,7 +112,7 @@ def pagina(request: Request, slug: str, user: dict = Depends(require_user),
         enlaces=enrolamiento.listar_enlaces(conn, cli["id"]),
         ttl_h=cfg.enroll_ttl_h, max_usos=cfg.enroll_max_usos,
         equipos=equipos, nota_tx=nota_tx,
-        mesh_global=bool(cfg.mesh_node_token), smtp=correo.configurado(cfg),
+        tunel_ok=enrolamiento.tunel_configurado(cfg), tunel_host=cfg.zbx_tunnel_hostname, smtp=correo.configurado(cfg),
         enlace_equipos=enlace_equipos, mailto=mailto, equipos_dias=cfg.equipos_ttl_h // 24,
     )
 
@@ -150,25 +149,6 @@ def enlace_equipos(request: Request, slug: str, email: str = Form(""), csrf: str
             flash(request, e.mensaje + " Podés copiar el enlace y enviarlo vos.", "error")
     else:
         flash(request, "Enlace de instalación generado. Copialo o envialo ahora: no se vuelve a mostrar.", "ok")
-    return destino
-
-
-@router.post("/clientes/{slug}/instaladores/mesh-token")
-def mesh_token(request: Request, slug: str, mesh_token: str = Form(""), csrf: str = Form(""),
-               user: dict = Depends(require_user), conn: sqlite3.Connection = Depends(get_db)):
-    cli = _cliente(request, conn, slug)
-    if not cli:
-        return RedirectResponse("/clientes", status_code=303)
-    destino = RedirectResponse(f"/clientes/{slug}/instaladores", status_code=303)
-    if not security.verificar_csrf(request.session, csrf):
-        flash(request, "Sesión expirada, reintentá.", "error")
-        return destino
-    try:
-        enrolamiento.guardar_mesh_token(conn, user["user"], cli, mesh_token)
-    except ServiceError as e:
-        flash(request, e.mensaje, "error")
-        return destino
-    flash(request, "Token del nodo mesh guardado.", "ok")
     return destino
 
 

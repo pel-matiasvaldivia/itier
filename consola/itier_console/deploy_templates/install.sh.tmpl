@@ -44,14 +44,9 @@ if [ "${ITIER_SKIP_CHECKS:-0}" != "1" ]; then
 
   VIRT="$(systemd-detect-virt -c 2>/dev/null || true)"
   if [ "$VIRT" = "lxc" ]; then
-    aviso "Este equipo es un contenedor LXC. iTier necesita una VM o un equipo físico;"
-    aviso "en LXC hace falta nesting + AppArmor relajado + /dev/net/tun (ver README del cliente)."
-  fi
-
-  if [ ! -c /dev/net/tun ]; then
-    modprobe tun 2>/dev/null || true
-    [ -c /dev/net/tun ] || fallar "No existe /dev/net/tun (lo necesita la malla de Cloudflare). \
-En una VM: 'modprobe tun'. En LXC: pasá el dispositivo tun al contenedor desde el host."
+    aviso "Este equipo es un contenedor LXC: Docker puede fallar al crear contenedores"
+    aviso "(error de 'sysctl ... permission denied'). Si pasa, usá una VM o ajustá el LXC"
+    aviso "en el host (ver README del cliente)."
   fi
 fi
 

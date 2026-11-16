@@ -10,7 +10,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from .. import audit, security
 from ..deps import flash, get_db, render, require_user
 from ..services import ServiceError
-from ..services import enrolamiento, onboarding
+from ..services import onboarding
 
 router = APIRouter()
 
@@ -31,7 +31,6 @@ def nuevo_post(
     request: Request,
     nombre: str = Form(...),
     notas: str = Form(""),
-    mesh_token: str = Form(""),
     csrf: str = Form(""),
     user: dict = Depends(require_user),
     conn: sqlite3.Connection = Depends(get_db),
@@ -49,11 +48,6 @@ def nuevo_post(
             cli = onboarding.obtener_cliente(conn, e.cliente_id)
             return RedirectResponse(f"/clientes/{cli['slug']}", status_code=303)
         return RedirectResponse("/clientes/nuevo", status_code=303)
-    if mesh_token.strip():
-        try:
-            enrolamiento.guardar_mesh_token(conn, user["user"], cli, mesh_token)
-        except ServiceError as e:
-            flash(request, e.mensaje, "error")
     flash(request, f"Cliente «{cli['nombre']}» dado de alta. Ya podés generar sus instaladores.", "ok")
     return RedirectResponse(f"/clientes/{cli['slug']}/instaladores", status_code=303)
 

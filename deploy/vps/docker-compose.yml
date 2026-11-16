@@ -148,10 +148,9 @@ services:
       ZBX_TIMEOUT: "10"
       TZ: ${TZ:-America/Argentina/Buenos_Aires}
     ports:
-      # Los zabbix-proxy de los clientes se conectan aquí de forma saliente por
-      # internet — por eso este bind es PÚBLICO (distinto del de la web, que va a
-      # la LAN). Restringí el origen en el firewall a las IP de tus clientes y
-      # usá PSK/TLS. Ver deploy/vps/README.md.
+      # Los zabbix-proxy de los clientes llegan por el Cloudflare Tunnel de este
+      # VPS (ADR-0010), que entra por loopback: dejá ZBX_SERVER_BIND=127.0.0.1
+      # para que el 10051 NO quede expuesto a internet.
       - "${ZBX_SERVER_BIND:-0.0.0.0}:10051:10051"
     networks: [interna]
 
@@ -216,8 +215,11 @@ services:
       # del appliance (curl <consola>/enrolar/<token>/install.sh | sudo bash).
       ITIER_CONSOLE_PUBLIC_URL: ${ITIER_CONSOLE_PUBLIC_URL:-}
       ITIER_ZBX_AGENT_MSI_URL: ${ITIER_ZBX_AGENT_MSI_URL:-}
-      # Token del nodo mesh de Cloudflare, COMÚN a todos los clientes (secreto).
-      ITIER_MESH_NODE_TOKEN: ${ITIER_MESH_NODE_TOKEN:-}
+      # Túnel a Zabbix (ADR-0010): hostname TCP del server en el Cloudflare Tunnel
+      # + service token de Access. Comunes a todos los clientes (secretos).
+      ITIER_ZBX_TUNNEL_HOSTNAME: ${ITIER_ZBX_TUNNEL_HOSTNAME:-}
+      ITIER_CF_ACCESS_CLIENT_ID: ${ITIER_CF_ACCESS_CLIENT_ID:-}
+      ITIER_CF_ACCESS_CLIENT_SECRET: ${ITIER_CF_ACCESS_CLIENT_SECRET:-}
       # SMTP (opcional): para enviarle al cliente el enlace de instalación.
       ITIER_SMTP_HOST: ${ITIER_SMTP_HOST:-}
       ITIER_SMTP_PORT: ${ITIER_SMTP_PORT:-587}

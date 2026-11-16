@@ -70,9 +70,12 @@ class Config:
     enroll_ttl_h: int = 24
     enroll_max_usos: int = 3
     # MSI de los agentes para puestos Windows (instalador .ps1).
-    # Token del nodo mesh de Cloudflare COMÚN a todos los clientes (el del VPS en
-    # producción). Un cliente puede tener uno propio que lo reemplaza.
-    mesh_node_token: str | None = None
+    # Túnel al servidor Zabbix: hostname publicado por el Cloudflare Tunnel del
+    # VPS (TCP) + service token de Cloudflare Access. COMUNES a todos los
+    # clientes: la consola los incluye en cada instalador.
+    zbx_tunnel_hostname: str | None = None
+    cf_access_client_id: str | None = None
+    cf_access_client_secret: str | None = None
     # Enlace de descarga para equipos Windows (se manda por correo al cliente).
     equipos_ttl_h: int = 168
     equipos_max_usos: int = 500
@@ -131,7 +134,12 @@ class Config:
             console_public_url=(os.environ.get("ITIER_CONSOLE_PUBLIC_URL") or "").rstrip("/") or None,
             enroll_ttl_h=int(os.environ.get("ITIER_ENROLL_TTL_H", "24")),
             enroll_max_usos=int(os.environ.get("ITIER_ENROLL_MAX_USOS", "3")),
-            mesh_node_token=(os.environ.get("ITIER_MESH_NODE_TOKEN") or "").strip() or None,
+            zbx_tunnel_hostname=(os.environ.get("ITIER_ZBX_TUNNEL_HOSTNAME") or "").strip() or (
+                "itier-zbx.demo.example" if demo else None),
+            cf_access_client_id=(os.environ.get("ITIER_CF_ACCESS_CLIENT_ID") or "").strip() or (
+                "demo.access" if demo else None),
+            cf_access_client_secret=(os.environ.get("ITIER_CF_ACCESS_CLIENT_SECRET") or "").strip() or (
+                "demo-secreto-0123456789abcdef" if demo else None),
             equipos_ttl_h=int(os.environ.get("ITIER_EQUIPOS_TTL_H", "168")),
             equipos_max_usos=int(os.environ.get("ITIER_EQUIPOS_MAX_USOS", "500")),
             smtp_host=os.environ.get("ITIER_SMTP_HOST") or None,

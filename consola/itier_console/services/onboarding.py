@@ -139,20 +139,17 @@ def autoasignar(conn: sqlite3.Connection, cfg, actor: str, cid: int) -> None:
 
 
 def bundle_env(cfg, cli: dict) -> str:
-    """Fragmento de .env drop-in para deploy/cliente/ del appliance del cliente."""
+    """Fragmento de .env para configurar el appliance a mano (avanzado). Sin los
+    secretos del túnel: esos van solo en el instalador."""
     glpi = cfg.public_glpi_url or "https://itier-itsm.tu-dominio.com"
-    server = cfg.zbx_server_host or "172.16.0.4"
     return (
-        f"# ── Bundle de enrolamiento iTier — cliente: {cli['nombre']} ──\n"
-        f"# Generado por la consola. Pegá estas líneas en deploy/cliente/.env del appliance,\n"
-        f"# guardá la PSK (abajo) en ./enc/proxy.psk y completá MESH_NODE_TOKEN con el\n"
-        f"# token del nodo de la malla de Cloudflare para este cliente.\n"
+        f"# ── iTier — cliente: {cli['nombre']} (configuración manual) ──\n"
         f"ITIER_TENANT={cli['slug']}\n"
         f"ITIER_GLPI_URL={glpi}\n"
-        f"# Token del nodo mesh (Cloudflare Zero Trust → WARP Connector). Secreto, por cliente.\n"
-        f"MESH_NODE_TOKEN=\n"
-        f"# IP privada del server Zabbix dentro de la malla (no se expone a internet).\n"
-        f"ZBX_SERVER_HOST={server}\n"
+        f"ZBX_TUNNEL_HOSTNAME={cfg.zbx_tunnel_hostname or 'itier-zbx.tu-dominio.com'}\n"
+        f"# Service token de Cloudflare Access (está en el .env de la consola):\n"
+        f"CF_ACCESS_CLIENT_ID=\n"
+        f"CF_ACCESS_CLIENT_SECRET=\n"
         f"ZBX_TLSCONNECT=psk\n"
         f"ZBX_TLSPSKIDENTITY={cli['psk_identity']}\n"
         f"ZBX_TLSPSKFILE=/var/lib/zabbix/enc/proxy.psk\n"

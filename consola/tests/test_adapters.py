@@ -231,17 +231,25 @@ check("zbx: operaciones = grupo del cliente + plantilla",
       {"operationtype": 4, "opgroup": [{"groupid": "5"}]} in ops
       and {"operationtype": 6, "optemplate": [{"templateid": "10081"}]} in ops)
 
-# ── Token mesh común del VPS (sin cargarlo por cliente) ──────────────────────
+# ── Túnel a Zabbix común (Cloudflare Tunnel + Access) ────────────────────────
 import dataclasses  # noqa: E402
+from itier_console.services import ServiceError  # noqa: E402
 from itier_console.services import enrolamiento as enr  # noqa: E402
 
-cli_x = {"slug": "x", "nombre": "X", "estado": "activo", "psk_key": "a" * 64, "psk_identity": "itier-x", "mesh_token": None}
-cfg_m = dataclasses.replace(cfg, mesh_node_token="TOKEN-COMUN-DEL-VPS-1234", public_glpi_url="https://itier-itsm.example.com")
-check("mesh: sin token común ni propio falta", any("mesh" in f for f in enr.faltantes(cfg, cli_x)))
-check("mesh: con token común no falta nada", enr.faltantes(cfg_m, cli_x) == [], str(enr.faltantes(cfg_m, cli_x)))
-check("mesh: el .env usa el token común", "MESH_NODE_TOKEN=TOKEN-COMUN-DEL-VPS-1234" in enr.env_completo(cfg_m, cli_x))
-check("mesh: el token propio del cliente tiene prioridad",
-      "MESH_NODE_TOKEN=PROPIO-DEL-CLIENTE-123456" in enr.env_completo(cfg_m, dict(cli_x, mesh_token="PROPIO-DEL-CLIENTE-123456")))
+cli_x = {"slug": "x", "nombre": "X", "estado": "activo", "psk_key": "a" * 64, "psk_identity": "itier-x"}
+cfg_t = dataclasses.replace(cfg, zbx_tunnel_hostname="itier-zbx.example.com", cf_access_client_id="abc123def456.access",
+                            cf_access_client_secret="0123456789abcdef0123456789abcdef", public_glpi_url="https://itier-itsm.example.com")
+check("túnel: sin configurar, falta", any("túnel" in f for f in enr.faltantes(cfg, cli_x)))
+check("túnel: configurado, no falta nada (sin token por cliente)", enr.faltantes(cfg_t, cli_x) == [], str(enr.faltantes(cfg_t, cli_x)))
+env_x = enr.env_completo(cfg_t, cli_x)
+check("túnel: el .env trae hostname + service token",
+      "ZBX_TUNNEL_HOSTNAME=itier-zbx.example.com" in env_x and "CF_ACCESS_CLIENT_ID=abc123def456.access" in env_x
+      and "CF_ACCESS_CLIENT_SECRET=0123456789abcdef0123456789abcdef" in env_x and "MESH" not in env_x)
+try:
+    enr.env_completo(dataclasses.replace(cfg_t, zbx_tunnel_hostname="malo; rm -rf /"), cli_x)
+    check("túnel: hostname inyectable rechazado", False)
+except ServiceError:
+    check("túnel: hostname inyectable rechazado", True)
 
 # ── GLPI: lista de tickets vacía (install nuevo) → el 400 se trata como [] ────
 TICKET_EMPTY = True

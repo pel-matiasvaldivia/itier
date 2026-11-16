@@ -79,6 +79,7 @@ check("alta de cliente → instaladores", r.url.path == "/clientes/prueba-srl/in
 det = c.get("/clientes/prueba-srl").text
 check("detalle enlaza a instaladores", "/clientes/prueba-srl/instaladores" in det)
 check("bundle manual tiene ITIER_TENANT", "ITIER_TENANT=prueba-srl" in det)
+check("bundle manual NO expone el secreto del túnel", "demo-secreto" not in det)
 check("bundle manual tiene PSK identity", "ZBX_TLSPSKIDENTITY=itier-prueba-srl" in det)
 check("bundle manual muestra PSK (64 hex)", bool(re.search(r'id="bundle-psk">[0-9a-f]{64}<', det)))
 
@@ -87,15 +88,10 @@ import subprocess  # noqa: E402
 
 INST = "/clientes/prueba-srl/instaladores"
 pag = c.get(INST).text
-check("instaladores: sin token mesh avisa qué falta", "falta el token del nodo mesh" in pag)
-r = c.post(INST + "/enlace", data={"csrf": csrf_de(pag)})
-check("instaladores: sin token mesh NO genera comando", "curl -fsSL" not in r.text)
-r = c.post(INST + "/mesh-token", data={"mesh_token": "con espacios malos", "csrf": csrf_de(r.text)})
-check("instaladores: token mesh inválido rechazado", "formato inválido" in r.text)
-MESH = "eyJhIjoiZGVtbyJ9.tok-DEMO_1234567890"
-r = c.post(INST + "/mesh-token", data={"mesh_token": MESH, "csrf": csrf_de(r.text)})
-check("instaladores: token mesh guardado", "token propio" in r.text)
-check("instaladores: la página NO muestra el token mesh", MESH not in r.text)
+check("instaladores: túnel a Zabbix configurado (común)", "Túnel seguro al servidor Zabbix" in pag and "itier-zbx.demo.example" in pag)
+SECRETO = "demo-secreto-0123456789abcdef"
+check("instaladores: la página NO muestra el secreto del túnel", SECRETO not in pag)
+r = c.get(INST)
 
 r = c.post(INST + "/enlace", data={"csrf": csrf_de(r.text)})
 m = re.search(r"/enrolar/([A-Za-z0-9_\-]+)/install\.sh \| sudo bash", r.text)
@@ -108,8 +104,9 @@ r = pub.get(f"/enrolar/{tok}/install.sh")
 sh = r.text
 check("install.sh: 200 sin sesión con token válido", r.status_code == 200)
 check("install.sh: trae el .env completo",
-      "ITIER_TENANT=prueba-srl" in sh and f"MESH_NODE_TOKEN={MESH}" in sh and "ZBX_TLSCONNECT=psk" in sh)
-check("install.sh: trae la PSK y el compose", bool(re.search(r"printf '%s' '[0-9a-f]{64}'", sh)) and "cloudflare-mesh:" in sh)
+      "ITIER_TENANT=prueba-srl" in sh and "ZBX_TUNNEL_HOSTNAME=itier-zbx.demo.example" in sh
+      and f"CF_ACCESS_CLIENT_SECRET={SECRETO}" in sh and "ZBX_TLSCONNECT=psk" in sh)
+check("install.sh: trae la PSK y el compose", bool(re.search(r"printf '%s' '[0-9a-f]{64}'", sh)) and "zbx-tunnel:" in sh and "cap_add" not in sh)
 check("install.sh: sin marcadores sin reemplazar", "@@" not in sh)
 check("install.sh: no cacheable", r.headers.get("cache-control") == "no-store")
 ruta_sh = os.path.join(tmp, "install.sh")
@@ -224,7 +221,7 @@ check("instaladores: distingue instalado de transmitiendo", "esperando" in pag)
 check("descargas exigen sesión", pub.get(INST + "/appliance.sh", follow_redirects=False).status_code == 303)
 aud = c.get("/auditoria").text
 check("auditoría registra el enrolamiento", "enrolamiento.instalador.descargado" in aud and "enrolamiento.appliance.reporte" in aud)
-check("auditoría NO contiene el token mesh", MESH not in aud)
+check("auditoría NO contiene el secreto del túnel", SECRETO not in aud)
 
 # 7) Agentes: panel + vincular
 ag = c.get("/clientes/prueba-srl/agentes").text

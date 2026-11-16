@@ -1,5 +1,7 @@
 # ADR-0009 · Transporte del proxy Zabbix por malla WARP de Cloudflare
 
+> **Reemplazado por [ADR-0010](ADR-0010-tunel-zabbix-cloudflare-access.md)** (túnel por Cloudflare Tunnel + Access, sin nodo de malla por cliente).
+
 **Estado:** aceptada · **Fecha:** 2026-11-13
 
 ## Contexto

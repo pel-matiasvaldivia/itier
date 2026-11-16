@@ -1,7 +1,7 @@
 """Enrolamiento automatizado: instaladores preconfigurados por cliente.
 
 Al dar de alta un cliente, la consola ya conoce TODOS los valores del appliance
-(tenant, URL de GLPI, server Zabbix en la malla, PSK, token del nodo mesh). En vez
+(tenant, URL de GLPI, túnel al server Zabbix, PSK). En vez
 de que el operador copie un `.env` a mano, acá se generan artefactos listos:
 
   1. APPLIANCE (Linux) — un instalador `install.sh` autocontenido: trae embebidos
@@ -15,7 +15,7 @@ de que el operador copie un `.env` a mano, acá se generan artefactos listos:
      con el tag del cliente) y Zabbix Agent 2 (apuntando al proxy del appliance)
      como servicios, en silencio.
 
-⚠ El instalador del appliance CONTIENE SECRETOS (PSK, token mesh). Por eso el
+⚠ El instalador del appliance CONTIENE SECRETOS (PSK, service token del túnel). Por eso el
   enlace público vence, tiene usos limitados, es revocable y cada descarga queda
   en auditoría.
 """
@@ -33,7 +33,6 @@ from .. import audit
 from . import ServiceError
 
 _PLANTILLAS = Path(__file__).resolve().parent.parent / "deploy_templates"
-_RE_MESH = re.compile(r"^[A-Za-z0-9_\-=.+/]{16,4096}$")
 _RE_SEGURO = re.compile(r"^[A-Za-z0-9_\-.:/@]*$")   # valores que van a un .env / script
 
 
@@ -45,21 +44,16 @@ def _hash(token: str) -> str:
     return hashlib.sha256(token.encode()).hexdigest()
 
 
-# ── Token del nodo mesh ──────────────────────────────────────────────────────
+# ── Túnel al servidor Zabbix (común a todos los clientes) ───────────────────
 
-def guardar_mesh_token(conn: sqlite3.Connection, actor: str, cli: dict, token: str) -> None:
-    token = (token or "").strip()
-    if token and not _RE_MESH.match(token):
-        raise ServiceError("El token del nodo mesh tiene un formato inválido (pegá solo el token, sin espacios).")
-    conn.execute("UPDATE clients SET mesh_token=? WHERE id=?", (token or None, cli["id"]))
-    conn.commit()
-    # Nunca el token en la auditoría: solo el hecho.
-    audit.registrar(conn, actor, "enrolamiento.mesh_token", {"cliente": cli["nombre"], "cargado": bool(token)})
+_RE_HOST = re.compile(r"^[a-z0-9]([a-z0-9\-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9\-]*[a-z0-9])?)+$")
+_RE_CF = re.compile(r"^[A-Za-z0-9._\-]{8,200}$")
 
 
-def mesh_efectivo(cfg, cli: dict) -> str:
-    """Token mesh a usar: el propio del cliente si tiene, si no el común del VPS."""
-    return (cli.get("mesh_token") or cfg.mesh_node_token or "").strip()
+def tunel_configurado(cfg) -> bool:
+    return bool(_RE_HOST.match(cfg.zbx_tunnel_hostname or "")
+                and _RE_CF.match(cfg.cf_access_client_id or "")
+                and _RE_CF.match(cfg.cf_access_client_secret or ""))
 
 
 # ── Enlaces de instalación ───────────────────────────────────────────────────
@@ -71,8 +65,9 @@ def faltantes(cfg, cli: dict) -> list[str]:
         f.append("el alta en GLPI/Zabbix no está completa (reintentá el aprovisionamiento)")
     if not cli.get("psk_key"):
         f.append("no hay PSK del proxy")
-    if not mesh_efectivo(cfg, cli):
-        f.append("falta el token del nodo mesh de Cloudflare (ITIER_MESH_NODE_TOKEN en la consola)")
+    if not tunel_configurado(cfg):
+        f.append("falta configurar el túnel a Zabbix en la consola (ITIER_ZBX_TUNNEL_HOSTNAME, "
+                 "ITIER_CF_ACCESS_CLIENT_ID, ITIER_CF_ACCESS_CLIENT_SECRET)")
     if not cfg.public_glpi_url and not cfg.demo:
         f.append("falta ITIER_PUBLIC_GLPI_URL en la consola")
     return f
@@ -194,16 +189,15 @@ def _seguro(nombre: str, valor: str) -> str:
 def env_completo(cfg, cli: dict) -> str:
     """El .env COMPLETO del appliance (sin huecos que rellenar a mano)."""
     glpi = _seguro("la URL de GLPI", cfg.public_glpi_url or "https://itier-itsm.ejemplo.com")
-    server = _seguro("ITIER_ZBX_SERVER_HOST", cfg.zbx_server_host or "172.16.0.4")
-    mesh = mesh_efectivo(cfg, cli)
-    if not _RE_MESH.match(mesh):
-        raise ServiceError("Falta (o es inválido) el token del nodo mesh (ITIER_MESH_NODE_TOKEN).")
+    if not tunel_configurado(cfg):
+        raise ServiceError("Falta configurar el túnel a Zabbix en la consola (ITIER_ZBX_TUNNEL_HOSTNAME y service token).")
     return (
         f"# iTier — appliance del cliente «{cli['slug']}». Generado por la consola; no editar a mano.\n"
         f"ITIER_TENANT={_seguro('tenant', cli['slug'])}\n"
         f"ITIER_GLPI_URL={glpi}\n"
-        f"MESH_NODE_TOKEN={mesh}\n"
-        f"ZBX_SERVER_HOST={server}\n"
+        f"ZBX_TUNNEL_HOSTNAME={cfg.zbx_tunnel_hostname}\n"
+        f"CF_ACCESS_CLIENT_ID={cfg.cf_access_client_id}\n"
+        f"CF_ACCESS_CLIENT_SECRET={cfg.cf_access_client_secret}\n"
         f"ZBX_TLSCONNECT=psk\n"
         f"ZBX_TLSPSKIDENTITY={_seguro('PSK identity', cli['psk_identity'])}\n"
         f"ZBX_TLSPSKFILE=/var/lib/zabbix/enc/proxy.psk\n"

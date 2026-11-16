@@ -171,7 +171,8 @@ cd deploy/vps
 #   ITIER_CONSOLE_SECRET      → openssl rand -hex 32
 #   ITIER_CONSOLE_ADMIN_PASSWORD → clave del admin inicial
 #   ITIER_PUBLIC_GLPI_URL     → URL pública de GLPI por el túnel (https://itier-itsm.pymesenlinea.com.ar)
-#   ITIER_ZBX_SERVER_HOST     → IP del server Zabbix en la malla WARP (p. ej. 172.16.0.4; ADR-0009)
+#   ITIER_CONSOLE_PUBLIC_URL  → URL pública de la consola (para los instaladores)
+#   ITIER_ZBX_TUNNEL_HOSTNAME + ITIER_CF_ACCESS_CLIENT_ID/SECRET → ver «Túnel a Zabbix» abajo
 nano .env
 
 docker compose pull consola && docker compose up -d consola   # baja la imagen de GHCR
@@ -245,3 +246,25 @@ docker compose up -d
 
 Antes de subir versiones mayores de GLPI o Zabbix, leé sus notas de migración y
 respaldá la base.
+
+## Túnel a Zabbix (una sola vez; sirve para todos los clientes)
+
+Los `zabbix-proxy` de los clientes llegan al server por el Cloudflare Tunnel de
+este VPS, sin exponer IP ni puerto (ADR-0010). Se configura una vez:
+
+1. **Publicar el server en el túnel.** Zero Trust → Networks → Tunnels → (tu túnel)
+   → *Public Hostnames* → Add: hostname `itier-zbx.<tu-dominio>` (un solo nivel),
+   *Service* = `TCP` → `localhost:10051`. (Con túnel por `config.yml`: una regla
+   `service: tcp://localhost:10051`.)
+2. **Protegerlo con Access.** Zero Trust → Access → *Service Auth* → Create Service
+   Token (guardá Client ID y Client Secret). Después Access → Applications → Add
+   → *Self-hosted* con ese hostname, y una política con acción **Service Auth**
+   que incluya ese service token. Sin esto el hostname quedaría abierto.
+3. **Cerrar el 10051 público.** En `.env`: `ZBX_SERVER_BIND=127.0.0.1` y
+   `docker compose up -d zabbix-server`.
+4. **Cargarlo en la consola.** En `.env`: `ITIER_ZBX_TUNNEL_HOSTNAME`,
+   `ITIER_CF_ACCESS_CLIENT_ID`, `ITIER_CF_ACCESS_CLIENT_SECRET`, y
+   `docker compose up -d consola`.
+
+Desde ahí, cada instalador de appliance que genere la consola ya trae el túnel
+configurado. El nodo de malla `zabbix-proxy-gw` deja de ser necesario.
