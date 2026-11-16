@@ -47,8 +47,9 @@ def _ip(request: Request) -> str:
     return request.client.host if request.client else "?"
 
 
-def _url_reporte_equipos(request: Request, conn: sqlite3.Connection, cli: dict) -> str:
-    return f"{_base_publica(request)}/equipos/{enrolamiento.clave_reporte(conn, cli)}/reporte"
+def _url_reporte_equipos(request: Request, conn: sqlite3.Connection, cli: dict, rol: str = "equipo") -> str:
+    clave = enrolamiento.clave_central(conn, cli) if rol == "central" else enrolamiento.clave_reporte(conn, cli)
+    return f"{_base_publica(request)}/equipos/{clave}/reporte"
 
 
 def _transmision(cfg, cli: dict) -> tuple[dict, set, str]:
@@ -213,22 +214,26 @@ def bajar_appliance(request: Request, slug: str, user: dict = Depends(require_us
 
 
 @router.get("/clientes/{slug}/instaladores/windows.{ext}")
-def bajar_windows(request: Request, slug: str, ext: str, user: dict = Depends(require_user),
-                  conn: sqlite3.Connection = Depends(get_db)):
+def bajar_windows(request: Request, slug: str, ext: str, rol: str = "equipo",
+                  user: dict = Depends(require_user), conn: sqlite3.Connection = Depends(get_db)):
     cli = _cliente(request, conn, slug)
     if not cli:
         return RedirectResponse("/clientes", status_code=303)
     try:
         if ext not in ("cmd", "ps1"):
             raise ServiceError("Formato de instalador desconocido.")
+        if rol not in ("equipo", "central"):
+            raise ServiceError("Rol de instalador desconocido.")
         script = enrolamiento.instalador_windows(
-            request.app.state.cfg, cli, formato=ext, url_reporte=_url_reporte_equipos(request, conn, cli))
+            request.app.state.cfg, cli, formato=ext, rol=rol,
+            url_reporte=_url_reporte_equipos(request, conn, cli, rol))
     except ServiceError as e:
         flash(request, e.mensaje, "error")
         return RedirectResponse(f"/clientes/{slug}/instaladores", status_code=303)
     audit.registrar(conn, user["user"], "enrolamiento.instalador.descargado",
-                    {"cliente": cli["nombre"], "tipo": f"windows.{ext}", "via": "consola"})
-    nombre = f"itier-{slug}-instalar.cmd" if ext == "cmd" else f"itier-{slug}-windows.ps1"
+                    {"cliente": cli["nombre"], "tipo": f"windows.{ext}", "rol": rol, "via": "consola"})
+    base = "central" if rol == "central" else ("instalar" if ext == "cmd" else "windows")
+    nombre = f"itier-{slug}-{base}.{ext}"
     return _descarga(script, nombre)
 
 
@@ -290,6 +295,6 @@ async def reporte_equipo(request: Request, clave: str, conn: sqlite3.Connection 
         return PlainTextResponse("demasiado grande\n", status_code=413)
     form = await request.form()
     datos = {k: str(form.get(k) or "") for k in (
-        "host", "estado", "os", "glpi_servicio", "glpi_conexion", "zbx_servicio", "zbx_conexion", "detalle")}
+        "host", "estado", "os", "glpi_servicio", "glpi_conexion", "zbx_servicio", "zbx_conexion", "detalle", "ip")}
     ok = enrolamiento.registrar_equipo(conn, clave, _ip(request), datos)
     return PlainTextResponse("ok\n" if ok else "rechazado\n", status_code=200 if ok else 404, headers=_NO_CACHE)

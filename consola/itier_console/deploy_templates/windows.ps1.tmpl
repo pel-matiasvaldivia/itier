@@ -3,7 +3,16 @@
   iTier - instalador para equipos Windows del cliente "@@TENANT@@"
   Generado por la consola de iTier. Instala, en silencio y como servicios:
     - GLPI Agent      : inventario del equipo hacia GLPI (con el tag del cliente)
-    - Zabbix Agent 2  : monitoreo, reportando al proxy del appliance de iTier
+    - Zabbix Agent 2  : monitoreo, reportando al equipo central de iTier
+
+  Hay dos roles (-Rol):
+    equipo  (por defecto) GLPI Agent + Zabbix Agent 2. Zabbix reporta al equipo central
+            de la LAN (-ProxyHost). No contiene secretos.
+    central UN equipo por cliente (idealmente un servidor encendido siempre). Ademas:
+            instala cloudflared como tarea de arranque (SYSTEM) que abre el tunel seguro
+            a Zabbix (Cloudflare Tunnel + Access) y lo ofrece a la LAN en el puerto 10051,
+            y el GLPI Agent tambien contacta el plugin de inventario para el
+            descubrimiento/escaneo de la red. CONTIENE EL SERVICE TOKEN: no lo reenvies.
 
   Despliegue masivo SIN interaccion (GPO / RMM / Intune, corre como SYSTEM):
       powershell -NoProfile -ExecutionPolicy Bypass -File itier-@@TENANT@@-windows.ps1
@@ -14,6 +23,8 @@
 #>
 param(
   # IP del appliance de iTier en la LAN del cliente (donde corre el zabbix-proxy).
+  [ValidateSet("equipo", "central")]
+  [string]$Rol = "@@ROL@@",
   [string]$ProxyHost = "@@PROXY_IP@@",
   [switch]$SinZabbix,
   [switch]$SinGlpi
@@ -28,6 +39,10 @@ $GlpiServer = "@@GLPI_SERVER@@"
 $GlpiMsi    = "@@GLPI_MSI@@"
 $ZbxMsi     = "@@ZBX_MSI@@"
 $ReportUrl  = "@@URL_REPORTE@@"
+$CloudflaredUrl = "@@CLOUDFLARED_URL@@"
+$TunelHost  = "@@ZBX_TUNNEL_HOST@@"
+$CfId       = "@@CF_ID@@"
+$CfSecret   = "@@CF_SECRET@@"
 $Tmp        = Join-Path $env:TEMP "itier-instalador"
 $LogDir     = Join-Path $env:ProgramData "iTier"
 New-Item -ItemType Directory -Force -Path $Tmp, $LogDir | Out-Null
@@ -73,6 +88,27 @@ function Probar-Tcp([string]$Destino, [int]$Puerto) {
   } catch { return "sin_respuesta" }
 }
 
+function Probar-Tunel() {
+  # De punta a punta: el listener local de cloudflared dialea a Cloudflare Access en
+  # cada conexion; si Access la rechaza, la cierra enseguida. Un servidor Zabbix no
+  # habla primero, asi que una conexion que sigue abierta indica que paso.
+  try { [Net.Dns]::GetHostAddresses($TunelHost) | Out-Null } catch { return "dns_no_resuelve" }
+  try {
+    $c = New-Object Net.Sockets.TcpClient
+    $c.Connect("127.0.0.1", 10051)
+    $cerrada = $c.Client.Poll(5000000, [Net.Sockets.SelectMode]::SelectRead)
+    $c.Close()
+    if ($cerrada) { return "sin_respuesta" } else { return "ok" }
+  } catch { return "sin_respuesta" }
+}
+
+function Ip-Lan() {
+  try {
+    $cfg = Get-NetIPConfiguration | Where-Object { $_.IPv4DefaultGateway -and $_.NetAdapter.Status -eq "Up" } | Select-Object -First 1
+    return [string]$cfg.IPv4Address.IPAddress
+  } catch { return "" }
+}
+
 function Linea([string]$Que, [string]$Valor, [bool]$Bien) {
   $marca = "[FALLO]"; $color = "Red"
   if ($Bien) { $marca = "[ OK  ]"; $color = "Green" }
@@ -110,6 +146,40 @@ try {
   Remove-Item -Recurse -Force $Tmp -ErrorAction SilentlyContinue
 }
 
+# --- Rol central: tunel a Zabbix (cloudflared) + acceso desde la LAN ---------
+if ($Rol -eq "central" -and -not $Detalle) {
+  try {
+    $dirIt = Join-Path $env:ProgramFiles "iTier"
+    New-Item -ItemType Directory -Force -Path $dirIt | Out-Null
+    $exe = Join-Path $dirIt "cloudflared.exe"
+    Stop-ScheduledTask -TaskName "iTier-Tunel" -ErrorAction SilentlyContinue
+    Start-Sleep -Seconds 2
+    Anotar "Descargando cloudflared"
+    Invoke-WebRequest -Uri $CloudflaredUrl -OutFile $exe -UseBasicParsing
+    $run = Join-Path $dirIt "tunel.cmd"
+    $lineas = @("@echo off",
+      "set TUNNEL_SERVICE_TOKEN_ID=$CfId",
+      "set TUNNEL_SERVICE_TOKEN_SECRET=$CfSecret",
+      "`"$exe`" access tcp --hostname $TunelHost --url 0.0.0.0:10051")
+    Set-Content -Path $run -Value $lineas -Encoding ASCII
+    # Solo SYSTEM y Administradores (por SID: el nombre depende del idioma).
+    & icacls.exe $dirIt /inheritance:r /grant:r "*S-1-5-18:(OI)(CI)F" "*S-1-5-32-544:(OI)(CI)F" | Out-Null
+    $accion = New-ScheduledTaskAction -Execute $run
+    $disparo = New-ScheduledTaskTrigger -AtStartup
+    $ajustes = New-ScheduledTaskSettingsSet -RestartCount 999 -RestartInterval (New-TimeSpan -Minutes 1) -ExecutionTimeLimit ([TimeSpan]::Zero) -StartWhenAvailable -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries
+    $quien = New-ScheduledTaskPrincipal -UserId "SYSTEM" -LogonType ServiceAccount -RunLevel Highest
+    Register-ScheduledTask -TaskName "iTier-Tunel" -Action $accion -Trigger $disparo -Settings $ajustes -Principal $quien -Force | Out-Null
+    Get-NetFirewallRule -DisplayName "iTier - relay Zabbix (10051)" -ErrorAction SilentlyContinue | Remove-NetFirewallRule
+    New-NetFirewallRule -DisplayName "iTier - relay Zabbix (10051)" -Direction Inbound -Protocol TCP -LocalPort 10051 -Action Allow -Profile Domain,Private | Out-Null
+    Start-ScheduledTask -TaskName "iTier-Tunel"
+    Start-Sleep -Seconds 6
+    Anotar "Tunel a Zabbix instalado como tarea de arranque (iTier-Tunel)"
+  } catch {
+    $Detalle = "No se pudo instalar el tunel: " + $_.Exception.Message
+    Anotar ("ERROR: " + $Detalle)
+  }
+}
+
 # Si el agente ya estaba instalado, el MSI no pisa su configuracion: se fija
 # el servidor y el tag en el registro y se reinicia el servicio.
 if (-not $SinGlpi) {
@@ -129,7 +199,7 @@ Write-Host ""
 Write-Host "==================== RESULTADO DE LA INSTALACION ====================" -ForegroundColor Cyan
 if (-not $SinGlpi) {
   $GlpiSvc = Estado-Servicio "GLPI-Agent"
-  $u = [Uri]$GlpiServer
+  $u = [Uri](($GlpiServer -split ",")[0])
   $GlpiCon = Probar-Tcp $u.Host $u.Port
   Linea "Inventario - servicio GLPI Agent" $GlpiSvc ($GlpiSvc -eq "activo")
   Linea "Inventario - conexion al servidor" "$GlpiCon ($($u.Host))" ($GlpiCon -eq "ok")
@@ -141,9 +211,14 @@ if ($SinZabbix) {
   Write-Host "  [  -  ] Monitoreo: pendiente (todavia no esta instalado el equipo central de iTier)" -ForegroundColor Yellow
 } else {
   $ZbxSvc = Estado-Servicio "Zabbix Agent 2"
-  $ZbxCon = Probar-Tcp $ProxyHost 10051
+  if ($Rol -ne "central") { $ZbxCon = Probar-Tcp $ProxyHost 10051 }
+  if ($Rol -eq "central") { $ZbxCon = Probar-Tunel }
   Linea "Monitoreo - servicio Zabbix Agent" $ZbxSvc ($ZbxSvc -eq "activo")
-  Linea "Monitoreo - conexion a iTier" "$ZbxCon ($ProxyHost)" ($ZbxCon -eq "ok")
+  if ($Rol -eq "central") {
+    Linea "Tunel seguro a Zabbix (Cloudflare)" "$ZbxCon ($TunelHost)" ($ZbxCon -eq "ok")
+  } else {
+    Linea "Monitoreo - conexion al equipo central" "$ZbxCon ($ProxyHost)" ($ZbxCon -eq "ok")
+  }
 }
 
 $Mal = @($GlpiSvc, $GlpiCon, $ZbxSvc, $ZbxCon) | Where-Object { $_ -in @("ausente", "detenido", "sin_respuesta", "dns_no_resuelve") }
@@ -159,7 +234,7 @@ if ($ReportUrl) {
     Invoke-RestMethod -Method Post -Uri $ReportUrl -TimeoutSec 15 -Body @{
       host = $env:COMPUTERNAME; estado = $Estado; os = "$os"
       glpi_servicio = $GlpiSvc; glpi_conexion = $GlpiCon
-      zbx_servicio = $ZbxSvc; zbx_conexion = $ZbxCon; detalle = $Detalle
+      zbx_servicio = $ZbxSvc; zbx_conexion = $ZbxCon; detalle = $Detalle; ip = (Ip-Lan)
     } | Out-Null
     $Avisado = $true
   } catch { Anotar ("No se pudo avisar a la consola: " + $_.Exception.Message) }

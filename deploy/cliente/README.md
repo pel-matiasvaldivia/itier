@@ -211,3 +211,18 @@ difiere, fijá `ITIER_GLPI_INVENTORY_URL` explícito.
   revisita la red del servicio (hoy es solo-salida a propósito). Ese cambio se
   documentará como su propio ADR.
 - **Fijá imágenes por digest** (incluida `CLOUDFLARED_IMAGE`) para despliegues reproducibles.
+
+## Windows sin appliance Linux: «equipo central»
+
+Zabbix **no tiene proxy para Windows** (solo agentes). Para clientes que no quieren un appliance Linux, la consola
+genera un instalador con rol **central** (Instaladores → «Equipo central»), uno por cliente, en un equipo siempre
+encendido:
+
+- instala GLPI Agent (inventario + contacto con el plugin de inventario para el escaneo de red) y Zabbix Agent 2;
+- instala `cloudflared` como tarea de arranque (SYSTEM) que abre el túnel `access tcp` a Zabbix (ADR-0010) y lo
+  ofrece a la LAN en el puerto 10051 (regla de firewall Dominio/Privado);
+- reporta su IP: los instaladores de los equipos comunes apuntan ahí (`SERVERACTIVE=<IP central>`).
+
+Es un relay, no un proxy: los agentes reportan al servidor a través del central (sin PSK de proxy; el tramo LAN va
+sin cifrar). Para monitoreo SNMP desde la LAN y buffer ante cortes, usar el appliance Linux.
+El instalador central **contiene el service token**: solo se descarga desde la consola con sesión.

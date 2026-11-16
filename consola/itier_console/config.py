@@ -88,6 +88,7 @@ class Config:
     smtp_tls: str = "starttls"     # starttls | ssl | no
     glpi_agent_msi_url: str = ""
     zbx_agent_msi_url: str = ""
+    cloudflared_win_url: str = ""
 
     @classmethod
     def from_env(cls) -> "Config":
@@ -154,6 +155,8 @@ class Config:
             zbx_agent_msi_url=os.environ.get("ITIER_ZBX_AGENT_MSI_URL") or (
                 "https://cdn.zabbix.com/zabbix/binaries/stable/7.0/7.0.22/"
                 "zabbix_agent2-7.0.22-windows-amd64-openssl.msi"),
+            cloudflared_win_url=os.environ.get("ITIER_CLOUDFLARED_WIN_URL") or (
+                "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-windows-amd64.exe"),
         )
 
     # -- ayudas de estado ----------------------------------------------------

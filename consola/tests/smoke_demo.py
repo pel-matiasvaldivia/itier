@@ -218,6 +218,34 @@ check("instaladores: muestra el equipo con problemas y su detalle", "con problem
 check("instaladores: el detalle se escapa (sin HTML inyectado)", "<script>x</script>" not in pag)
 check("instaladores: distingue instalado de transmitiendo", "esperando" in pag)
 
+# Equipo central de Windows: lleva el túnel (secretos) y fija la IP que usan los demás
+check("equipo común: sin secretos del túnel", SECRETO not in cmd and "access tcp --hostname $TunelHost" in cmd
+      and '$CfSecret   = ""' in cmd and '[string]$Rol = "equipo"' in cmd)
+r = c.get(INST + "/windows.ps1?rol=central")
+cen = r.text
+check("central: trae túnel, token de servicio y rol",
+      r.status_code == 200 and '$Rol = "central"' in cen and SECRETO in cen and "itier-zbx.demo.example" in cen
+      and "cloudflared-windows-amd64.exe" in cen and "plugins/glpiinventory/" in cen
+      and '$ProxyHost = "127.0.0.1"' in cen and "@@" not in cen and cen.isascii())
+check("central: el nombre del archivo lo distingue", "itier-prueba-srl-central.ps1" in r.headers.get("content-disposition", ""))
+r = c.get(INST + "/windows.cmd?rol=central")
+check("central .cmd: doble clic con elevación", r.status_code == 200 and "-Verb RunAs" in r.text and SECRETO in r.text)
+check("central: exige sesión", pub.get(INST + "/windows.ps1?rol=central", follow_redirects=False).status_code == 303)
+mc = re.search(r'\$ReportUrl  = "(http[^"]+/equipos/[A-Za-z0-9_\-]+/reporte)"', cen)
+check("central: reporta con una clave propia", bool(mc) and mc.group(1) != mrep.group(1))
+ruta_c = "/" + mc.group(1).split("/", 3)[3]
+r = pub.post(ruta_rep, data={"host": "pc-falsa", "estado": "ok", "ip": "6.6.6.6", "glpi_servicio": "activo",
+                             "glpi_conexion": "ok", "zbx_servicio": "activo", "zbx_conexion": "ok"})
+check("equipo común NO puede fijar la IP del central", "6.6.6.6" not in c.get(INST).text)
+r = pub.post(ruta_c, data={"host": "srv-central", "estado": "ok", "ip": "192.168.50.10", "glpi_servicio": "activo",
+                           "glpi_conexion": "ok", "zbx_servicio": "activo", "zbx_conexion": "ok"})
+check("central reporta y fija la IP del equipo central", r.status_code == 200 and "192.168.50.10" in c.get(INST).text)
+pub.post(ruta_c, data={"host": "srv-x", "estado": "ok", "ip": "999.1.1.1", "glpi_servicio": "activo",
+                       "glpi_conexion": "ok", "zbx_servicio": "activo", "zbx_conexion": "ok"})
+check("IP inválida del central se ignora", "999.1.1.1" not in c.get(INST).text)
+check("los equipos comunes ahora apuntan al central",
+      '$ProxyHost = "192.168.50.10"' in c.get(INST + "/windows.ps1").text)
+
 check("descargas exigen sesión", pub.get(INST + "/appliance.sh", follow_redirects=False).status_code == 303)
 aud = c.get("/auditoria").text
 check("auditoría registra el enrolamiento", "enrolamiento.instalador.descargado" in aud and "enrolamiento.appliance.reporte" in aud)

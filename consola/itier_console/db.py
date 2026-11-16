@@ -63,7 +63,8 @@ CREATE TABLE IF NOT EXISTS clients (
     zbx_action_id   TEXT,
     autoasig_detalle TEXT,
     -- Clave con la que los instaladores de equipos reportan su resultado.
-    report_key      TEXT
+    report_key      TEXT,
+    central_key     TEXT
 );
 
 -- Resultado que reporta cada equipo Windows al terminar su instalación
@@ -77,6 +78,7 @@ CREATE TABLE IF NOT EXISTS endpoint_reports (
     zbx_servicio  TEXT, zbx_conexion  TEXT,
     os            TEXT,
     detalle       TEXT,
+    rol           TEXT    NOT NULL DEFAULT 'equipo',   -- equipo | central
     ip_origen     TEXT,
     ts            TEXT    NOT NULL,
     UNIQUE(client_id, host)
@@ -156,9 +158,12 @@ def _migrar(conn: sqlite3.Connection) -> None:
         conn.execute("ALTER TABLE users ADD COLUMN client_id INTEGER")
     ccols = {r["name"] for r in conn.execute("PRAGMA table_info(clients)").fetchall()}
     for col in ("mesh_token", "enrolado_at", "enrolado_host", "enrolado_ip", "enrolado_estado",
-                "glpi_rule_id", "zbx_action_id", "autoasig_detalle", "report_key"):
+                "glpi_rule_id", "zbx_action_id", "autoasig_detalle", "report_key", "central_key"):
         if col not in ccols:
             conn.execute(f"ALTER TABLE clients ADD COLUMN {col} TEXT")
+    ecols = {r["name"] for r in conn.execute("PRAGMA table_info(endpoint_reports)").fetchall()}
+    if ecols and "rol" not in ecols:
+        conn.execute("ALTER TABLE endpoint_reports ADD COLUMN rol TEXT NOT NULL DEFAULT 'equipo'")
     tcols = {r["name"] for r in conn.execute("PRAGMA table_info(enroll_tokens)").fetchall()}
     if tcols and "tipo" not in tcols:
         conn.execute("ALTER TABLE enroll_tokens ADD COLUMN tipo TEXT NOT NULL DEFAULT 'appliance'")

@@ -244,6 +244,21 @@ def clave_reporte(conn: sqlite3.Connection, cli: dict) -> str:
     return cli["report_key"]
 
 
+def clave_central(conn: sqlite3.Connection, cli: dict) -> str:
+    """Clave del instalador del equipo CENTRAL (el que lleva el túnel). Es distinta
+    de la de los equipos comunes: solo con ella un reporte puede fijar la IP a la
+    que apuntan los demás agentes de Zabbix."""
+    if cli.get("central_key"):
+        return cli["central_key"]
+    clave = secrets.token_urlsafe(24)
+    conn.execute("UPDATE clients SET central_key=? WHERE id=? AND central_key IS NULL", (clave, cli["id"]))
+    conn.commit()
+    r = conn.execute("SELECT central_key FROM clients WHERE id=?", (cli["id"],)).fetchone()
+    cli["central_key"] = r["central_key"]
+    return cli["central_key"]
+
+
+_RE_IPV4 = re.compile(r"^(?:\d{1,3}\.){3}\d{1,3}$")
 _MAX_EQUIPOS = 2000
 _VALORES = {"activo", "detenido", "ausente", "ok", "sin_respuesta", "dns_no_resuelve", "omitido", "pendiente"}
 
@@ -252,9 +267,11 @@ def registrar_equipo(conn: sqlite3.Connection, clave: str, ip_origen: str, datos
     """Guarda (upsert por equipo) lo que reporta un instalador de Windows."""
     if not clave or len(clave) > 64:
         return False
-    r = conn.execute("SELECT id, nombre FROM clients WHERE report_key=?", (clave,)).fetchone()
+    r = conn.execute("SELECT id, nombre FROM clients WHERE report_key=? OR central_key=?", (clave, clave)).fetchone()
     if not r:
         return False
+    es_central = bool(conn.execute("SELECT 1 FROM clients WHERE id=? AND central_key=?", (r["id"], clave)).fetchone())
+    rol = "central" if es_central else "equipo"
     host = re.sub(r"[^A-Za-z0-9_.\-]", "", datos.get("host") or "")[:64].upper()
     if not host:
         return False
@@ -274,15 +291,20 @@ def registrar_equipo(conn: sqlite3.Connection, clave: str, ip_origen: str, datos
     estado = "ok" if datos.get("estado") == "ok" else "error"
     conn.execute(
         "INSERT INTO endpoint_reports(client_id, host, estado, glpi_servicio, glpi_conexion, zbx_servicio, "
-        "zbx_conexion, os, detalle, ip_origen, ts) VALUES (?,?,?,?,?,?,?,?,?,?,?) "
+        "zbx_conexion, os, detalle, rol, ip_origen, ts) VALUES (?,?,?,?,?,?,?,?,?,?,?,?) "
         "ON CONFLICT(client_id, host) DO UPDATE SET estado=excluded.estado, glpi_servicio=excluded.glpi_servicio, "
         "glpi_conexion=excluded.glpi_conexion, zbx_servicio=excluded.zbx_servicio, zbx_conexion=excluded.zbx_conexion, "
-        "os=excluded.os, detalle=excluded.detalle, ip_origen=excluded.ip_origen, ts=excluded.ts",
+        "os=excluded.os, detalle=excluded.detalle, rol=excluded.rol, ip_origen=excluded.ip_origen, ts=excluded.ts",
         (r["id"], host, estado, v("glpi_servicio"), v("glpi_conexion"), v("zbx_servicio"), v("zbx_conexion"),
-         txt("os", 80), txt("detalle", 300), ip_origen, _ahora().isoformat(timespec="seconds")))
+         txt("os", 80), txt("detalle", 300), rol, ip_origen, _ahora().isoformat(timespec="seconds")))
+    ip_lan = (datos.get("ip") or "").strip()
+    if es_central and estado == "ok" and _RE_IPV4.match(ip_lan) and all(int(o) < 256 for o in ip_lan.split(".")):
+        # El equipo central es el que reciben los demás agentes de Zabbix.
+        conn.execute("UPDATE clients SET enrolado_at=?, enrolado_host=?, enrolado_ip=?, enrolado_estado='ok' WHERE id=?",
+                     (_ahora().isoformat(timespec="seconds"), host, ip_lan, r["id"]))
     conn.commit()
     audit.registrar(conn, "enrolamiento", "enrolamiento.equipo.reporte",
-                    {"cliente": r["nombre"], "host": host, "estado": estado, "ip_origen": ip_origen})
+                    {"cliente": r["nombre"], "host": host, "estado": estado, "rol": rol, "ip_origen": ip_origen})
     return True
 
 
@@ -291,7 +313,7 @@ def listar_equipos(conn: sqlite3.Connection, cid: int) -> list[dict]:
         "SELECT * FROM endpoint_reports WHERE client_id=? ORDER BY ts DESC LIMIT 500", (cid,))]
 
 
-def instalador_windows(cfg, cli: dict, formato: str = "cmd", url_reporte: str = "") -> str:
+def instalador_windows(cfg, cli: dict, formato: str = "cmd", url_reporte: str = "", rol: str = "equipo") -> str:
     """Instalador para equipos Windows del cliente.
 
     formato='cmd' → un .cmd de DOBLE CLIC: pide elevación (UAC) una vez y después
@@ -300,14 +322,32 @@ def instalador_windows(cfg, cli: dict, formato: str = "cmd", url_reporte: str = 
                     como SYSTEM: sin UAC ni interacción).
     """
     glpi = _seguro("la URL de GLPI", cfg.public_glpi_url or "https://itier-itsm.ejemplo.com")
+    if rol not in ("equipo", "central"):
+        raise ServiceError("Rol de instalador desconocido.")
+    # El equipo CENTRAL lleva el túnel a Zabbix (con el service token de Cloudflare
+    # Access) y hace el escaneo de red: ese instalador SÍ contiene secretos.
+    if rol == "central":
+        if not tunel_configurado(cfg):
+            raise ServiceError("Falta configurar el túnel a Zabbix en la consola "
+                               "(ITIER_ZBX_TUNNEL_HOSTNAME, ITIER_CF_ACCESS_CLIENT_ID/SECRET).")
+        tunel = (cfg.zbx_tunnel_hostname, cfg.cf_access_client_id, cfg.cf_access_client_secret)
+        glpi_servers = glpi + "/," + glpi + "/plugins/glpiinventory/"   # inventario + tareas de descubrimiento
+    else:
+        tunel = ("", "", "")
+        glpi_servers = glpi + "/"
     plantilla = (_PLANTILLAS / "windows.ps1.tmpl").read_text(encoding="utf-8")
     if formato == "cmd":
         plantilla = (_PLANTILLAS / "windows.cmd.tmpl").read_text(encoding="utf-8") + plantilla
     plantilla.encode("ascii")  # los .cmd/.ps1 van en ASCII puro (PowerShell 5.1 lee ANSI)
     return _crlf(plantilla
             .replace("@@TENANT@@", _seguro("tenant", cli["slug"]))
-            .replace("@@GLPI_SERVER@@", glpi + "/")  # raíz: inventario nativo de GLPI 10+
+            .replace("@@GLPI_SERVER@@", glpi_servers)  # raíz: inventario nativo de GLPI 10+
+            .replace("@@ROL@@", rol)
+            .replace("@@CLOUDFLARED_URL@@", _seguro("URL de cloudflared", cfg.cloudflared_win_url if rol == "central" else ""))
+            .replace("@@ZBX_TUNNEL_HOST@@", _seguro("host del túnel", tunel[0]))
+            .replace("@@CF_ID@@", _seguro("CF client id", tunel[1]))
+            .replace("@@CF_SECRET@@", _seguro("CF client secret", tunel[2]))
             .replace("@@GLPI_MSI@@", _seguro("URL del MSI de GLPI Agent", cfg.glpi_agent_msi_url))
             .replace("@@ZBX_MSI@@", _seguro("URL del MSI de Zabbix Agent", cfg.zbx_agent_msi_url))
             .replace("@@URL_REPORTE@@", _seguro("URL de reporte", url_reporte))
-            .replace("@@PROXY_IP@@", _seguro("IP del appliance", cli.get("enrolado_ip") or "")))
+            .replace("@@PROXY_IP@@", _seguro("IP del equipo central", cli.get("enrolado_ip") or "" if rol == "equipo" else "127.0.0.1")))

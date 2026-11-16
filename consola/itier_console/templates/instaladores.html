@@ -118,7 +118,21 @@
       <button class="btn btn-primary" type="submit">{% if smtp %}Generar y enviar{% else %}Generar enlace{% endif %}</button>
     </form>
 
-    <h3>Descargar</h3>
+    <h3>Equipo central (uno por cliente) — túnel a Zabbix + escaneo de red</h3>
+    <p class="muted small">Se instala <strong>primero</strong>, en un equipo Windows que quede encendido (ideal: un
+      servidor). Además de GLPI Agent y Zabbix Agent, deja corriendo el túnel seguro a Zabbix (cloudflared, tarea de
+      arranque como SYSTEM) y lo ofrece a los demás equipos de la LAN en el puerto 10051; el GLPI Agent también contacta
+      el plugin de inventario para el descubrimiento de red. <strong>Contiene el service token de Cloudflare:</strong>
+      bajalo desde acá y entregalo por un canal seguro; no se manda por el enlace público.</p>
+    <div class="acciones">
+      <a class="btn btn-primary" href="/clientes/{{ cli.slug }}/instaladores/windows.cmd?rol=central" {% if not tunel_ok %}aria-disabled="true"{% endif %}>Equipo central (.cmd)</a>
+      <a class="btn" href="/clientes/{{ cli.slug }}/instaladores/windows.ps1?rol=central">Equipo central (.ps1, GPO / RMM)</a>
+    </div>
+    <p class="small">{% if cli.enrolado_ip %}<span class="dot ok"></span>Equipo central: <code>{{ cli.enrolado_host or '—' }}</code>
+      ({{ cli.enrolado_ip }}). Los demás equipos ya apuntan ahí.{% else %}<span class="dot warn"></span>Todavía no hay equipo central:
+      hasta que uno reporte, los demás equipos instalan solo el inventario.{% endif %}</p>
+
+    <h3>Descargar (equipos comunes)</h3>
     <div class="acciones">
       <a class="btn" href="/clientes/{{ cli.slug }}/instaladores/windows.cmd">Instalador de doble clic (.cmd)</a>
       <a class="btn" href="/clientes/{{ cli.slug }}/instaladores/windows.ps1">Script para GPO / RMM (.ps1)</a>
@@ -126,8 +140,8 @@
     <p class="muted small">
       <strong>Sin ninguna interacción:</strong> distribuí el <code>.ps1</code> por GPO, Intune o tu RMM (corre como
       SYSTEM, sin UAC). El <code>.cmd</code> es para que lo ejecute una persona: pide permisos de administrador una vez.
-      {% if cli.enrolado_ip %}El agente de Zabbix ya apunta al appliance (<code>{{ cli.enrolado_ip }}</code>).
-      {% else %}Hasta que el appliance se instale y reporte su IP, solo se instala el inventario (GLPI Agent).{% endif %}
+      {% if cli.enrolado_ip %}El agente de Zabbix reporta al equipo central (<code>{{ cli.enrolado_ip }}</code>).
+      {% else %}Hasta que el equipo central (o el appliance Linux) reporte su IP, solo se instala el inventario (GLPI Agent).{% endif %}
     </p>
     <h3>Equipos instalados</h3>
     {% if equipos %}
@@ -136,7 +150,7 @@
       <tbody>
         {% for e in equipos %}
         <tr>
-          <td><strong>{{ e.host }}</strong><div class="muted small">{{ e.os or '' }}</div></td>
+          <td><strong>{{ e.host }}</strong>{% if e.rol == 'central' %} <span class="muted small">(central)</span>{% endif %}<div class="muted small">{{ e.os or '' }}</div></td>
           <td>{% if e.estado == 'ok' %}<span class="dot ok"></span>correcta{% else %}<span class="dot bad"></span>con problemas{% endif %}
             {% if e.detalle %}<div class="muted small">{{ e.detalle }}</div>{% endif %}</td>
           <td>
