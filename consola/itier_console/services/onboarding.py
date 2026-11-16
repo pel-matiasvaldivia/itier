@@ -141,7 +141,7 @@ def autoasignar(conn: sqlite3.Connection, cfg, actor: str, cid: int) -> None:
 def bundle_env(cfg, cli: dict) -> str:
     """Fragmento de .env para configurar el appliance a mano (avanzado). Sin los
     secretos del túnel: esos van solo en el instalador."""
-    glpi = cfg.public_glpi_url or "https://itier-itsm.tu-dominio.com"
+    glpi = cfg.public_glpi_url or "https://itier-itsm.pymesenlinea.com.ar"
     return (
         f"# ── iTier — cliente: {cli['nombre']} (configuración manual) ──\n"
         f"ITIER_TENANT={cli['slug']}\n"

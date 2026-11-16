@@ -125,7 +125,7 @@ class Config:
             glpi_apirest_path=os.environ.get("ITIER_GLPI_APIREST_PATH", "/apirest.php"),
             glpi_app_token=os.environ.get("ITIER_GLPI_APP_TOKEN") or None,
             glpi_user_token=os.environ.get("ITIER_GLPI_USER_TOKEN") or None,
-            public_glpi_url=(os.environ.get("ITIER_PUBLIC_GLPI_URL") or os.environ.get("ITIER_GLPI_URL") or "").rstrip("/") or None,
+            public_glpi_url=(os.environ.get("ITIER_PUBLIC_GLPI_URL") or "").rstrip("/") or None,
             zbx_url=(os.environ.get("ITIER_ZBX_URL") or "").rstrip("/") or None,
             zbx_token=os.environ.get("ITIER_ZBX_TOKEN") or None,
             zbx_user=os.environ.get("ITIER_ZBX_USER") or None,

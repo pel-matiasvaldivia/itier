@@ -113,7 +113,7 @@ def pagina(request: Request, slug: str, user: dict = Depends(require_user),
         enlaces=enrolamiento.listar_enlaces(conn, cli["id"]),
         ttl_h=cfg.enroll_ttl_h, max_usos=cfg.enroll_max_usos,
         equipos=equipos, nota_tx=nota_tx,
-        tunel_ok=enrolamiento.tunel_configurado(cfg), tunel_host=cfg.zbx_tunnel_hostname, smtp=correo.configurado(cfg),
+        tunel_ok=enrolamiento.tunel_configurado(cfg), glpi_url=cfg.public_glpi_url or '', tunel_host=cfg.zbx_tunnel_hostname, smtp=correo.configurado(cfg),
         enlace_equipos=enlace_equipos, mailto=mailto, equipos_dias=cfg.equipos_ttl_h // 24,
     )
 

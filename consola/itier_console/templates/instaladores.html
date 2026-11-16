@@ -27,6 +27,12 @@
   {% endif %}
 
   <div class="card">
+    <h2>Servidor GLPI que usan los agentes</h2>
+    <p>{% if glpi_url %}<code>{{ glpi_url }}</code> <span class="muted small">(ITIER_PUBLIC_GLPI_URL; los instaladores apuntan acá, así que tiene que resolver desde internet)</span>
+    {% else %}<span class="dot bad"></span>No está configurada <code>ITIER_PUBLIC_GLPI_URL</code>.{% endif %}</p>
+  </div>
+
+  <div class="card">
     <h2>1 · Túnel seguro al servidor Zabbix</h2>
     {% if tunel_ok %}
       <p><span class="dot ok"></span>Configurado: los appliances llegan al servidor Zabbix por

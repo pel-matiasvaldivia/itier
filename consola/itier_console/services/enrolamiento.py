@@ -58,6 +58,20 @@ def tunel_configurado(cfg) -> bool:
 
 # ── Enlaces de instalación ───────────────────────────────────────────────────
 
+_RE_URL_PUBLICA = re.compile(r"^https://[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)+(:\d+)?$")
+
+
+def glpi_publica(cfg) -> str:
+    """URL pública de GLPI (la que usan los agentes de los clientes). Sin valores
+    por defecto inventados: si falta o no es una URL https pública, se avisa."""
+    url = (cfg.public_glpi_url or ("https://itier-itsm.demo.example" if cfg.demo else "")).rstrip("/")
+    if not _RE_URL_PUBLICA.match(url):
+        raise ServiceError(
+            "ITIER_PUBLIC_GLPI_URL no está bien configurada en la consola (hoy: «%s»). Debe ser la URL https "
+            "pública de GLPI, p. ej. https://itier-itsm.pymesenlinea.com.ar" % (url or "vacía"))
+    return url
+
+
 def faltantes(cfg, cli: dict) -> list[str]:
     """Qué le falta al cliente para poder generar un instalador completo."""
     f = []
@@ -68,8 +82,10 @@ def faltantes(cfg, cli: dict) -> list[str]:
     if not tunel_configurado(cfg):
         f.append("falta configurar el túnel a Zabbix en la consola (ITIER_ZBX_TUNNEL_HOSTNAME, "
                  "ITIER_CF_ACCESS_CLIENT_ID, ITIER_CF_ACCESS_CLIENT_SECRET)")
-    if not cfg.public_glpi_url and not cfg.demo:
-        f.append("falta ITIER_PUBLIC_GLPI_URL en la consola")
+    try:
+        glpi_publica(cfg)
+    except ServiceError as e:
+        f.append(e.mensaje)
     return f
 
 
@@ -188,7 +204,7 @@ def _seguro(nombre: str, valor: str) -> str:
 
 def env_completo(cfg, cli: dict) -> str:
     """El .env COMPLETO del appliance (sin huecos que rellenar a mano)."""
-    glpi = _seguro("la URL de GLPI", cfg.public_glpi_url or "https://itier-itsm.ejemplo.com")
+    glpi = _seguro("la URL de GLPI", glpi_publica(cfg))
     if not tunel_configurado(cfg):
         raise ServiceError("Falta configurar el túnel a Zabbix en la consola (ITIER_ZBX_TUNNEL_HOSTNAME y service token).")
     return (
@@ -321,7 +337,7 @@ def instalador_windows(cfg, cli: dict, formato: str = "cmd", url_reporte: str = 
     formato='ps1' → el script PowerShell solo, para GPO / RMM / Intune (corre
                     como SYSTEM: sin UAC ni interacción).
     """
-    glpi = _seguro("la URL de GLPI", cfg.public_glpi_url or "https://itier-itsm.ejemplo.com")
+    glpi = _seguro("la URL de GLPI", glpi_publica(cfg))
     if rol not in ("equipo", "central"):
         raise ServiceError("Rol de instalador desconocido.")
     # El equipo CENTRAL lleva el túnel a Zabbix (con el service token de Cloudflare
