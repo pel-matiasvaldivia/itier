@@ -57,6 +57,11 @@ def guardar_mesh_token(conn: sqlite3.Connection, actor: str, cli: dict, token: s
     audit.registrar(conn, actor, "enrolamiento.mesh_token", {"cliente": cli["nombre"], "cargado": bool(token)})
 
 
+def mesh_efectivo(cfg, cli: dict) -> str:
+    """Token mesh a usar: el propio del cliente si tiene, si no el común del VPS."""
+    return (cli.get("mesh_token") or cfg.mesh_node_token or "").strip()
+
+
 # ── Enlaces de instalación ───────────────────────────────────────────────────
 
 def faltantes(cfg, cli: dict) -> list[str]:
@@ -66,29 +71,40 @@ def faltantes(cfg, cli: dict) -> list[str]:
         f.append("el alta en GLPI/Zabbix no está completa (reintentá el aprovisionamiento)")
     if not cli.get("psk_key"):
         f.append("no hay PSK del proxy")
-    if not cli.get("mesh_token"):
-        f.append("falta el token del nodo mesh de Cloudflare")
+    if not mesh_efectivo(cfg, cli):
+        f.append("falta el token del nodo mesh de Cloudflare (ITIER_MESH_NODE_TOKEN en la consola)")
     if not cfg.public_glpi_url and not cfg.demo:
         f.append("falta ITIER_PUBLIC_GLPI_URL en la consola")
     return f
 
 
-def crear_enlace(conn: sqlite3.Connection, cfg, actor: str, cli: dict) -> str:
-    """Crea un enlace de instalación y devuelve el token EN CLARO (única vez)."""
-    falta = faltantes(cfg, cli)
-    if falta:
-        raise ServiceError("No se puede generar el instalador: " + "; ".join(falta) + ".")
+def crear_enlace(conn: sqlite3.Connection, cfg, actor: str, cli: dict, tipo: str = "appliance") -> str:
+    """Crea un enlace de instalación y devuelve el token EN CLARO (única vez).
+
+    tipo='appliance' → install.sh (con secretos: vida corta, pocos usos).
+    tipo='equipos'   → instalador de Windows para mandarle al cliente (sin
+                       secretos: vida más larga, muchos usos).
+    """
+    if tipo == "appliance":
+        falta = faltantes(cfg, cli)
+        if falta:
+            raise ServiceError("No se puede generar el instalador: " + "; ".join(falta) + ".")
+        ttl, usos = cfg.enroll_ttl_h, cfg.enroll_max_usos
+    elif tipo == "equipos":
+        ttl, usos = cfg.equipos_ttl_h, cfg.equipos_max_usos
+    else:
+        raise ServiceError("Tipo de enlace inválido.")
     token = secrets.token_urlsafe(32)
     ahora = _ahora()
     conn.execute(
-        "INSERT INTO enroll_tokens(client_id, token_hash, created_at, created_by, expires_at, max_usos) "
-        "VALUES (?, ?, ?, ?, ?, ?)",
+        "INSERT INTO enroll_tokens(client_id, token_hash, created_at, created_by, expires_at, max_usos, tipo) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?)",
         (cli["id"], _hash(token), ahora.isoformat(timespec="seconds"), actor,
-         (ahora + timedelta(hours=cfg.enroll_ttl_h)).isoformat(timespec="seconds"), cfg.enroll_max_usos),
+         (ahora + timedelta(hours=ttl)).isoformat(timespec="seconds"), usos, tipo),
     )
     conn.commit()
     audit.registrar(conn, actor, "enrolamiento.enlace.creado", {
-        "cliente": cli["nombre"], "vence_h": cfg.enroll_ttl_h, "max_usos": cfg.enroll_max_usos})
+        "cliente": cli["nombre"], "tipo": tipo, "vence_h": ttl, "max_usos": usos})
     return token
 
 
@@ -108,10 +124,10 @@ def revocar_enlace(conn: sqlite3.Connection, actor: str, cli: dict, tid: int) ->
     audit.registrar(conn, actor, "enrolamiento.enlace.revocado", {"cliente": cli["nombre"], "enlace": tid})
 
 
-def _buscar(conn: sqlite3.Connection, token: str) -> dict | None:
+def _buscar(conn: sqlite3.Connection, token: str, tipo: str = "appliance") -> dict | None:
     if not token or len(token) > 128:
         return None
-    r = conn.execute("SELECT * FROM enroll_tokens WHERE token_hash=?", (_hash(token),)).fetchone()
+    r = conn.execute("SELECT * FROM enroll_tokens WHERE token_hash=? AND tipo=?", (_hash(token), tipo)).fetchone()
     if not r:
         return None
     d = dict(r)
@@ -120,9 +136,18 @@ def _buscar(conn: sqlite3.Connection, token: str) -> dict | None:
     return d
 
 
-def canjear(conn: sqlite3.Connection, token: str, ip: str) -> dict | None:
+def cliente_de_enlace(conn: sqlite3.Connection, token: str, tipo: str) -> dict | None:
+    """Cliente de un enlace vigente, SIN consumir usos (para la página de descarga)."""
+    t = _buscar(conn, token, tipo)
+    if not t or t["usos"] >= t["max_usos"]:
+        return None
+    r = conn.execute("SELECT * FROM clients WHERE id=?", (t["client_id"],)).fetchone()
+    return dict(r) if r else None
+
+
+def canjear(conn: sqlite3.Connection, token: str, ip: str, tipo: str = "appliance") -> dict | None:
     """Valida el token y consume un uso. Devuelve el cliente o None."""
-    t = _buscar(conn, token)
+    t = _buscar(conn, token, tipo)
     if not t or t["usos"] >= t["max_usos"]:
         return None
     cur = conn.execute("UPDATE enroll_tokens SET usos=usos+1 WHERE id=? AND usos<max_usos", (t["id"],))
@@ -134,7 +159,7 @@ def canjear(conn: sqlite3.Connection, token: str, ip: str) -> dict | None:
         return None
     cli = dict(r)
     audit.registrar(conn, "enrolamiento", "enrolamiento.instalador.descargado", {
-        "cliente": cli["nombre"], "enlace": t["id"], "ip": ip, "uso": t["usos"] + 1})
+        "cliente": cli["nombre"], "tipo": tipo, "enlace": t["id"], "ip": ip, "uso": t["usos"] + 1})
     return cli
 
 
@@ -170,9 +195,9 @@ def env_completo(cfg, cli: dict) -> str:
     """El .env COMPLETO del appliance (sin huecos que rellenar a mano)."""
     glpi = _seguro("la URL de GLPI", cfg.public_glpi_url or "https://itier-itsm.ejemplo.com")
     server = _seguro("ITIER_ZBX_SERVER_HOST", cfg.zbx_server_host or "172.16.0.4")
-    mesh = cli.get("mesh_token") or ""
+    mesh = mesh_efectivo(cfg, cli)
     if not _RE_MESH.match(mesh):
-        raise ServiceError("Falta (o es inválido) el token del nodo mesh de este cliente.")
+        raise ServiceError("Falta (o es inválido) el token del nodo mesh (ITIER_MESH_NODE_TOKEN).")
     return (
         f"# iTier — appliance del cliente «{cli['slug']}». Generado por la consola; no editar a mano.\n"
         f"ITIER_TENANT={_seguro('tenant', cli['slug'])}\n"
@@ -208,11 +233,24 @@ def instalador_linux(cfg, cli: dict, url_reporte: str = "") -> str:
             .replace("@@PSK@@", psk))
 
 
-def instalador_windows(cfg, cli: dict) -> str:
-    """Script PowerShell para puestos/servidores Windows del cliente."""
+def _crlf(texto: str) -> str:
+    return texto.replace("\r\n", "\n").replace("\n", "\r\n")
+
+
+def instalador_windows(cfg, cli: dict, formato: str = "cmd") -> str:
+    """Instalador para equipos Windows del cliente.
+
+    formato='cmd' → un .cmd de DOBLE CLIC: pide elevación (UAC) una vez y después
+                    instala todo en silencio. Es el que se le manda al cliente.
+    formato='ps1' → el script PowerShell solo, para GPO / RMM / Intune (corre
+                    como SYSTEM: sin UAC ni interacción).
+    """
     glpi = _seguro("la URL de GLPI", cfg.public_glpi_url or "https://itier-itsm.ejemplo.com")
     plantilla = (_PLANTILLAS / "windows.ps1.tmpl").read_text(encoding="utf-8")
-    return (plantilla
+    if formato == "cmd":
+        plantilla = (_PLANTILLAS / "windows.cmd.tmpl").read_text(encoding="utf-8") + plantilla
+    plantilla.encode("ascii")  # los .cmd/.ps1 van en ASCII puro (PowerShell 5.1 lee ANSI)
+    return _crlf(plantilla
             .replace("@@TENANT@@", _seguro("tenant", cli["slug"]))
             .replace("@@GLPI_SERVER@@", glpi + "/plugins/glpiinventory/")
             .replace("@@GLPI_MSI@@", _seguro("URL del MSI de GLPI Agent", cfg.glpi_agent_msi_url))

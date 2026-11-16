@@ -62,21 +62,41 @@ El `itier-agent` queda aislado en una red puente de solo salida y no expone nada
 
 Todo sale preconfigurado de la consola: **Clientes → \<cliente\> → Instaladores**.
 
-1. Cargá el **token del nodo mesh** de Cloudflare del cliente (único dato externo).
-2. **Generar comando de instalación** y ejecutarlo como root en el equipo del cliente:
+1. **Generar comando de instalación** y ejecutarlo como root en el equipo del cliente:
 
    ```sh
    curl -fsSL https://<consola>/enrolar/<token>/install.sh | sudo bash
    ```
 
-   El instalador trae embebidos el compose, el `.env` completo y la PSK; instala
+   El instalador trae embebidos el compose, el `.env` completo (incluido el token
+   mesh común del VPS, `ITIER_MESH_NODE_TOKEN` de la consola) y la PSK; instala
    Docker si falta, deja el stack en `/opt/itier` como servicio (`itier.service`) y
    le avisa a la consola cómo quedó. El enlace vence (24 h), tiene usos acotados y
    es revocable. Si el equipo no llega a la consola, descargá el `.sh` y copialo.
-3. **Equipos Windows**: descargá `itier-<tenant>-windows.ps1` y corrélo como
-   Administrador (o distribuilo por GPO/RMM). Instala GLPI Agent y Zabbix Agent 2
-   como servicios; el agente de Zabbix reporta al proxy del appliance (puerto
-   `10051` publicado en la LAN).
+2. **Equipos Windows** — dos caminos:
+   - **Lo instala el cliente:** desde la consola se le envía por correo un *enlace*
+     (no un adjunto: los correos bloquean ejecutables). Descarga
+     `itier-<tenant>-instalar.cmd`, doble clic, acepta el aviso de Windows y el
+     resto es silencioso.
+   - **Cero interacción:** el `.ps1` por GPO / Intune / RMM (corre como SYSTEM).
+
+   Instala GLPI Agent y Zabbix Agent 2 como servicios. Los equipos caen solos en
+   la entidad (regla de GLPI por tag `itier-<tenant>`) y en el grupo de Zabbix
+   (autorregistro por metadata) que la consola crea en el alta.
+
+### Seguridad de Windows: qué se puede y qué no
+
+- **UAC no se puede saltear** (ni conviene): instalar servicios exige
+  administrador. El `.cmd` se autoeleva y muestra **un** aviso de UAC; si el
+  usuario no es administrador, Windows pide credenciales de uno. La única forma
+  de no ver ningún aviso es desplegar como SYSTEM (GPO/Intune/RMM).
+- **SmartScreen / marca de Internet:** al ser un archivo descargado y sin firma,
+  Windows puede mostrar «Windows protegió su PC» → *Más información → Ejecutar de
+  todas formas* (la página de descarga lo explica). Para eliminar ese aviso hace
+  falta un **ejecutable firmado** con certificado de firma de código (p. ej. Azure
+  Trusted Signing); es el paso pendiente para una experiencia tipo MeshCentral.
+- El instalador no contiene secretos y deja registro en
+  `%ProgramData%\iTier\instalador.log`.
 
 Operación: `systemctl status itier` · `cd /opt/itier && docker compose logs -f`.
 Para actualizar o reparar, volvé a correr el instalador (es idempotente).

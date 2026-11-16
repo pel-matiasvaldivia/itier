@@ -70,6 +70,19 @@ class Config:
     enroll_ttl_h: int = 24
     enroll_max_usos: int = 3
     # MSI de los agentes para puestos Windows (instalador .ps1).
+    # Token del nodo mesh de Cloudflare COMÚN a todos los clientes (el del VPS en
+    # producción). Un cliente puede tener uno propio que lo reemplaza.
+    mesh_node_token: str | None = None
+    # Enlace de descarga para equipos Windows (se manda por correo al cliente).
+    equipos_ttl_h: int = 168
+    equipos_max_usos: int = 500
+    # SMTP para enviar el enlace de instalación al cliente (opcional).
+    smtp_host: str | None = None
+    smtp_port: int = 587
+    smtp_user: str | None = None
+    smtp_password: str | None = None
+    smtp_from: str | None = None
+    smtp_tls: str = "starttls"     # starttls | ssl | no
     glpi_agent_msi_url: str = ""
     zbx_agent_msi_url: str = ""
 
@@ -118,6 +131,15 @@ class Config:
             console_public_url=(os.environ.get("ITIER_CONSOLE_PUBLIC_URL") or "").rstrip("/") or None,
             enroll_ttl_h=int(os.environ.get("ITIER_ENROLL_TTL_H", "24")),
             enroll_max_usos=int(os.environ.get("ITIER_ENROLL_MAX_USOS", "3")),
+            mesh_node_token=(os.environ.get("ITIER_MESH_NODE_TOKEN") or "").strip() or None,
+            equipos_ttl_h=int(os.environ.get("ITIER_EQUIPOS_TTL_H", "168")),
+            equipos_max_usos=int(os.environ.get("ITIER_EQUIPOS_MAX_USOS", "500")),
+            smtp_host=os.environ.get("ITIER_SMTP_HOST") or None,
+            smtp_port=int(os.environ.get("ITIER_SMTP_PORT", "587")),
+            smtp_user=os.environ.get("ITIER_SMTP_USER") or None,
+            smtp_password=os.environ.get("ITIER_SMTP_PASSWORD") or None,
+            smtp_from=os.environ.get("ITIER_SMTP_FROM") or os.environ.get("ITIER_SMTP_USER") or None,
+            smtp_tls=(os.environ.get("ITIER_SMTP_TLS") or "starttls").lower(),
             glpi_agent_msi_url=os.environ.get("ITIER_GLPI_AGENT_MSI_URL") or (
                 "https://github.com/glpi-project/glpi-agent/releases/download/1.21/GLPI-Agent-1.21-x64.msi"),
             # ⚠ Fijá la versión menor que exista en cdn.zabbix.com (misma mayor que el server).

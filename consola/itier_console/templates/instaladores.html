@@ -28,17 +28,25 @@
 
   <div class="card">
     <h2>1 · Token del nodo mesh (Cloudflare)</h2>
-    <p class="muted">Es el único dato que no nace en la consola: se crea en Cloudflare Zero Trust
-      (un nodo por cliente). Pegalo una vez y queda incluido en el instalador.</p>
-    <form method="post" action="/clientes/{{ cli.slug }}/instaladores/mesh-token" class="form row">
-      <input type="hidden" name="csrf" value="{{ csrf }}">
-      <label>Token del nodo
-        <input type="password" name="mesh_token" autocomplete="off"
-               placeholder="{% if cli.mesh_token %}•••••••• (cargado — pegá otro para reemplazarlo){% else %}eyJ…{% endif %}" required>
-      </label>
-      <button class="btn btn-primary" type="submit">Guardar</button>
-    </form>
-    <p class="small">{% if cli.mesh_token %}<span class="dot ok"></span>Token cargado.{% else %}<span class="dot warn"></span>Sin token.{% endif %}</p>
+    {% if mesh_global and not cli.mesh_token %}
+      <p><span class="dot ok"></span>Se usa el <strong>token común del VPS</strong> (<code>ITIER_MESH_NODE_TOKEN</code>).
+        No hay que cargar nada para este cliente.</p>
+    {% elif cli.mesh_token %}
+      <p><span class="dot ok"></span>Este cliente usa un <strong>token propio</strong>{% if mesh_global %} (reemplaza al común del VPS){% endif %}.</p>
+    {% else %}
+      <p><span class="dot warn"></span>Sin token. Definí <code>ITIER_MESH_NODE_TOKEN</code> en la consola (vale para
+        todos los clientes) o cargá uno propio para este cliente.</p>
+    {% endif %}
+    <details>
+      <summary class="muted small">Usar un token propio para este cliente (opcional)</summary>
+      <form method="post" action="/clientes/{{ cli.slug }}/instaladores/mesh-token" class="form row" style="margin-top:.75rem">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <label>Token del nodo <span class="muted small">(vacío = volver al común)</span>
+          <input type="password" name="mesh_token" autocomplete="off" placeholder="eyJ…">
+        </label>
+        <button class="btn" type="submit">Guardar</button>
+      </form>
+    </details>
   </div>
 
   <div class="card">
@@ -75,7 +83,7 @@
       <tbody>
         {% for e in enlaces %}
         <tr>
-          <td>#{{ e.id }}</td>
+          <td>#{{ e.id }} · {{ 'equipos Windows' if e.tipo == 'equipos' else 'appliance' }}</td>
           <td class="muted">{{ e.created_at }} · {{ e.created_by }}</td>
           <td class="muted">{{ e.expires_at }}</td>
           <td>{{ e.usos }}/{{ e.max_usos }}</td>
@@ -97,20 +105,46 @@
 
   <div class="card">
     <h2>3 · Equipos Windows del cliente</h2>
-    <p class="muted">Instala <strong>GLPI Agent</strong> (inventario, con el tag <code>itier-{{ cli.slug }}</code>) y
-      <strong>Zabbix Agent 2</strong> (monitoreo, hacia el proxy del appliance) como servicios, en silencio.
-      Se distribuye por GPO, RMM o pendrive. No contiene secretos.</p>
+    <p class="muted">Instala <strong>GLPI Agent</strong> (inventario) y <strong>Zabbix Agent 2</strong> (monitoreo)
+      como servicios, en silencio. Los equipos aparecen solos en la entidad y el grupo de este cliente.
+      No contiene secretos.</p>
+
+    <h3>Enviar al cliente</h3>
+    <p class="muted small">Se manda un <strong>enlace</strong> (los correos bloquean ejecutables adjuntos). El cliente
+      descarga un instalador de doble clic: acepta el aviso de Windows una vez y el resto es automático.</p>
+    {% if enlace_equipos %}
+      <div class="bundle-head">
+        <span class="bundle-t">Enlace para el cliente (vence en {{ equipos_dias }} días)</span>
+        <button class="btn btn-sm" type="button" data-copy="#enlace-equipos">Copiar</button>
+      </div>
+      <pre class="codeblock" id="enlace-equipos">{{ enlace_equipos }}</pre>
+      <p><a class="btn btn-sm" href="{{ mailto }}">Abrir en mi programa de correo</a></p>
+    {% endif %}
+    <form method="post" action="/clientes/{{ cli.slug }}/instaladores/enlace-equipos" class="form row">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <label>Correo del cliente <span class="muted small">({% if smtp %}se envía desde la consola{% else %}opcional — sin SMTP configurado, se genera el enlace para que lo envíes vos{% endif %})</span>
+        <input type="email" name="email" placeholder="contacto@cliente.com">
+      </label>
+      <button class="btn btn-primary" type="submit">{% if smtp %}Generar y enviar{% else %}Generar enlace{% endif %}</button>
+    </form>
+
+    <h3>Descargar</h3>
     <div class="acciones">
-      <a class="btn btn-primary" href="/clientes/{{ cli.slug }}/instaladores/windows.ps1">Descargar instalador (.ps1)</a>
+      <a class="btn" href="/clientes/{{ cli.slug }}/instaladores/windows.cmd">Instalador de doble clic (.cmd)</a>
+      <a class="btn" href="/clientes/{{ cli.slug }}/instaladores/windows.ps1">Script para GPO / RMM (.ps1)</a>
     </div>
-    <div class="bundle-head">
-      <span class="bundle-t">En cada equipo, PowerShell como Administrador</span>
-      <button class="btn btn-sm" type="button" data-copy="#cmd-windows">Copiar</button>
-    </div>
-    <pre class="codeblock" id="cmd-windows">powershell -ExecutionPolicy Bypass -File .\itier-{{ cli.slug }}-windows.ps1{% if not cli.enrolado_ip %} -ProxyHost &lt;IP-del-appliance&gt;{% endif %}</pre>
     <p class="muted small">
-      {% if cli.enrolado_ip %}El instalador ya apunta el agente de Zabbix al appliance (<code>{{ cli.enrolado_ip }}</code>).
-      {% else %}Cuando el appliance se instale y reporte su IP, el instalador la trae incluida; mientras tanto pasala con <code>-ProxyHost</code>.{% endif %}
+      <strong>Sin ninguna interacción:</strong> distribuí el <code>.ps1</code> por GPO, Intune o tu RMM (corre como
+      SYSTEM, sin UAC). El <code>.cmd</code> es para que lo ejecute una persona: pide permisos de administrador una vez.
+      {% if cli.enrolado_ip %}El agente de Zabbix ya apunta al appliance (<code>{{ cli.enrolado_ip }}</code>).
+      {% else %}Hasta que el appliance se instale y reporte su IP, solo se instala el inventario (GLPI Agent).{% endif %}
     </p>
+    {% if cli.autoasig_detalle %}
+      <div class="note note-bad small">La asignación automática quedó incompleta: {{ cli.autoasig_detalle }}.
+        Usá «Reintentar aprovisionamiento» en la ficha del cliente.</div>
+    {% elif cli.glpi_rule_id and cli.zbx_action_id %}
+      <p class="small"><span class="dot ok"></span>Asignación automática activa: regla de GLPI (tag
+        <code>itier-{{ cli.slug }}</code>) y autorregistro de Zabbix.</p>
+    {% endif %}
   </div>
 {% endblock %}

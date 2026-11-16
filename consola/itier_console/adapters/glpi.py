@@ -188,6 +188,36 @@ class GLPIClient:
             raise AdapterError("GLPI", f"crear_entidad sin id en respuesta: {resp}")
         return int(nuevo)
 
+    # -- regla de asignación de entidad por tag (inventario) -----------------
+
+    def asegurar_regla_tag(self, nombre: str, tag: str, entity_id: int) -> int:
+        """Crea (si falta) la regla que manda a la entidad del cliente todo
+        inventario que llegue con ese TAG del agente. Idempotente por nombre.
+
+        ⚠ GLPI 11: RuleImportEntity + RuleCriteria (criteria=tag) + RuleAction
+          (assign entities_id). Verificar contra el server real.
+        """
+        if self.demo:
+            return 800 + (abs(hash(tag)) % 99)
+        try:
+            existentes = self._get("/RuleImportEntity", {"range": "0-999"})
+        except AdapterError:
+            existentes = []
+        for r in existentes if isinstance(existentes, list) else []:
+            if r.get("name") == nombre:
+                return int(r["id"])
+        rid = self._id_de(self._post("/RuleImportEntity", {"input": {
+            "name": nombre, "sub_type": "RuleImportEntity", "match": "AND",
+            "is_active": 1, "entities_id": 0, "is_recursive": 1,
+            "comment": "Creada por la consola de iTier"}}))
+        if rid is None:
+            raise AdapterError("GLPI", "RuleImportEntity sin id en la respuesta")
+        # condition 0 = "es"
+        self._post("/RuleCriteria", {"input": {"rules_id": rid, "criteria": "tag", "condition": 0, "pattern": tag}})
+        self._post("/RuleAction", {"input": {"rules_id": rid, "action_type": "assign",
+                                             "field": "entities_id", "value": int(entity_id)}})
+        return rid
+
     # -- descubrimiento de red (SNMP) ---------------------------------------
 
     @staticmethod

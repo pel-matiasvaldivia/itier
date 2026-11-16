@@ -125,6 +125,36 @@ class ZabbixClient:
         res = self._rpc("hostgroup.create", {"name": nombre})
         return res["groupids"][0]
 
+    # -- autoregistro de agentes ---------------------------------------------
+
+    def asegurar_autoregistro(self, nombre: str, metadata: str, groupid: str,
+                              plantilla: str = "Windows by Zabbix agent active") -> str:
+        """Crea (si falta) la acción de AUTORREGISTRO: todo agente activo cuyo
+        HostMetadata contenga `metadata` se da de alta solo en el grupo del
+        cliente (y con la plantilla, si existe). Idempotente por nombre.
+
+        ⚠ 7.0: action.create con eventsource=2; conditiontype 24 = host metadata,
+          operator 2 = contiene; operationtype 4 = agregar a grupo, 6 = plantilla.
+        """
+        if self.demo:
+            return str(600 + (abs(hash(nombre)) % 99))
+        res = self._rpc("action.get", {"filter": {"name": [nombre], "eventsource": 2}, "output": ["actionid"]})
+        if res:
+            return res[0]["actionid"]
+        operaciones: list[dict] = [{"operationtype": 4, "opgroup": [{"groupid": groupid}]}]
+        try:
+            t = self._rpc("template.get", {"filter": {"host": [plantilla]}, "output": ["templateid"]})
+            if t:
+                operaciones.append({"operationtype": 6, "optemplate": [{"templateid": t[0]["templateid"]}]})
+        except AdapterError:
+            pass
+        res = self._rpc("action.create", {
+            "name": nombre, "eventsource": 2, "status": 0,
+            "filter": {"evaltype": 0, "conditions": [{"conditiontype": 24, "operator": 2, "value": metadata}]},
+            "operations": operaciones,
+        })
+        return res["actionids"][0]
+
     # -- proxy ---------------------------------------------------------------
 
     def proxy_por_nombre(self, nombre: str) -> dict | None:

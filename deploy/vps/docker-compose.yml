@@ -216,6 +216,15 @@ services:
       # del appliance (curl <consola>/enrolar/<token>/install.sh | sudo bash).
       ITIER_CONSOLE_PUBLIC_URL: ${ITIER_CONSOLE_PUBLIC_URL:-}
       ITIER_ZBX_AGENT_MSI_URL: ${ITIER_ZBX_AGENT_MSI_URL:-}
+      # Token del nodo mesh de Cloudflare, COMÚN a todos los clientes (secreto).
+      ITIER_MESH_NODE_TOKEN: ${ITIER_MESH_NODE_TOKEN:-}
+      # SMTP (opcional): para enviarle al cliente el enlace de instalación.
+      ITIER_SMTP_HOST: ${ITIER_SMTP_HOST:-}
+      ITIER_SMTP_PORT: ${ITIER_SMTP_PORT:-587}
+      ITIER_SMTP_USER: ${ITIER_SMTP_USER:-}
+      ITIER_SMTP_PASSWORD: ${ITIER_SMTP_PASSWORD:-}
+      ITIER_SMTP_FROM: ${ITIER_SMTP_FROM:-}
+      ITIER_SMTP_TLS: ${ITIER_SMTP_TLS:-starttls}
       TZ: ${TZ:-America/Argentina/Buenos_Aires}
     volumes:
       - consola_data:/data

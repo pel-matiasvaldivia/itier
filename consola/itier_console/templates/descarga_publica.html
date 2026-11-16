@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Instalación del agente de soporte</title>
+  <link rel="stylesheet" href="/static/app.css">
+</head>
+<body class="auth">
+  <main style="max-width:640px;margin:3rem auto;padding:0 16px">
+    <div class="card">
+    {% if cli %}
+      <h1>Instalación del agente de soporte</h1>
+      <p class="muted">{{ cli.nombre }}</p>
+      <p>Este instalador deja la computadora bajo monitoreo y soporte. Es automático: no hay que configurar nada.</p>
+      <p><a class="btn btn-primary" href="/descargar/{{ token }}/instalador.cmd">Descargar instalador para Windows</a></p>
+      <h2>Pasos</h2>
+      <ol>
+        <li>Descargá el instalador con el botón de arriba.</li>
+        <li>Abrilo con <strong>doble clic</strong>.</li>
+        <li>Si aparece el aviso <em>«Windows protegió su PC»</em>, elegí <strong>Más información</strong> y después
+          <strong>Ejecutar de todas formas</strong>.</li>
+        <li>Cuando Windows pregunte si permitís que la aplicación haga cambios, respondé <strong>Sí</strong>
+          (si pide usuario y contraseña, hace falta una cuenta de administrador del equipo).</li>
+        <li>Esperá a que la ventana se cierre sola. Listo.</li>
+      </ol>
+      <p class="muted small">Repetí estos pasos en cada computadora con Windows. Instala GLPI Agent (inventario)
+        y Zabbix Agent (monitoreo) como servicios del sistema.</p>
+    {% else %}
+      <h1>Enlace no disponible</h1>
+      <p>Este enlace de instalación venció o ya no es válido. Pedile uno nuevo a tu proveedor de soporte.</p>
+    {% endif %}
+    </div>
+  </main>
+</body>
+</html>

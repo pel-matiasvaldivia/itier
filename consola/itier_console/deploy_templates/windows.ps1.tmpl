@@ -1,16 +1,15 @@
 #Requires -RunAsAdministrator
 <#
-  iTier — instalador para equipos Windows del cliente «@@TENANT@@»
+  iTier - instalador para equipos Windows del cliente "@@TENANT@@"
   Generado por la consola de iTier. Instala, en silencio y como servicios:
-    - GLPI Agent      → inventario del equipo hacia GLPI (con el tag del cliente)
-    - Zabbix Agent 2  → monitoreo, reportando al proxy del appliance de iTier
+    - GLPI Agent      : inventario del equipo hacia GLPI (con el tag del cliente)
+    - Zabbix Agent 2  : monitoreo, reportando al proxy del appliance de iTier
 
-  Uso (PowerShell como Administrador):
-      powershell -ExecutionPolicy Bypass -File .\itier-@@TENANT@@-windows.ps1
-      powershell -ExecutionPolicy Bypass -File .\itier-@@TENANT@@-windows.ps1 -ProxyHost 192.168.1.50
-      powershell -ExecutionPolicy Bypass -File .\itier-@@TENANT@@-windows.ps1 -SinZabbix
+  Despliegue masivo SIN interaccion (GPO / RMM / Intune, corre como SYSTEM):
+      powershell -NoProfile -ExecutionPolicy Bypass -File itier-@@TENANT@@-windows.ps1
+  Opciones: -ProxyHost <IP del appliance>  -SinZabbix  -SinGlpi
 
-  Se puede distribuir por GPO / RMM / pendrive. No contiene secretos.
+  No contiene secretos. Deja un registro en %ProgramData%\iTier\instalador.log
 #>
 param(
   # IP del appliance de iTier en la LAN del cliente (donde corre el zabbix-proxy).
@@ -20,6 +19,7 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+$ProgressPreference = "SilentlyContinue"
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
 $Tenant     = "@@TENANT@@"
@@ -27,43 +27,59 @@ $GlpiServer = "@@GLPI_SERVER@@"
 $GlpiMsi    = "@@GLPI_MSI@@"
 $ZbxMsi     = "@@ZBX_MSI@@"
 $Tmp        = Join-Path $env:TEMP "itier-instalador"
-New-Item -ItemType Directory -Force -Path $Tmp | Out-Null
+$LogDir     = Join-Path $env:ProgramData "iTier"
+New-Item -ItemType Directory -Force -Path $Tmp, $LogDir | Out-Null
+$Log        = Join-Path $LogDir "instalador.log"
+
+function Anotar([string]$Texto) {
+  $linea = "{0} {1}" -f (Get-Date -Format "s"), $Texto
+  Add-Content -Path $Log -Value $linea
+  Write-Host "[iTier] $Texto"
+}
 
 function Instalar-Msi([string]$Nombre, [string]$Url, [string[]]$Propiedades) {
   $archivo = Join-Path $Tmp ($Nombre + ".msi")
-  Write-Host "[iTier] Descargando $Nombre..."
+  Anotar "Descargando $Nombre"
   Invoke-WebRequest -Uri $Url -OutFile $archivo -UseBasicParsing
-  Write-Host "[iTier] Instalando $Nombre..."
-  $argumentos = @("/i", "`"$archivo`"", "/qn", "/norestart") + $Propiedades
+  Anotar "Instalando $Nombre"
+  $argumentos = @("/i", "`"$archivo`"", "/qn", "/norestart", "/l*v", "`"$LogDir\$Nombre-msi.log`"") + $Propiedades
   $p = Start-Process -FilePath "msiexec.exe" -ArgumentList $argumentos -Wait -PassThru
   if ($p.ExitCode -ne 0 -and $p.ExitCode -ne 3010) {
     throw "La instalacion de $Nombre fallo (msiexec devolvio $($p.ExitCode))."
   }
 }
 
-if (-not $SinGlpi) {
-  Instalar-Msi "glpi-agent" $GlpiMsi @(
-    "SERVER=$GlpiServer",
-    "TAG=itier-$Tenant",
-    "EXECMODE=1",              # como servicio de Windows
-    "RUNNOW=1",                # primer inventario al terminar
-    "ADD_FIREWALL_EXCEPTION=1"
-  )
-}
+try {
+  Anotar "Inicio - cliente $Tenant - equipo $env:COMPUTERNAME"
 
-if (-not $SinZabbix) {
-  if ([string]::IsNullOrWhiteSpace($ProxyHost)) {
-    Write-Warning "[iTier] No se indico la IP del appliance (-ProxyHost). Se omite Zabbix Agent."
-  } else {
-    Instalar-Msi "zabbix-agent2" $ZbxMsi @(
-      "SERVER=$ProxyHost",
-      "SERVERACTIVE=$ProxyHost",
-      "HOSTNAME=$env:COMPUTERNAME",
-      "HOSTMETADATA=itier-$Tenant",   # para el autoregistro en el grupo del cliente
-      "ENABLEPATH=1"
+  if (-not $SinGlpi) {
+    Instalar-Msi "glpi-agent" $GlpiMsi @(
+      "SERVER=$GlpiServer",
+      "TAG=itier-$Tenant",
+      "EXECMODE=1",
+      "RUNNOW=1",
+      "ADD_FIREWALL_EXCEPTION=1"
     )
   }
-}
 
-Remove-Item -Recurse -Force $Tmp -ErrorAction SilentlyContinue
-Write-Host "[iTier] Listo. Equipo '$env:COMPUTERNAME' enrolado en el cliente '$Tenant'."
+  if (-not $SinZabbix) {
+    if ([string]::IsNullOrWhiteSpace($ProxyHost)) {
+      Anotar "Sin IP del appliance (-ProxyHost): se omite Zabbix Agent."
+    } else {
+      Instalar-Msi "zabbix-agent2" $ZbxMsi @(
+        "SERVER=$ProxyHost",
+        "SERVERACTIVE=$ProxyHost",
+        "HOSTNAME=$env:COMPUTERNAME",
+        "HOSTMETADATA=itier-$Tenant",
+        "ENABLEPATH=1"
+      )
+    }
+  }
+
+  Anotar "Listo - equipo enrolado en el cliente $Tenant"
+} catch {
+  Anotar ("ERROR: " + $_.Exception.Message)
+  exit 1
+} finally {
+  Remove-Item -Recurse -Force $Tmp -ErrorAction SilentlyContinue
+}

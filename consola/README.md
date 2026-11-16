@@ -20,13 +20,17 @@ roadmap (`docs/06`) menciona en todas las fases. Diseño en
   enrolamiento** (fragmento de `.env` + PSK) que se pega en `deploy/cliente/` del
   appliance. Los nombres calzan con `deploy/cliente/docker-compose.yml`.
 - **Instaladores preconfigurados** (enrolamiento automatizado). Por cliente, la
-  consola entrega todo listo: un **comando de una línea** para el appliance
-  (`curl …/enrolar/<token>/install.sh | sudo bash`: instala Docker, escribe compose +
-  `.env` + PSK, deja el servicio `itier.service` y reporta a la consola) y un
-  **instalador `.ps1` para equipos Windows** (GLPI Agent + Zabbix Agent 2 como
-  servicios). El enlace vence, tiene usos acotados, es revocable y queda auditado.
-  Requiere `ITIER_CONSOLE_PUBLIC_URL`. El único dato externo es el token del nodo
-  mesh de Cloudflare, que se carga una vez por cliente.
+  consola entrega todo listo, sin cargar nada a mano:
+  - **Appliance:** comando de una línea (`curl …/enrolar/<token>/install.sh | sudo bash`)
+    que instala Docker, escribe compose + `.env` + PSK, deja `itier.service` y
+    reporta a la consola. El token mesh de Cloudflare es **común** (`ITIER_MESH_NODE_TOKEN`).
+  - **Equipos Windows:** enlace de descarga que se **envía por correo** al cliente
+    (SMTP opcional) → instalador `.cmd` de doble clic que se autoeleva (UAC) e
+    instala GLPI Agent + Zabbix Agent 2 en silencio; y `.ps1` para GPO/RMM.
+  - **Autoasignación:** el alta crea la regla de GLPI (tag → entidad) y el
+    autorregistro de Zabbix (metadata → grupo), así los equipos aparecen solos.
+  Los enlaces vencen, tienen usos acotados, son revocables y quedan auditados.
+  Requiere `ITIER_CONSOLE_PUBLIC_URL`.
 - **Agentes de Zabbix.** Estado del proxy del cliente y de sus hosts; **vincular**
   un host al proxy y grupo del cliente.
 - **Descubrimiento de red (SNMP).** Por cliente, cargás los **rangos de IP** a
@@ -145,7 +149,10 @@ ingreso.
 - **API de Zabbix 7.0.** `adapters/zabbix.py` usa `proxy.create` con `name` +
   `operating_mode` y PSK, y `host.get` con disponibilidad a nivel de interfaz.
   Confirmá contra tu versión exacta.
-- **Instalador de Windows.** `windows.ps1.tmpl` no se pudo probar en un Windows real:
+- **Autoasignación.** La regla `RuleImportEntity` de GLPI y la acción de
+  autorregistro de Zabbix se crean por API con formas no verificadas contra los
+  servers reales; si fallan, el alta sigue y el detalle queda en Instaladores.
+- **Instalador de Windows.** `windows.cmd.tmpl`/`windows.ps1.tmpl` no se pudieron probar en un Windows real:
   verificá las propiedades MSI (GLPI Agent: `SERVER/TAG/EXECMODE/RUNNOW`; Zabbix
   Agent 2: `SERVER/SERVERACTIVE/HOSTNAME/HOSTMETADATA`) y que la URL del MSI de
   Zabbix (`ITIER_ZBX_AGENT_MSI_URL`) exista. La asignación a la entidad por tag y

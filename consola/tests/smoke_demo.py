@@ -94,7 +94,7 @@ r = c.post(INST + "/mesh-token", data={"mesh_token": "con espacios malos", "csrf
 check("instaladores: token mesh inválido rechazado", "formato inválido" in r.text)
 MESH = "eyJhIjoiZGVtbyJ9.tok-DEMO_1234567890"
 r = c.post(INST + "/mesh-token", data={"mesh_token": MESH, "csrf": csrf_de(r.text)})
-check("instaladores: token mesh guardado", "Token cargado" in r.text)
+check("instaladores: token mesh guardado", "token propio" in r.text)
 check("instaladores: la página NO muestra el token mesh", MESH not in r.text)
 
 r = c.post(INST + "/enlace", data={"csrf": csrf_de(r.text)})
@@ -171,6 +171,34 @@ r = c.get(INST + "/windows.ps1")
 check("descarga windows.ps1 preconfigurado",
       r.status_code == 200 and 'TAG=itier-$Tenant' in r.text and '$Tenant     = "prueba-srl"' in r.text
       and '$ProxyHost = "10.20.30.5"' in r.text and "@@" not in r.text and "\r\n" in r.text)
+r = c.get(INST + "/windows.cmd")
+cmd = r.text
+check("descarga windows.cmd (doble clic, autoelevación UAC)",
+      r.status_code == 200 and cmd.startswith("@echo off") and "-Verb RunAs" in cmd
+      and cmd.count("#__ITIER_PS__") == 1 and 'TAG=itier-$Tenant' in cmd and "@@" not in cmd)
+check("windows.cmd: ASCII puro y CRLF", cmd.isascii() and "\r\n" in cmd and "\n" not in cmd.replace("\r\n", ""))
+check("windows.cmd: el bloque PowerShell arranca en el marcador",
+      cmd[cmd.rfind("#__ITIER_PS__"):].splitlines()[1].startswith("#Requires"))
+
+# Enlace para el cliente final (se manda por correo)
+pag = c.get(INST).text
+r = c.post(INST + "/enlace-equipos", data={"email": "no-es-un-mail", "csrf": csrf_de(pag)})
+check("enlace equipos: correo inválido rechazado", "no es válida" in r.text and "/descargar/" not in r.text)
+r = c.post(INST + "/enlace-equipos", data={"email": "contacto@cliente.example", "csrf": csrf_de(r.text)})
+m = re.search(r"/descargar/([A-Za-z0-9_\-]+)<", r.text)
+check("enlace equipos: se genera y trae mailto", bool(m) and "mailto:contacto%40cliente.example" in r.text)
+tk = m.group(1) if m else "x"
+r = pub.get(f"/descargar/{tk}")
+check("página pública de descarga (sin sesión)", r.status_code == 200 and "Prueba SRL" in r.text and "doble clic" in r.text)
+r = pub.get(f"/descargar/{tk}/instalador.cmd")
+check("cliente descarga el .cmd por enlace", r.status_code == 200 and r.text.startswith("@echo off")
+      and "itier-prueba-srl-instalar.cmd" in r.headers.get("content-disposition", ""))
+check("enlace de equipos NO sirve para el instalador del appliance (secretos)",
+      pub.get(f"/enrolar/{tk}/install.sh").status_code == 404)
+check("enlace de appliance NO sirve como descarga pública", pub.get(f"/descargar/{tok}").status_code == 404)
+check("descarga pública con token falso → 404", pub.get("/descargar/falso").status_code == 404)
+check("autoasignación creada en el alta", "Asignación automática activa" in c.get(INST).text)
+
 check("descargas exigen sesión", pub.get(INST + "/appliance.sh", follow_redirects=False).status_code == 303)
 aud = c.get("/auditoria").text
 check("auditoría registra el enrolamiento", "enrolamiento.instalador.descargado" in aud and "enrolamiento.appliance.reporte" in aud)

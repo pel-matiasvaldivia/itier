@@ -103,7 +103,39 @@ def alta_cliente(conn: sqlite3.Connection, cfg, actor: str, nombre: str, notas: 
             "para reintentar o limpiar; revisá GLPI/Zabbix.",
             cliente_id=cid,
         )
+    autoasignar(conn, cfg, actor, cid)
     return obtener_cliente(conn, cid)
+
+
+def autoasignar(conn: sqlite3.Connection, cfg, actor: str, cid: int) -> None:
+    """Deja el cliente "enchufar y listo": regla de GLPI (tag itier-<slug> →
+    su entidad) y acción de autorregistro de Zabbix (metadata itier-<slug> → su
+    grupo). Best-effort e idempotente: si falla NO invalida el alta; queda el
+    detalle para reintentar."""
+    cli = obtener_cliente(conn, cid)
+    if not cli or cli.get("estado") != "activo":
+        return
+    marca = f"itier-{cli['slug']}"
+    rule_id, action_id = cli.get("glpi_rule_id"), cli.get("zbx_action_id")
+    errores = []
+    if not rule_id:
+        try:
+            with glpi_mod.cliente(cfg) as g:
+                rule_id = g.asegurar_regla_tag(f"iTier · {cli['nombre']}", marca, int(cli["glpi_entity_id"]))
+        except (AdapterError, TypeError, ValueError) as e:
+            errores.append(f"GLPI (regla por tag): {e}")
+    if not action_id:
+        try:
+            with zbx_mod.cliente(cfg) as z:
+                action_id = z.asegurar_autoregistro(f"iTier · {cli['nombre']}", marca, cli["zbx_hostgroup_id"])
+        except (AdapterError, KeyError, IndexError) as e:
+            errores.append(f"Zabbix (autorregistro): {e}")
+    detalle = "; ".join(errores)[:500] or None
+    conn.execute("UPDATE clients SET glpi_rule_id=?, zbx_action_id=?, autoasig_detalle=? WHERE id=?",
+                 (str(rule_id) if rule_id else None, str(action_id) if action_id else None, detalle, cid))
+    conn.commit()
+    audit.registrar(conn, actor, "cliente.autoasignacion", {
+        "cliente": cli["nombre"], "glpi_rule_id": rule_id, "zbx_action_id": action_id, "error": detalle})
 
 
 def bundle_env(cfg, cli: dict) -> str:
@@ -184,6 +216,7 @@ def reprovisionar(conn: sqlite3.Connection, cfg, actor: str, cid: int) -> dict:
             f"Reintento parcial de «{nombre}»: {error}. Revisá permisos/tokens y volvé a intentar.",
             cliente_id=cid,
         )
+    autoasignar(conn, cfg, actor, cid)
     return obtener_cliente(conn, cid)
 
 

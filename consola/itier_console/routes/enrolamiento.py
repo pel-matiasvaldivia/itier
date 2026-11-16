@@ -11,18 +11,24 @@
   Appliance (sin sesión; el token del enlace es la credencial):
     GET  /enrolar/{token}/install.sh                    el instalador (consume un uso)
     POST /enrolar/{token}/reporte                       el appliance avisa cómo quedó
+
+  Cliente final (sin sesión; enlace que el operador le manda por correo):
+    GET  /descargar/{token}                             página con instrucciones
+    GET  /descargar/{token}/instalador.cmd              instalador de Windows (doble clic)
 """
 
 from __future__ import annotations
 
 import sqlite3
+from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import HTMLResponse, PlainTextResponse, RedirectResponse, Response
 
 from .. import audit, security
 from ..deps import flash, get_db, render, require_user
-from ..services import ServiceError, enrolamiento, onboarding
+from ..deps import templates
+from ..services import ServiceError, correo, enrolamiento, onboarding
 
 router = APIRouter()
 
@@ -59,12 +65,55 @@ def pagina(request: Request, slug: str, user: dict = Depends(require_user),
     comando = None
     if nuevo and nuevo.get("slug") == slug:
         comando = f"curl -fsSL {_base_publica(request)}/enrolar/{nuevo['token']}/install.sh | sudo bash"
+    eq = request.session.pop("_enlace_equipos", None)
+    enlace_equipos = mailto = None
+    if eq and eq.get("slug") == slug:
+        enlace_equipos = f"{_base_publica(request)}/descargar/{eq['token']}"
+        asunto, cuerpo = correo.texto_instalacion(cli["nombre"], enlace_equipos, cfg.equipos_ttl_h // 24)
+        mailto = "mailto:" + quote(eq.get("email") or "") + "?subject=" + quote(asunto) + "&body=" + quote(cuerpo)
     return render(
         request, "instaladores.html", cli=cli, comando=comando,
         faltantes=enrolamiento.faltantes(cfg, cli),
         enlaces=enrolamiento.listar_enlaces(conn, cli["id"]),
         ttl_h=cfg.enroll_ttl_h, max_usos=cfg.enroll_max_usos,
+        mesh_global=bool(cfg.mesh_node_token), smtp=correo.configurado(cfg),
+        enlace_equipos=enlace_equipos, mailto=mailto, equipos_dias=cfg.equipos_ttl_h // 24,
     )
+
+
+@router.post("/clientes/{slug}/instaladores/enlace-equipos")
+def enlace_equipos(request: Request, slug: str, email: str = Form(""), csrf: str = Form(""),
+                   user: dict = Depends(require_user), conn: sqlite3.Connection = Depends(get_db)):
+    """Genera el enlace de descarga del instalador de Windows y, si se indicó un
+    correo y hay SMTP, se lo envía al cliente."""
+    cli = _cliente(request, conn, slug)
+    if not cli:
+        return RedirectResponse("/clientes", status_code=303)
+    destino = RedirectResponse(f"/clientes/{slug}/instaladores", status_code=303)
+    if not security.verificar_csrf(request.session, csrf):
+        flash(request, "Sesión expirada, reintentá.", "error")
+        return destino
+    cfg = request.app.state.cfg
+    try:
+        email = correo.validar_email(email) if email.strip() else ""
+        token = enrolamiento.crear_enlace(conn, cfg, user["user"], cli, tipo="equipos")
+    except ServiceError as e:
+        flash(request, e.mensaje, "error")
+        return destino
+    request.session["_enlace_equipos"] = {"slug": slug, "token": token, "email": email}
+    url = f"{_base_publica(request)}/descargar/{token}"
+    if email and correo.configurado(cfg):
+        try:
+            asunto, cuerpo = correo.texto_instalacion(cli["nombre"], url, cfg.equipos_ttl_h // 24)
+            correo.enviar(cfg, email, asunto, cuerpo)
+            audit.registrar(conn, user["user"], "enrolamiento.correo.enviado",
+                            {"cliente": cli["nombre"], "destinatario": email})
+            flash(request, f"Enlace de instalación enviado a {email}.", "ok")
+        except ServiceError as e:
+            flash(request, e.mensaje + " Podés copiar el enlace y enviarlo vos.", "error")
+    else:
+        flash(request, "Enlace de instalación generado. Copialo o envialo ahora: no se vuelve a mostrar.", "ok")
+    return destino
 
 
 @router.post("/clientes/{slug}/instaladores/mesh-token")
@@ -146,21 +195,23 @@ def bajar_appliance(request: Request, slug: str, user: dict = Depends(require_us
     return _descarga(script, f"itier-{slug}-appliance.sh")
 
 
-@router.get("/clientes/{slug}/instaladores/windows.ps1")
-def bajar_windows(request: Request, slug: str, user: dict = Depends(require_user),
+@router.get("/clientes/{slug}/instaladores/windows.{ext}")
+def bajar_windows(request: Request, slug: str, ext: str, user: dict = Depends(require_user),
                   conn: sqlite3.Connection = Depends(get_db)):
     cli = _cliente(request, conn, slug)
     if not cli:
         return RedirectResponse("/clientes", status_code=303)
     try:
-        script = enrolamiento.instalador_windows(request.app.state.cfg, cli)
+        if ext not in ("cmd", "ps1"):
+            raise ServiceError("Formato de instalador desconocido.")
+        script = enrolamiento.instalador_windows(request.app.state.cfg, cli, formato=ext)
     except ServiceError as e:
         flash(request, e.mensaje, "error")
         return RedirectResponse(f"/clientes/{slug}/instaladores", status_code=303)
     audit.registrar(conn, user["user"], "enrolamiento.instalador.descargado",
-                    {"cliente": cli["nombre"], "tipo": "windows", "via": "consola"})
-    # CRLF: lo esperan las herramientas de Windows.
-    return _descarga(script.replace("\r\n", "\n").replace("\n", "\r\n"), f"itier-{slug}-windows.ps1")
+                    {"cliente": cli["nombre"], "tipo": f"windows.{ext}", "via": "consola"})
+    nombre = f"itier-{slug}-instalar.cmd" if ext == "cmd" else f"itier-{slug}-windows.ps1"
+    return _descarga(script, nombre)
 
 
 # ── Appliance (público, por token) ───────────────────────────────────────────
@@ -188,3 +239,25 @@ def reporte(request: Request, token: str, estado: str = Form(""), host: str = Fo
             ip: str = Form(""), conn: sqlite3.Connection = Depends(get_db)):
     ok = enrolamiento.registrar_reporte(conn, token, _ip(request), estado, host, ip)
     return PlainTextResponse("ok\n" if ok else "rechazado\n", status_code=200 if ok else 404, headers=_NO_CACHE)
+
+
+# ── Cliente final (público, por token): descarga del instalador de Windows ───
+
+@router.get("/descargar/{token}", response_class=HTMLResponse)
+def pagina_descarga(request: Request, token: str, conn: sqlite3.Connection = Depends(get_db)):
+    cli = enrolamiento.cliente_de_enlace(conn, token, "equipos")
+    return templates.TemplateResponse(
+        request, "descarga_publica.html", {"cli": cli, "token": token},
+        status_code=200 if cli else 404, headers=_NO_CACHE)
+
+
+@router.get("/descargar/{token}/instalador.cmd")
+def descargar_instalador(request: Request, token: str, conn: sqlite3.Connection = Depends(get_db)):
+    cli = enrolamiento.canjear(conn, token, _ip(request), tipo="equipos")
+    if not cli:
+        return PlainTextResponse("Enlace invalido o vencido.\n", status_code=404, headers=_NO_CACHE)
+    try:
+        script = enrolamiento.instalador_windows(request.app.state.cfg, cli, formato="cmd")
+    except ServiceError:
+        return PlainTextResponse("Enlace invalido o vencido.\n", status_code=404, headers=_NO_CACHE)
+    return _descarga(script, f"itier-{cli['slug']}-instalar.cmd")

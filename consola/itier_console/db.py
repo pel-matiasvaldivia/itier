@@ -56,7 +56,12 @@ CREATE TABLE IF NOT EXISTS clients (
     enrolado_at     TEXT,
     enrolado_host   TEXT,
     enrolado_ip     TEXT,
-    enrolado_estado TEXT
+    enrolado_estado TEXT,
+    -- Autoasignación: regla de GLPI (tag → entidad) y acción de autorregistro
+    -- de Zabbix (metadata → grupo) creadas en el alta.
+    glpi_rule_id    TEXT,
+    zbx_action_id   TEXT,
+    autoasig_detalle TEXT
 );
 
 -- Enlaces de instalación del appliance: token de un solo propósito, con
@@ -70,7 +75,8 @@ CREATE TABLE IF NOT EXISTS enroll_tokens (
     expires_at  TEXT    NOT NULL,
     max_usos    INTEGER NOT NULL DEFAULT 3,
     usos        INTEGER NOT NULL DEFAULT 0,
-    revocado    INTEGER NOT NULL DEFAULT 0
+    revocado    INTEGER NOT NULL DEFAULT 0,
+    tipo        TEXT    NOT NULL DEFAULT 'appliance'   -- appliance | equipos
 );
 
 -- Descubrimiento de red por cliente: rangos de IP + credencial SNMP que la
@@ -131,9 +137,13 @@ def _migrar(conn: sqlite3.Connection) -> None:
     if "client_id" not in cols:
         conn.execute("ALTER TABLE users ADD COLUMN client_id INTEGER")
     ccols = {r["name"] for r in conn.execute("PRAGMA table_info(clients)").fetchall()}
-    for col in ("mesh_token", "enrolado_at", "enrolado_host", "enrolado_ip", "enrolado_estado"):
+    for col in ("mesh_token", "enrolado_at", "enrolado_host", "enrolado_ip", "enrolado_estado",
+                "glpi_rule_id", "zbx_action_id", "autoasig_detalle"):
         if col not in ccols:
             conn.execute(f"ALTER TABLE clients ADD COLUMN {col} TEXT")
+    tcols = {r["name"] for r in conn.execute("PRAGMA table_info(enroll_tokens)").fetchall()}
+    if tcols and "tipo" not in tcols:
+        conn.execute("ALTER TABLE enroll_tokens ADD COLUMN tipo TEXT NOT NULL DEFAULT 'appliance'")
     conn.commit()
 
 

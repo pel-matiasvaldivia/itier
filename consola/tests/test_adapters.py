@@ -78,6 +78,13 @@ def handler(request: httpx.Request) -> httpx.Response:
             {"id": 1042, "name": "a", "status": 2, "priority": 3, "entities_id": 2},
             {"id": 1050, "name": "b", "status": 1, "priority": 4, "entities_id": 3},
         ])
+    # ── GLPI: regla de entidad por tag ──
+    if "/RuleImportEntity" in p:
+        if request.method == "POST":
+            return httpx.Response(201, json={"id": 31})
+        return httpx.Response(200, json=[{"id": 30, "name": "otra"}])
+    if "/RuleCriteria" in p or "/RuleAction" in p:
+        return httpx.Response(201, json={"id": 1})
     # ── GLPI: criticidad (curación de CMDB) ──
     if "/BusinessCriticity" in p:
         if request.method == "POST":
@@ -99,6 +106,12 @@ def handler(request: httpx.Request) -> httpx.Response:
             return _rpc(body, [])
         if m == "hostgroup.create":
             return _rpc(body, {"groupids": ["5"]})
+        if m == "action.get":
+            return _rpc(body, [])
+        if m == "template.get":
+            return _rpc(body, [{"templateid": "10081"}])
+        if m == "action.create":
+            return _rpc(body, {"actionids": ["44"]})
         if m == "proxy.get":
             return _rpc(body, [])
         if m == "proxy.create":
@@ -193,6 +206,42 @@ with glpi_mod.cliente(cfg) as g:
 put = next((x for x in captured if x["path"].endswith("/Computer/501") and x["method"] == "PUT"), None)
 check("glpi.fijar_criticidad hace PUT con businesscriticities_id",
       put and "businesscriticities_id" in put["body"]["input"], str(put["body"]) if put else "—")
+
+# ── Autoasignación: regla GLPI por tag + autorregistro Zabbix ────────────────
+captured.clear()
+with glpi_mod.cliente(cfg) as g:
+    rid = g.asegurar_regla_tag("iTier · X", "itier-x", 42)
+check("glpi.asegurar_regla_tag crea la regla", rid == 31, rid)
+crit = next((x for x in captured if x["path"].endswith("/RuleCriteria")), None)
+check("glpi: criterio tag = itier-x", crit and crit["body"]["input"]["criteria"] == "tag"
+      and crit["body"]["input"]["pattern"] == "itier-x" and crit["body"]["input"]["rules_id"] == 31)
+act = next((x for x in captured if x["path"].endswith("/RuleAction")), None)
+check("glpi: acción asigna la entidad", act and act["body"]["input"]["field"] == "entities_id"
+      and act["body"]["input"]["value"] == 42)
+captured.clear()
+with zbx_mod.cliente(cfg) as z:
+    aid = z.asegurar_autoregistro("iTier · X", "itier-x", "5")
+check("zbx.asegurar_autoregistro crea la acción", aid == "44", aid)
+ac = next((x for x in captured if x["body"].get("method") == "action.create"), None)
+check("zbx: autorregistro por metadata (eventsource=2, cond 24 contiene)",
+      ac and ac["body"]["params"]["eventsource"] == 2
+      and ac["body"]["params"]["filter"]["conditions"][0] == {"conditiontype": 24, "operator": 2, "value": "itier-x"})
+ops = ac["body"]["params"]["operations"] if ac else []
+check("zbx: operaciones = grupo del cliente + plantilla",
+      {"operationtype": 4, "opgroup": [{"groupid": "5"}]} in ops
+      and {"operationtype": 6, "optemplate": [{"templateid": "10081"}]} in ops)
+
+# ── Token mesh común del VPS (sin cargarlo por cliente) ──────────────────────
+import dataclasses  # noqa: E402
+from itier_console.services import enrolamiento as enr  # noqa: E402
+
+cli_x = {"slug": "x", "nombre": "X", "estado": "activo", "psk_key": "a" * 64, "psk_identity": "itier-x", "mesh_token": None}
+cfg_m = dataclasses.replace(cfg, mesh_node_token="TOKEN-COMUN-DEL-VPS-1234", public_glpi_url="https://itier-itsm.example.com")
+check("mesh: sin token común ni propio falta", any("mesh" in f for f in enr.faltantes(cfg, cli_x)))
+check("mesh: con token común no falta nada", enr.faltantes(cfg_m, cli_x) == [], str(enr.faltantes(cfg_m, cli_x)))
+check("mesh: el .env usa el token común", "MESH_NODE_TOKEN=TOKEN-COMUN-DEL-VPS-1234" in enr.env_completo(cfg_m, cli_x))
+check("mesh: el token propio del cliente tiene prioridad",
+      "MESH_NODE_TOKEN=PROPIO-DEL-CLIENTE-123456" in enr.env_completo(cfg_m, dict(cli_x, mesh_token="PROPIO-DEL-CLIENTE-123456")))
 
 # ── GLPI: lista de tickets vacía (install nuevo) → el 400 se trata como [] ────
 TICKET_EMPTY = True
