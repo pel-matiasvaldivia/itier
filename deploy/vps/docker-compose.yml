@@ -97,10 +97,11 @@ services:
         ref=$$(stat -c '%u:%g' /var/glpi);
         [ "$$ref" = "0:0" ] && ref=33:33;
         echo "iTier: aplicando dueño $$ref a los volúmenes de GLPI";
-        chown -R "$$ref" /vol/files /vol/config
+        chown -R "$$ref" /vol/files /vol/config /vol/marketplace
     volumes:
       - glpi_files:/vol/files
       - glpi_config:/vol/config
+      - glpi_marketplace:/vol/marketplace
     networks: [interna]
     restart: "no"
 
@@ -126,6 +127,9 @@ services:
     volumes:
       - glpi_files:/var/glpi/files
       - glpi_config:/var/glpi/config
+      # Plugins instalados desde el Marketplace (p. ej. GlpiInventory). Sin este
+      # volumen se pierden cada vez que se recrea el contenedor.
+      - glpi_marketplace:/var/glpi/marketplace
     networks: [interna, publica]
     ports:
       # Publicado para que NPM (en otro VPS de la LAN) lo alcance. Atalo a la IP
@@ -253,4 +257,5 @@ volumes:
   glpi_db:
   glpi_files:
   glpi_config:
+  glpi_marketplace:
   consola_data:

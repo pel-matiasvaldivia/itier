@@ -107,7 +107,7 @@ services:
     environment:
       ITIER_TENANT: ${ITIER_TENANT:?falta ITIER_TENANT}
       # URL pública de GLPI (por el túnel). El agente deriva el endpoint de
-      # inventario como <ITIER_GLPI_URL>/plugins/glpiinventory/ salvo que fijes
+      # inventario como la raíz de GLPI (<ITIER_GLPI_URL>/) salvo que fijes
       # ITIER_GLPI_INVENTORY_URL explícito.
       ITIER_GLPI_URL: ${ITIER_GLPI_URL:?falta ITIER_GLPI_URL}
       ITIER_GLPI_INVENTORY_URL: ${ITIER_GLPI_INVENTORY_URL:-}

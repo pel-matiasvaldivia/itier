@@ -306,7 +306,7 @@ def instalador_windows(cfg, cli: dict, formato: str = "cmd", url_reporte: str = 
     plantilla.encode("ascii")  # los .cmd/.ps1 van en ASCII puro (PowerShell 5.1 lee ANSI)
     return _crlf(plantilla
             .replace("@@TENANT@@", _seguro("tenant", cli["slug"]))
-            .replace("@@GLPI_SERVER@@", glpi + "/plugins/glpiinventory/")
+            .replace("@@GLPI_SERVER@@", glpi + "/")  # raíz: inventario nativo de GLPI 10+
             .replace("@@GLPI_MSI@@", _seguro("URL del MSI de GLPI Agent", cfg.glpi_agent_msi_url))
             .replace("@@ZBX_MSI@@", _seguro("URL del MSI de Zabbix Agent", cfg.zbx_agent_msi_url))
             .replace("@@URL_REPORTE@@", _seguro("URL de reporte", url_reporte))

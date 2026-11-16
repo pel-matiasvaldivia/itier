@@ -7,12 +7,12 @@ set -eu
 
 : "${ITIER_TENANT:?falta ITIER_TENANT}"
 
-# Endpoint del plugin GlpiInventory (GLPI 11). Si no se pasa explícito, se deriva
+# Endpoint de inventario. Si no se pasa explícito, es la raíz de GLPI, derivada
 # de ITIER_GLPI_URL (la URL pública de GLPI por el túnel).
 URL="${ITIER_GLPI_INVENTORY_URL:-}"
 if [ -z "$URL" ]; then
   : "${ITIER_GLPI_URL:?falta ITIER_GLPI_URL o ITIER_GLPI_INVENTORY_URL}"
-  URL="${ITIER_GLPI_URL%/}/plugins/glpiinventory/"
+  URL="${ITIER_GLPI_URL%/}/"   # raíz de GLPI: inventario nativo + tareas del plugin
 fi
 
 set -- glpi-agent \
