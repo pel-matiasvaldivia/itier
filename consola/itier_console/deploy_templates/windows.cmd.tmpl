@@ -12,13 +12,11 @@ if %errorlevel% neq 0 (
   powershell -NoProfile -ExecutionPolicy Bypass -Command "Start-Process -FilePath '%~f0' -Verb RunAs"
   exit /b 0
 )
-echo Instalando iTier. No cierre esta ventana; se cierra sola al terminar...
+echo Instalando iTier. No cierre esta ventana: al terminar muestra el resultado...
 powershell -NoProfile -ExecutionPolicy Bypass -Command "$s=[IO.File]::ReadAllText('%~f0'); $i=$s.LastIndexOf('#__ITIER_' + 'PS__'); & ([scriptblock]::Create($s.Substring($i)))"
 set RC=%errorlevel%
-if not "%RC%"=="0" (
-  echo.
-  echo La instalacion no pudo completarse ^(codigo %RC%^). Avise a su proveedor de soporte.
-  pause
-)
+echo.
+echo Presione una tecla para cerrar esta ventana.
+pause >nul
 exit /b %RC%
 #__ITIER_PS__

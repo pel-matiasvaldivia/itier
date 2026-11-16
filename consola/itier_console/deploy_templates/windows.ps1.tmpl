@@ -9,7 +9,8 @@
       powershell -NoProfile -ExecutionPolicy Bypass -File itier-@@TENANT@@-windows.ps1
   Opciones: -ProxyHost <IP del appliance>  -SinZabbix  -SinGlpi
 
-  No contiene secretos. Deja un registro en %ProgramData%\iTier\instalador.log
+  Al terminar verifica los servicios y la conexion, muestra el resultado y
+  avisa a la consola. No contiene secretos. Deja un registro en %ProgramData%\iTier\instalador.log
 #>
 param(
   # IP del appliance de iTier en la LAN del cliente (donde corre el zabbix-proxy).
@@ -26,6 +27,7 @@ $Tenant     = "@@TENANT@@"
 $GlpiServer = "@@GLPI_SERVER@@"
 $GlpiMsi    = "@@GLPI_MSI@@"
 $ZbxMsi     = "@@ZBX_MSI@@"
+$ReportUrl  = "@@URL_REPORTE@@"
 $Tmp        = Join-Path $env:TEMP "itier-instalador"
 $LogDir     = Join-Path $env:ProgramData "iTier"
 New-Item -ItemType Directory -Force -Path $Tmp, $LogDir | Out-Null
@@ -49,6 +51,34 @@ function Instalar-Msi([string]$Nombre, [string]$Url, [string[]]$Propiedades) {
   }
 }
 
+function Estado-Servicio([string]$Nombre) {
+  $svc = Get-Service -Name $Nombre -ErrorAction SilentlyContinue
+  if (-not $svc) { return "ausente" }
+  if ($svc.Status -ne "Running") {
+    try { Start-Service -Name $Nombre -ErrorAction Stop; Start-Sleep -Seconds 3; $svc.Refresh() } catch { }
+  }
+  if ($svc.Status -eq "Running") { return "activo" } else { return "detenido" }
+}
+
+function Probar-Tcp([string]$Destino, [int]$Puerto) {
+  try {
+    $c = New-Object Net.Sockets.TcpClient
+    $r = $c.BeginConnect($Destino, $Puerto, $null, $null)
+    $ok = $r.AsyncWaitHandle.WaitOne(5000)
+    if ($ok) { $c.EndConnect($r) }
+    $c.Close()
+    if ($ok) { return "ok" } else { return "sin_respuesta" }
+  } catch { return "sin_respuesta" }
+}
+
+function Linea([string]$Que, [string]$Valor, [bool]$Bien) {
+  $marca = "[FALLO]"; $color = "Red"
+  if ($Bien) { $marca = "[ OK  ]"; $color = "Green" }
+  Write-Host ("  {0} {1,-34} {2}" -f $marca, $Que, $Valor) -ForegroundColor $color
+  Add-Content -Path $Log -Value ("  {0} {1}: {2}" -f $marca, $Que, $Valor)
+}
+
+$Detalle = ""
 try {
   Anotar "Inicio - cliente $Tenant - equipo $env:COMPUTERNAME"
 
@@ -62,24 +92,73 @@ try {
     )
   }
 
-  if (-not $SinZabbix) {
-    if ([string]::IsNullOrWhiteSpace($ProxyHost)) {
-      Anotar "Sin IP del appliance (-ProxyHost): se omite Zabbix Agent."
-    } else {
-      Instalar-Msi "zabbix-agent2" $ZbxMsi @(
-        "SERVER=$ProxyHost",
-        "SERVERACTIVE=$ProxyHost",
-        "HOSTNAME=$env:COMPUTERNAME",
-        "HOSTMETADATA=itier-$Tenant",
-        "ENABLEPATH=1"
-      )
-    }
+  if (-not $SinZabbix -and -not [string]::IsNullOrWhiteSpace($ProxyHost)) {
+    Instalar-Msi "zabbix-agent2" $ZbxMsi @(
+      "SERVER=$ProxyHost",
+      "SERVERACTIVE=$ProxyHost",
+      "HOSTNAME=$env:COMPUTERNAME",
+      "HOSTMETADATA=itier-$Tenant",
+      "ENABLEPATH=1"
+    )
   }
-
-  Anotar "Listo - equipo enrolado en el cliente $Tenant"
 } catch {
-  Anotar ("ERROR: " + $_.Exception.Message)
-  exit 1
+  $Detalle = $_.Exception.Message
+  Anotar ("ERROR: " + $Detalle)
 } finally {
   Remove-Item -Recurse -Force $Tmp -ErrorAction SilentlyContinue
 }
+
+# --- Verificacion: servicios corriendo y conexion con iTier -----------------
+$GlpiSvc = "omitido"; $GlpiCon = "omitido"; $ZbxSvc = "omitido"; $ZbxCon = "omitido"
+Write-Host ""
+Write-Host "==================== RESULTADO DE LA INSTALACION ====================" -ForegroundColor Cyan
+if (-not $SinGlpi) {
+  $GlpiSvc = Estado-Servicio "GLPI-Agent"
+  $u = [Uri]$GlpiServer
+  $GlpiCon = Probar-Tcp $u.Host $u.Port
+  Linea "Inventario - servicio GLPI Agent" $GlpiSvc ($GlpiSvc -eq "activo")
+  Linea "Inventario - conexion al servidor" $GlpiCon ($GlpiCon -eq "ok")
+}
+if ($SinZabbix) {
+  Write-Host "  [  -  ] Monitoreo: omitido (-SinZabbix)"
+} elseif ([string]::IsNullOrWhiteSpace($ProxyHost)) {
+  $ZbxSvc = "pendiente"
+  Write-Host "  [  -  ] Monitoreo: pendiente (todavia no esta instalado el equipo central de iTier)" -ForegroundColor Yellow
+} else {
+  $ZbxSvc = Estado-Servicio "Zabbix Agent 2"
+  $ZbxCon = Probar-Tcp $ProxyHost 10051
+  Linea "Monitoreo - servicio Zabbix Agent" $ZbxSvc ($ZbxSvc -eq "activo")
+  Linea "Monitoreo - conexion a iTier" "$ZbxCon ($ProxyHost)" ($ZbxCon -eq "ok")
+}
+
+$Mal = @($GlpiSvc, $GlpiCon, $ZbxSvc, $ZbxCon) | Where-Object { $_ -in @("ausente", "detenido", "sin_respuesta") }
+$Estado = "ok"
+if ($Detalle -or $Mal) { $Estado = "error" }
+
+# --- Aviso a la consola de iTier (best-effort) ------------------------------
+$Avisado = $false
+if ($ReportUrl) {
+  try {
+    $os = (Get-CimInstance Win32_OperatingSystem -ErrorAction SilentlyContinue).Caption
+    Invoke-RestMethod -Method Post -Uri $ReportUrl -TimeoutSec 15 -Body @{
+      host = $env:COMPUTERNAME; estado = $Estado; os = "$os"
+      glpi_servicio = $GlpiSvc; glpi_conexion = $GlpiCon
+      zbx_servicio = $ZbxSvc; zbx_conexion = $ZbxCon; detalle = $Detalle
+    } | Out-Null
+    $Avisado = $true
+  } catch { Anotar ("No se pudo avisar a la consola: " + $_.Exception.Message) }
+}
+
+Write-Host "---------------------------------------------------------------------" -ForegroundColor Cyan
+if ($Estado -eq "ok") {
+  Write-Host "  INSTALACION CORRECTA: el equipo $env:COMPUTERNAME quedo conectado." -ForegroundColor Green
+  if ($Avisado) { Write-Host "  Su proveedor de soporte ya fue notificado." -ForegroundColor Green }
+} else {
+  Write-Host "  LA INSTALACION TUVO PROBLEMAS." -ForegroundColor Red
+  if ($Detalle) { Write-Host "  Detalle: $Detalle" -ForegroundColor Red }
+  if ($Avisado) { Write-Host "  Su proveedor de soporte ya fue notificado del problema." -ForegroundColor Yellow }
+  else { Write-Host "  Avise a su proveedor de soporte y envie el archivo: $Log" -ForegroundColor Yellow }
+}
+Write-Host "=====================================================================" -ForegroundColor Cyan
+Anotar "Fin - estado $Estado"
+if ($Estado -ne "ok") { exit 1 }

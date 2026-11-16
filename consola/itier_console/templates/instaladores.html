@@ -139,6 +139,41 @@
       {% if cli.enrolado_ip %}El agente de Zabbix ya apunta al appliance (<code>{{ cli.enrolado_ip }}</code>).
       {% else %}Hasta que el appliance se instale y reporte su IP, solo se instala el inventario (GLPI Agent).{% endif %}
     </p>
+    <h3>Equipos instalados</h3>
+    {% if equipos %}
+    <table class="tabla">
+      <thead><tr><th>Equipo</th><th>Instalación</th><th>Inventario (GLPI)</th><th>Monitoreo (Zabbix)</th><th>Último reporte</th></tr></thead>
+      <tbody>
+        {% for e in equipos %}
+        <tr>
+          <td><strong>{{ e.host }}</strong><div class="muted small">{{ e.os or '' }}</div></td>
+          <td>{% if e.estado == 'ok' %}<span class="dot ok"></span>correcta{% else %}<span class="dot bad"></span>con problemas{% endif %}
+            {% if e.detalle %}<div class="muted small">{{ e.detalle }}</div>{% endif %}</td>
+          <td>
+            {% if e.en_glpi %}<span class="dot ok"></span>transmitiendo (ya inventariado)
+            {% elif e.glpi_servicio == 'activo' and e.glpi_conexion == 'ok' %}<span class="dot warn"></span>instalado, esperando el primer inventario
+            {% elif e.glpi_servicio == 'omitido' %}<span class="muted">omitido</span>
+            {% else %}<span class="dot bad"></span>servicio {{ e.glpi_servicio }} · conexión {{ e.glpi_conexion }}{% endif %}
+          </td>
+          <td>
+            {% if e.en_zabbix and e.zbx_disponible %}<span class="dot ok"></span>transmitiendo
+            {% elif e.en_zabbix %}<span class="dot warn"></span>registrado, todavía sin datos
+            {% elif e.zbx_servicio == 'activo' and e.zbx_conexion == 'ok' %}<span class="dot warn"></span>instalado, esperando el autorregistro
+            {% elif e.zbx_servicio in ('omitido', 'pendiente') %}<span class="muted">{{ e.zbx_servicio }}</span>
+            {% else %}<span class="dot bad"></span>servicio {{ e.zbx_servicio }} · conexión {{ e.zbx_conexion }}{% endif %}
+          </td>
+          <td class="muted">{{ e.ts }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% if nota_tx %}<p class="muted small">{{ nota_tx }}</p>{% endif %}
+    <p class="muted small">«Instalación» es lo que informó el instalador al terminar (servicios corriendo y conexión).
+      «Transmitiendo» se confirma del lado del servidor: el equipo ya aparece en GLPI / ya envía datos a Zabbix.</p>
+    {% else %}
+    <p class="muted">Todavía no reportó ningún equipo. Cada instalador avisa solo al terminar.</p>
+    {% endif %}
+
     {% if cli.autoasig_detalle %}
       <div class="note note-bad small">La asignación automática quedó incompleta: {{ cli.autoasig_detalle }}.
         Usá «Reintentar aprovisionamiento» en la ficha del cliente.</div>

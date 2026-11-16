@@ -237,7 +237,67 @@ def _crlf(texto: str) -> str:
     return texto.replace("\r\n", "\n").replace("\n", "\r\n")
 
 
-def instalador_windows(cfg, cli: dict, formato: str = "cmd") -> str:
+def clave_reporte(conn: sqlite3.Connection, cli: dict) -> str:
+    """Clave (por cliente) con la que sus equipos reportan el resultado de la
+    instalación. No es un secreto fuerte: solo permite informar estado."""
+    if cli.get("report_key"):
+        return cli["report_key"]
+    clave = secrets.token_urlsafe(24)
+    conn.execute("UPDATE clients SET report_key=? WHERE id=? AND report_key IS NULL", (clave, cli["id"]))
+    conn.commit()
+    r = conn.execute("SELECT report_key FROM clients WHERE id=?", (cli["id"],)).fetchone()
+    cli["report_key"] = r["report_key"]
+    return cli["report_key"]
+
+
+_MAX_EQUIPOS = 2000
+_VALORES = {"activo", "detenido", "ausente", "ok", "sin_respuesta", "omitido", "pendiente"}
+
+
+def registrar_equipo(conn: sqlite3.Connection, clave: str, ip_origen: str, datos: dict) -> bool:
+    """Guarda (upsert por equipo) lo que reporta un instalador de Windows."""
+    if not clave or len(clave) > 64:
+        return False
+    r = conn.execute("SELECT id, nombre FROM clients WHERE report_key=?", (clave,)).fetchone()
+    if not r:
+        return False
+    host = re.sub(r"[^A-Za-z0-9_.\-]", "", datos.get("host") or "")[:64].upper()
+    if not host:
+        return False
+    existe = conn.execute("SELECT 1 FROM endpoint_reports WHERE client_id=? AND host=?", (r["id"], host)).fetchone()
+    if not existe:
+        n = conn.execute("SELECT COUNT(*) c FROM endpoint_reports WHERE client_id=?", (r["id"],)).fetchone()["c"]
+        if n >= _MAX_EQUIPOS:
+            return False
+
+    def v(k: str) -> str:
+        x = (datos.get(k) or "").strip().lower()
+        return x if x in _VALORES else "desconocido"
+
+    def txt(k: str, n: int) -> str:
+        return re.sub(r"[^\x20-\x7EáéíóúñÁÉÍÓÚÑ]", " ", datos.get(k) or "")[:n].strip()
+
+    estado = "ok" if datos.get("estado") == "ok" else "error"
+    conn.execute(
+        "INSERT INTO endpoint_reports(client_id, host, estado, glpi_servicio, glpi_conexion, zbx_servicio, "
+        "zbx_conexion, os, detalle, ip_origen, ts) VALUES (?,?,?,?,?,?,?,?,?,?,?) "
+        "ON CONFLICT(client_id, host) DO UPDATE SET estado=excluded.estado, glpi_servicio=excluded.glpi_servicio, "
+        "glpi_conexion=excluded.glpi_conexion, zbx_servicio=excluded.zbx_servicio, zbx_conexion=excluded.zbx_conexion, "
+        "os=excluded.os, detalle=excluded.detalle, ip_origen=excluded.ip_origen, ts=excluded.ts",
+        (r["id"], host, estado, v("glpi_servicio"), v("glpi_conexion"), v("zbx_servicio"), v("zbx_conexion"),
+         txt("os", 80), txt("detalle", 300), ip_origen, _ahora().isoformat(timespec="seconds")))
+    conn.commit()
+    audit.registrar(conn, "enrolamiento", "enrolamiento.equipo.reporte",
+                    {"cliente": r["nombre"], "host": host, "estado": estado, "ip_origen": ip_origen})
+    return True
+
+
+def listar_equipos(conn: sqlite3.Connection, cid: int) -> list[dict]:
+    return [dict(x) for x in conn.execute(
+        "SELECT * FROM endpoint_reports WHERE client_id=? ORDER BY ts DESC LIMIT 500", (cid,))]
+
+
+def instalador_windows(cfg, cli: dict, formato: str = "cmd", url_reporte: str = "") -> str:
     """Instalador para equipos Windows del cliente.
 
     formato='cmd' → un .cmd de DOBLE CLIC: pide elevación (UAC) una vez y después
@@ -255,4 +315,5 @@ def instalador_windows(cfg, cli: dict, formato: str = "cmd") -> str:
             .replace("@@GLPI_SERVER@@", glpi + "/plugins/glpiinventory/")
             .replace("@@GLPI_MSI@@", _seguro("URL del MSI de GLPI Agent", cfg.glpi_agent_msi_url))
             .replace("@@ZBX_MSI@@", _seguro("URL del MSI de Zabbix Agent", cfg.zbx_agent_msi_url))
+            .replace("@@URL_REPORTE@@", _seguro("URL de reporte", url_reporte))
             .replace("@@PROXY_IP@@", _seguro("IP del appliance", cli.get("enrolado_ip") or "")))

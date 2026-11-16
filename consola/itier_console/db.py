@@ -61,7 +61,25 @@ CREATE TABLE IF NOT EXISTS clients (
     -- de Zabbix (metadata → grupo) creadas en el alta.
     glpi_rule_id    TEXT,
     zbx_action_id   TEXT,
-    autoasig_detalle TEXT
+    autoasig_detalle TEXT,
+    -- Clave con la que los instaladores de equipos reportan su resultado.
+    report_key      TEXT
+);
+
+-- Resultado que reporta cada equipo Windows al terminar su instalación
+-- (servicios corriendo + conexión). Una fila por equipo (último reporte).
+CREATE TABLE IF NOT EXISTS endpoint_reports (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    client_id     INTEGER NOT NULL,
+    host          TEXT    NOT NULL,
+    estado        TEXT    NOT NULL,          -- ok | error
+    glpi_servicio TEXT, glpi_conexion TEXT,
+    zbx_servicio  TEXT, zbx_conexion  TEXT,
+    os            TEXT,
+    detalle       TEXT,
+    ip_origen     TEXT,
+    ts            TEXT    NOT NULL,
+    UNIQUE(client_id, host)
 );
 
 -- Enlaces de instalación del appliance: token de un solo propósito, con
@@ -138,7 +156,7 @@ def _migrar(conn: sqlite3.Connection) -> None:
         conn.execute("ALTER TABLE users ADD COLUMN client_id INTEGER")
     ccols = {r["name"] for r in conn.execute("PRAGMA table_info(clients)").fetchall()}
     for col in ("mesh_token", "enrolado_at", "enrolado_host", "enrolado_ip", "enrolado_estado",
-                "glpi_rule_id", "zbx_action_id", "autoasig_detalle"):
+                "glpi_rule_id", "zbx_action_id", "autoasig_detalle", "report_key"):
         if col not in ccols:
             conn.execute(f"ALTER TABLE clients ADD COLUMN {col} TEXT")
     tcols = {r["name"] for r in conn.execute("PRAGMA table_info(enroll_tokens)").fetchall()}

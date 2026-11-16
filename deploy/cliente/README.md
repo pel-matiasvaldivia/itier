@@ -84,6 +84,11 @@ Todo sale preconfigurado de la consola: **Clientes → \<cliente\> → Instalado
    la entidad (regla de GLPI por tag `itier-<tenant>`) y en el grupo de Zabbix
    (autorregistro por metadata) que la consola crea en el alta.
 
+Al terminar, el instalador **muestra el resultado** (servicios corriendo y
+conexión con iTier, en verde/rojo) y la ventana queda abierta hasta que se
+presiona una tecla. También lo **reporta a la consola**: en *Instaladores →
+Equipos instalados* se ve cada equipo, si instaló bien y si ya está transmitiendo.
+
 ### Seguridad de Windows: qué se puede y qué no
 
 - **UAC no se puede saltear** (ni conviene): instalar servicios exige

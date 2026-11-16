@@ -199,6 +199,28 @@ check("enlace de appliance NO sirve como descarga pública", pub.get(f"/descarga
 check("descarga pública con token falso → 404", pub.get("/descargar/falso").status_code == 404)
 check("autoasignación creada en el alta", "Asignación automática activa" in c.get(INST).text)
 
+# Control post-instalación: el equipo verifica y reporta a la consola
+check("windows: verifica servicios y conexión y muestra el resultado",
+      'Estado-Servicio "GLPI-Agent"' in cmd and "RESULTADO DE LA INSTALACION" in cmd and "pause >nul" in cmd)
+mrep = re.search(r'\$ReportUrl  = "(http[^"]+/equipos/[A-Za-z0-9_\-]+/reporte)"', cmd)
+check("windows: trae la URL de reporte del cliente", bool(mrep))
+ruta_rep = "/" + mrep.group(1).split("/", 3)[3] if mrep else "/equipos/x/reporte"
+r = pub.post(ruta_rep, data={"host": "pc-ventas-01", "estado": "ok", "os": "Microsoft Windows 11 Pro",
+                             "glpi_servicio": "activo", "glpi_conexion": "ok",
+                             "zbx_servicio": "activo", "zbx_conexion": "ok", "detalle": ""})
+check("reporte de equipo aceptado", r.status_code == 200, r.text)
+pub.post(ruta_rep, data={"host": "PC-DEPOSITO", "estado": "error", "glpi_servicio": "activo", "glpi_conexion": "ok",
+                         "zbx_servicio": "detenido", "zbx_conexion": "sin_respuesta",
+                         "detalle": "<script>x</script> msiexec devolvio 1603"})
+pub.post(ruta_rep, data={"host": "pc-ventas-01", "estado": "ok", "glpi_servicio": "activo", "glpi_conexion": "ok",
+                         "zbx_servicio": "activo", "zbx_conexion": "ok"})
+check("reporte con clave falsa rechazado", pub.post("/equipos/clave-falsa/reporte", data={"host": "x", "estado": "ok"}).status_code == 404)
+pag = c.get(INST).text
+check("instaladores: lista los equipos (uno por host, sin duplicar)", pag.count("<strong>PC-VENTAS-01</strong>") == 1 and "PC-DEPOSITO" in pag)
+check("instaladores: muestra el equipo con problemas y su detalle", "con problemas" in pag and "msiexec devolvio 1603" in pag)
+check("instaladores: el detalle se escapa (sin HTML inyectado)", "<script>x</script>" not in pag)
+check("instaladores: distingue instalado de transmitiendo", "esperando" in pag)
+
 check("descargas exigen sesión", pub.get(INST + "/appliance.sh", follow_redirects=False).status_code == 303)
 aud = c.get("/auditoria").text
 check("auditoría registra el enrolamiento", "enrolamiento.instalador.descargado" in aud and "enrolamiento.appliance.reporte" in aud)

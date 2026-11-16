@@ -15,6 +15,9 @@
   Cliente final (sin sesión; enlace que el operador le manda por correo):
     GET  /descargar/{token}                             página con instrucciones
     GET  /descargar/{token}/instalador.cmd              instalador de Windows (doble clic)
+
+  Equipos Windows (sin sesión; clave de reporte del cliente):
+    POST /equipos/{clave}/reporte                       el equipo avisa cómo quedó
 """
 
 from __future__ import annotations
@@ -27,6 +30,7 @@ from fastapi.responses import HTMLResponse, PlainTextResponse, RedirectResponse,
 
 from .. import audit, security
 from ..deps import flash, get_db, render, require_user
+from ..adapters import glpi as glpi_mod, zabbix as zbx_mod
 from ..deps import templates
 from ..services import ServiceError, correo, enrolamiento, onboarding
 
@@ -42,6 +46,30 @@ def _base_publica(request: Request) -> str:
 
 def _ip(request: Request) -> str:
     return request.client.host if request.client else "?"
+
+
+def _url_reporte_equipos(request: Request, conn: sqlite3.Connection, cli: dict) -> str:
+    return f"{_base_publica(request)}/equipos/{enrolamiento.clave_reporte(conn, cli)}/reporte"
+
+
+def _transmision(cfg, cli: dict) -> tuple[dict, set, str]:
+    """Qué equipos YA están llegando: hosts del grupo en Zabbix (con su
+    disponibilidad) y CIs inventariados en GLPI. Best-effort."""
+    zbx: dict[str, str] = {}
+    glpi: set[str] = set()
+    nota = ""
+    try:
+        with zbx_mod.cliente(cfg) as z:
+            for h in z.listar_hosts(cli.get("zbx_hostgroup_id")):
+                zbx[(h.get("host") or "").upper()] = str(h.get("available") or "0")
+    except Exception as e:  # noqa: BLE001
+        nota = f"Zabbix no respondió ({str(e)[:80]}). "
+    try:
+        with glpi_mod.cliente(cfg) as g:
+            glpi = {(c.get("name") or "").upper() for c in g.listar_cis(cli.get("glpi_entity_id"))}
+    except Exception as e:  # noqa: BLE001
+        nota += f"GLPI no respondió ({str(e)[:80]})."
+    return zbx, glpi, nota
 
 
 def _cliente(request: Request, conn: sqlite3.Connection, slug: str) -> dict | None:
@@ -65,6 +93,14 @@ def pagina(request: Request, slug: str, user: dict = Depends(require_user),
     comando = None
     if nuevo and nuevo.get("slug") == slug:
         comando = f"curl -fsSL {_base_publica(request)}/enrolar/{nuevo['token']}/install.sh | sudo bash"
+    equipos = enrolamiento.listar_equipos(conn, cli["id"])
+    nota_tx = ""
+    if equipos:
+        zbx, glpi, nota_tx = _transmision(cfg, cli)
+        for e in equipos:
+            e["en_glpi"] = e["host"] in glpi
+            e["en_zabbix"] = e["host"] in zbx
+            e["zbx_disponible"] = zbx.get(e["host"]) == "1"
     eq = request.session.pop("_enlace_equipos", None)
     enlace_equipos = mailto = None
     if eq and eq.get("slug") == slug:
@@ -76,6 +112,7 @@ def pagina(request: Request, slug: str, user: dict = Depends(require_user),
         faltantes=enrolamiento.faltantes(cfg, cli),
         enlaces=enrolamiento.listar_enlaces(conn, cli["id"]),
         ttl_h=cfg.enroll_ttl_h, max_usos=cfg.enroll_max_usos,
+        equipos=equipos, nota_tx=nota_tx,
         mesh_global=bool(cfg.mesh_node_token), smtp=correo.configurado(cfg),
         enlace_equipos=enlace_equipos, mailto=mailto, equipos_dias=cfg.equipos_ttl_h // 24,
     )
@@ -204,7 +241,8 @@ def bajar_windows(request: Request, slug: str, ext: str, user: dict = Depends(re
     try:
         if ext not in ("cmd", "ps1"):
             raise ServiceError("Formato de instalador desconocido.")
-        script = enrolamiento.instalador_windows(request.app.state.cfg, cli, formato=ext)
+        script = enrolamiento.instalador_windows(
+            request.app.state.cfg, cli, formato=ext, url_reporte=_url_reporte_equipos(request, conn, cli))
     except ServiceError as e:
         flash(request, e.mensaje, "error")
         return RedirectResponse(f"/clientes/{slug}/instaladores", status_code=303)
@@ -257,7 +295,21 @@ def descargar_instalador(request: Request, token: str, conn: sqlite3.Connection 
     if not cli:
         return PlainTextResponse("Enlace invalido o vencido.\n", status_code=404, headers=_NO_CACHE)
     try:
-        script = enrolamiento.instalador_windows(request.app.state.cfg, cli, formato="cmd")
+        script = enrolamiento.instalador_windows(
+            request.app.state.cfg, cli, formato="cmd", url_reporte=_url_reporte_equipos(request, conn, cli))
     except ServiceError:
         return PlainTextResponse("Enlace invalido o vencido.\n", status_code=404, headers=_NO_CACHE)
     return _descarga(script, f"itier-{cli['slug']}-instalar.cmd")
+
+
+# ── Equipos Windows: reporte del resultado de la instalación ─────────────────
+
+@router.post("/equipos/{clave}/reporte")
+async def reporte_equipo(request: Request, clave: str, conn: sqlite3.Connection = Depends(get_db)):
+    if int(request.headers.get("content-length") or 0) > 8192:
+        return PlainTextResponse("demasiado grande\n", status_code=413)
+    form = await request.form()
+    datos = {k: str(form.get(k) or "") for k in (
+        "host", "estado", "os", "glpi_servicio", "glpi_conexion", "zbx_servicio", "zbx_conexion", "detalle")}
+    ok = enrolamiento.registrar_equipo(conn, clave, _ip(request), datos)
+    return PlainTextResponse("ok\n" if ok else "rechazado\n", status_code=200 if ok else 404, headers=_NO_CACHE)

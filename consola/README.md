@@ -29,6 +29,11 @@ roadmap (`docs/06`) menciona en todas las fases. Diseño en
     instala GLPI Agent + Zabbix Agent 2 en silencio; y `.ps1` para GPO/RMM.
   - **Autoasignación:** el alta crea la regla de GLPI (tag → entidad) y el
     autorregistro de Zabbix (metadata → grupo), así los equipos aparecen solos.
+  - **Control post-instalación:** cada instalador verifica al terminar que los
+    servicios estén corriendo y que haya conexión, le muestra el resultado a quien
+    lo ejecutó y lo **reporta a la consola**. En Instaladores → *Equipos instalados*
+    se ve, por equipo, si la instalación fue correcta y si ya está **transmitiendo**
+    (confirmado del lado del servidor: aparece en GLPI / envía datos a Zabbix).
   Los enlaces vencen, tienen usos acotados, son revocables y quedan auditados.
   Requiere `ITIER_CONSOLE_PUBLIC_URL`.
 - **Agentes de Zabbix.** Estado del proxy del cliente y de sus hosts; **vincular**
