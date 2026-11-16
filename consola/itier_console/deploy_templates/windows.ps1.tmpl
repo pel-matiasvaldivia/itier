@@ -160,7 +160,7 @@ if ($Rol -eq "central" -and -not $Detalle) {
     $lineas = @("@echo off",
       "set TUNNEL_SERVICE_TOKEN_ID=$CfId",
       "set TUNNEL_SERVICE_TOKEN_SECRET=$CfSecret",
-      "`"$exe`" access tcp --hostname $TunelHost --url 0.0.0.0:10051")
+      "`"$exe`" access tcp --hostname $TunelHost --url 0.0.0.0:10051 >> `"%~dp0tunel.log`" 2>&1")
     Set-Content -Path $run -Value $lineas -Encoding ASCII
     # Solo SYSTEM y Administradores (por SID: el nombre depende del idioma).
     & icacls.exe $dirIt /inheritance:r /grant:r "*S-1-5-18:(OI)(CI)F" "*S-1-5-32-544:(OI)(CI)F" | Out-Null
@@ -216,6 +216,14 @@ if ($SinZabbix) {
   Linea "Monitoreo - servicio Zabbix Agent" $ZbxSvc ($ZbxSvc -eq "activo")
   if ($Rol -eq "central") {
     Linea "Tunel seguro a Zabbix (Cloudflare)" "$ZbxCon ($TunelHost)" ($ZbxCon -eq "ok")
+    if ($ZbxCon -ne "ok") {
+      $lg = Join-Path $env:ProgramFiles "iTier\tunel.log"
+      if (Test-Path $lg) {
+        Write-Host "  Ultimas lineas del registro del tunel ($lg):" -ForegroundColor Yellow
+        Get-Content $lg -Tail 6 | ForEach-Object { Write-Host "    $_" -ForegroundColor Yellow }
+        Add-Content -Path $Log -Value (Get-Content $lg -Tail 20)
+      }
+    }
   } else {
     Linea "Monitoreo - conexion al equipo central" "$ZbxCon ($ProxyHost)" ($ZbxCon -eq "ok")
   }
