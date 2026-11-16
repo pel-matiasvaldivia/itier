@@ -79,36 +79,61 @@ def _arrancar_bucle(parar: "threading.Event") -> str:
 
     tenant = os.environ.get("ITIER_TENANT", "demo")
     auditoria = Auditoria(tenant=tenant)
-    datos = DatosDemo()
 
-    # Fuente de eventos: Zabbix real si hay URL+token; si no, la fuente demo.
+    # ── Clientes reales (se comparten entre fuente, tickets y adaptador) ──────
+    zbx_cli = None
     zbx_url = os.environ.get("ITIER_ZBX_URL")
     zbx_token = os.environ.get("ITIER_ZBX_TOKEN")
     if zbx_url and zbx_token:
         from .zabbix import ZabbixEventos
 
-        cli = ZabbixEventos(url=zbx_url, token=zbx_token, grupo=os.environ.get("ITIER_ZBX_GROUP"))
-        # resolver host→CI: correlación de CMDB (hoy vía el mapeo demo; en prod,
-        # una consulta a GLPI). Si no mapea, deja el nombre del host como pista.
-        fuente = FuenteZabbix(
-            cli, resolver_ci=lambda p: datos.ci_por_host(p.get("host") or "") or (p.get("host") or "")
-        )
-        fuente_desc = f"Zabbix real ({zbx_url})"
-    else:
-        fuente = FuenteDemo()
-        fuente_desc = "DEMO (definí ITIER_ZBX_URL + ITIER_ZBX_TOKEN para el Zabbix real)"
+        zbx_cli = ZabbixEventos(url=zbx_url, token=zbx_token, grupo=os.environ.get("ITIER_ZBX_GROUP"))
 
-    # Puerto de tickets: GLPI real si hay URL+tokens; si no, tickets en memoria.
+    glpi_cli = None
     glpi_url = os.environ.get("ITIER_GLPI_URL")
     glpi_app = os.environ.get("ITIER_GLPI_APP_TOKEN")
     glpi_user = os.environ.get("ITIER_GLPI_USER_TOKEN")
     if glpi_url and glpi_app and glpi_user:
         from .glpi import GLPITickets
 
-        tickets = GLPITickets(
+        glpi_cli = GLPITickets(
             url=glpi_url, app_token=glpi_app, user_token=glpi_user,
             entity_id=int(os.environ.get("ITIER_GLPI_ENTITY", "0") or 0),
         )
+
+    # ── Datos del agente: REAL si hay GLPI + Zabbix; si no, demo ──────────────
+    if glpi_cli is not None and zbx_cli is not None:
+        from .datos import AdaptadorReal
+
+        datos = AdaptadorReal(
+            glpi_cli, zbx_cli,
+            criticidad_default=os.environ.get("ITIER_CRITICIDAD_DEFAULT", "alta"),
+        )
+        datos_desc = "GLPI+Zabbix reales"
+    else:
+        datos = DatosDemo()
+        datos_desc = "DEMO"
+
+    # ── Fuente de eventos ─────────────────────────────────────────────────────
+    if zbx_cli is not None:
+        if glpi_cli is not None:
+            # correlación host→CI real: ci_id = "{itemtype}:{items_id}" de GLPI.
+            def _resolver(p, _g=glpi_cli):
+                ci = _g.ci_por_host(p.get("host") or "")
+                return f"{ci['itemtype']}:{ci['items_id']}" if ci and ci.get("items_id") else (p.get("host") or "")
+        else:
+            def _resolver(p, _d=datos):
+                f = getattr(_d, "ci_por_host", None)
+                return (f(p.get("host") or "") if f else None) or (p.get("host") or "")
+        fuente = FuenteZabbix(zbx_cli, resolver_ci=_resolver)
+        fuente_desc = f"Zabbix real ({zbx_url})"
+    else:
+        fuente = FuenteDemo()
+        fuente_desc = "DEMO (definí ITIER_ZBX_URL + ITIER_ZBX_TOKEN para el Zabbix real)"
+
+    # ── Puerto de tickets: GLPI real (mismo cliente) o tickets en memoria ─────
+    if glpi_cli is not None:
+        tickets = glpi_cli
         tickets_desc = f"GLPI real ({glpi_url})"
     else:
         from .glpi import TicketsDemo
@@ -144,8 +169,8 @@ def _arrancar_bucle(parar: "threading.Event") -> str:
     intervalo = float(os.environ.get("ITIER_AGENT_INTERVALO_S", "60"))
 
     log.warning(
-        "Bucle de eventos ACTIVO (modo=%s, fuente=%s, tickets=%s). Ver reference/README.",
-        modo, fuente_desc, tickets_desc,
+        "Bucle de eventos ACTIVO (modo=%s, fuente=%s, tickets=%s, datos=%s). Ver reference/README.",
+        modo, fuente_desc, tickets_desc, datos_desc,
     )
     threading.Thread(
         target=runner.bucle, args=(fuente, intervalo, parar),

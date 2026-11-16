@@ -16,6 +16,8 @@ JSON-RPC que el adaptador de la consola: `Authorization: Bearer <token>` contra
 
 from __future__ import annotations
 
+import time
+
 import httpx
 
 # Problemas de ejemplo para el modo demo (misma forma que devuelve problemas()).
@@ -130,6 +132,32 @@ class ZabbixEventos:
                 "acknowledged": p.get("acknowledged"),
             })
         return salida
+
+    def historial(self, host: str, key: str, horas: int = 24) -> dict:
+        """Serie temporal de un ítem de un host: host.get (itemid + value_type) y
+        luego history.get. Best-effort: {} si no encuentra el ítem.
+
+        ⚠ `history` debe ser el value_type del ítem (0 float, 3 uint…); se toma del
+        propio ítem. La `key` se busca exacta y, si no, por coincidencia parcial."""
+        if self.demo:
+            return {"host": host, "key": key, "serie": [], "nota": "demo"}
+        hosts = self._rpc("host.get", {
+            "filter": {"host": [host]}, "output": ["hostid"],
+            "selectItems": ["itemid", "key_", "value_type", "name"]})
+        if not hosts:
+            return {}
+        items = hosts[0].get("items", [])
+        item = next((i for i in items if i.get("key_") == key), None) \
+            or next((i for i in items if key in (i.get("key_") or "")), None)
+        if item is None:
+            return {}
+        desde = int(time.time()) - horas * 3600
+        hist = self._rpc("history.get", {
+            "itemids": [item["itemid"]], "history": int(item.get("value_type", 0)),
+            "time_from": desde, "sortfield": "clock", "sortorder": "ASC",
+            "output": "extend", "limit": 500})
+        serie = [{"clock": h.get("clock"), "value": h.get("value")} for h in (hist or [])]
+        return {"host": host, "item": item.get("name"), "key": item.get("key_"), "serie": serie}
 
 
 def cliente(**kwargs) -> ZabbixEventos:

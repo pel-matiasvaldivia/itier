@@ -50,6 +50,11 @@ jobs:
         # (/ITILFollowup) y que el Runner abre un ticket por evento. Sin GLPI real.
         run: python reference/edge-agent/tests/test_glpi.py
 
+      - name: Test del adaptador de datos real del agente (HTTP simulado)
+        # get_ci/get_ci_obj (criticidad+roles), actualizar_ticket, metrics (Zabbix),
+        # lifecycle, y el vacío honesto / no_disponible. Sin GLPI ni Zabbix reales.
+        run: python reference/edge-agent/tests/test_datos.py
+
   # ── Consola (plano de control): compila y corre el smoke test en modo demo ─
   consola:
     runs-on: ubuntu-latest

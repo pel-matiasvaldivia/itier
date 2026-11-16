@@ -16,6 +16,7 @@ decisiones que definen el producto.
 | [`edge-agent/itier_agent/runner.py`](edge-agent/itier_agent/runner.py) | **El bucle de Fase 3**: ingesta → dedup → despacho al agente (o triage offline) | [ADR-0006](../docs/adr/ADR-0006-autonomia-graduada.md) |
 | [`edge-agent/itier_agent/zabbix.py`](edge-agent/itier_agent/zabbix.py) | Cliente de eventos de Zabbix (`problem.get` + `event.get`), la fuente real del bucle | [ADR-0001](../docs/adr/ADR-0001-nucleo-itsm-glpi.md) |
 | [`edge-agent/itier_agent/glpi.py`](edge-agent/itier_agent/glpi.py) | Tickets de GLPI: abre el ticket del incidente, lo anota y lo vincula al CI — **cierra el lazo** | [ADR-0001](../docs/adr/ADR-0001-nucleo-itsm-glpi.md) |
+| [`edge-agent/itier_agent/datos.py`](edge-agent/itier_agent/datos.py) | Adaptador de datos **real** del agente (CMDB, tickets, métricas, ciclo de vida) sobre GLPI+Zabbix | [ADR-0002](../docs/adr/ADR-0002-razonamiento-fuera-del-borde.md) |
 
 ## Lo que hay que mirar
 
@@ -69,7 +70,15 @@ ITIER_ZBX_URL / ITIER_ZBX_TOKEN    # servidor Zabbix (API) + token → usa la fu
 ITIER_ZBX_GROUP                    # host group del tenant, para acotar los problemas
 ITIER_GLPI_URL / _APP_TOKEN / _USER_TOKEN   # GLPI (apirest) → abre tickets reales
 ITIER_GLPI_ENTITY                  # id de la entidad del cliente en GLPI
+ITIER_CRITICIDAD_DEFAULT           # criticidad conservadora si GLPI no la trae (def: alta)
 ```
+
+**Datos del agente:** con GLPI **y** Zabbix configurados, las *tools* del agente usan el
+**adaptador real** (`datos.py`): CMDB (`get_ci`), criticidad/roles para la política,
+métricas de Zabbix, actualización del ticket y ciclo de vida. Lo que aún no se cablea
+(evidencia por `/search`: tickets similares, KB; grafo de impacto; logs) devuelve **vacío
+honesto**, y la ejecución de playbooks es **no disponible** (Fase 4). Sin ambos, el agente
+usa `DatosDemo`.
 
 **Fuente de eventos:** si están `ITIER_ZBX_URL` + `ITIER_ZBX_TOKEN`, el bucle lee los
 problemas activos del servidor Zabbix (`zabbix.py`: `problem.get` + `event.get`, acotado
@@ -88,10 +97,11 @@ OFFLINE, le agrega un seguimiento con el triage; con LLM, el agente lo enriquece
 
 ## Lo que falta para producción
 
-- **Adaptador de datos completo del agente:** el lazo evento→ticket ya usa Zabbix y GLPI
-  reales (lee problemas, abre y vincula tickets), pero las *tools* de lectura del agente
-  (CMDB, métricas, logs, KB, grafo de impacto) y la criticidad/roles que consume el motor
-  de políticas siguen en `DatosDemo`; falta el adaptador real para esa superficie
+- **Completar el adaptador de datos del agente:** `datos.py` ya usa GLPI/Zabbix reales para
+  CMDB, criticidad/roles, métricas, ciclo de vida y tickets. Falta la evidencia por `/search`
+  (tickets similares, KB, búsqueda de CIs), el grafo de impacto y el colector de logs; y fijar
+  la **fuente de criticidad/roles** desde la curación de la CMDB (docs/07 §6.2) — hoy se deriva
+  de un campo de GLPI + heurística por nombre + un default conservador
 - Servidores MCP reales (acá las tools son funciones locales; en producción son procesos
   MCP separados con su propio límite de privilegio)
 - Adaptador de GLPI contra la API v2 con OAuth2

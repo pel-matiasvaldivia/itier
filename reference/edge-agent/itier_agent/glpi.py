@@ -101,11 +101,47 @@ class GLPITickets:
             raise GLPIError(f"GET {ruta} → {r.status_code}: {r.text[:200]}")
         return r.json()
 
+    def _put(self, ruta: str, cuerpo: dict) -> Any:
+        self._asegurar_sesion()
+        r = self._client().put(f"{self._base}{ruta}", headers=self._headers(), json=cuerpo)
+        if r.status_code not in (200, 201):
+            raise GLPIError(f"PUT {ruta} → {r.status_code}: {r.text[:200]}")
+        return r.json()
+
     @staticmethod
     def _id_de(resp: Any) -> int | None:
         if isinstance(resp, list):
             resp = resp[0] if resp else {}
         return resp.get("id") if isinstance(resp, dict) else None
+
+    # -- lectura para el agente (CMDB / ciclo de vida) ---------------------
+
+    def obtener_item(self, itemtype: str, items_id: str) -> dict | None:
+        """GET /{itemtype}/{id} con dropdowns expandidos. None si no existe."""
+        if self.demo:
+            return None
+        try:
+            return self._get(f"/{itemtype}/{items_id}", params={"expand_dropdowns": "true"})
+        except GLPIError:
+            return None
+
+    def infocom(self, itemtype: str, items_id: str) -> dict | None:
+        """Datos administrativos del activo (garantía, compra, contrato)."""
+        if self.demo:
+            return None
+        try:
+            r = self._get(f"/{itemtype}/{items_id}/Infocom", params={"expand_dropdowns": "true"})
+        except GLPIError:
+            return None
+        if isinstance(r, list):
+            return r[0] if r else None
+        return r if isinstance(r, dict) else None
+
+    def actualizar_ticket_campos(self, ticket_id: str, campos: dict) -> None:
+        """PUT /Ticket/{id} con los campos dados (p. ej. itilcategories_id, status)."""
+        if self.demo:
+            return
+        self._put(f"/Ticket/{ticket_id}", {"input": {"id": int(ticket_id), **campos}})
 
     # -- operaciones -------------------------------------------------------
 
