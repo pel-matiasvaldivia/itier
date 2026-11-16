@@ -32,6 +32,7 @@ class Evento:
     severidad: str              # "critica" | "alta" | "media" | "advertencia" | ...
     disparador: str             # texto del trigger (contenido no confiable)
     ticket_id: str | None = None
+    host: str | None = None     # nombre del host en el monitoreo (para correlación CMDB)
     ts: dt.datetime = field(default_factory=lambda: dt.datetime.now(dt.timezone.utc))
 
     def clave_correlacion(self) -> str:
@@ -90,6 +91,7 @@ class FuenteZabbix:
                     ci_id=self._resolver_ci(p) or "",
                     severidad=self._SEV.get(str(p.get("severity", "")), "media"),
                     disparador=p.get("name") or p.get("description") or "evento sin descripción",
+                    host=p.get("host"),
                 )
             )
         return out

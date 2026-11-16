@@ -45,6 +45,11 @@ jobs:
         # con httpx.MockTransport. No requiere un Zabbix real.
         run: python reference/edge-agent/tests/test_zabbix.py
 
+      - name: Test de tickets de GLPI + lazo evento→ticket (HTTP simulado)
+        # Apertura de ticket (/Ticket), vínculo de CI (/Item_Ticket), seguimiento
+        # (/ITILFollowup) y que el Runner abre un ticket por evento. Sin GLPI real.
+        run: python reference/edge-agent/tests/test_glpi.py
+
   # ── Consola (plano de control): compila y corre el smoke test en modo demo ─
   consola:
     runs-on: ubuntu-latest

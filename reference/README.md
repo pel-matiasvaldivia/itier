@@ -15,6 +15,7 @@ decisiones que definen el producto.
 | [`edge-agent/itier_agent/events.py`](edge-agent/itier_agent/events.py) | Ingesta de eventos del monitoreo: contrato de fuente, fuente demo y `FuenteZabbix` | [ADR-0006](../docs/adr/ADR-0006-autonomia-graduada.md) |
 | [`edge-agent/itier_agent/runner.py`](edge-agent/itier_agent/runner.py) | **El bucle de Fase 3**: ingesta → dedup → despacho al agente (o triage offline) | [ADR-0006](../docs/adr/ADR-0006-autonomia-graduada.md) |
 | [`edge-agent/itier_agent/zabbix.py`](edge-agent/itier_agent/zabbix.py) | Cliente de eventos de Zabbix (`problem.get` + `event.get`), la fuente real del bucle | [ADR-0001](../docs/adr/ADR-0001-nucleo-itsm-glpi.md) |
+| [`edge-agent/itier_agent/glpi.py`](edge-agent/itier_agent/glpi.py) | Tickets de GLPI: abre el ticket del incidente, lo anota y lo vincula al CI — **cierra el lazo** | [ADR-0001](../docs/adr/ADR-0001-nucleo-itsm-glpi.md) |
 
 ## Lo que hay que mirar
 
@@ -66,6 +67,8 @@ ITIER_AGENT_INTERVALO_S=60         # cada cuánto consulta la fuente
 ITIER_POLICY_CATALOG / _TENANT     # rutas del catálogo firmado y la política del tenant
 ITIER_ZBX_URL / ITIER_ZBX_TOKEN    # servidor Zabbix (API) + token → usa la fuente real
 ITIER_ZBX_GROUP                    # host group del tenant, para acotar los problemas
+ITIER_GLPI_URL / _APP_TOKEN / _USER_TOKEN   # GLPI (apirest) → abre tickets reales
+ITIER_GLPI_ENTITY                  # id de la entidad del cliente en GLPI
 ```
 
 **Fuente de eventos:** si están `ITIER_ZBX_URL` + `ITIER_ZBX_TOKEN`, el bucle lee los
@@ -74,15 +77,21 @@ al `ITIER_ZBX_GROUP` del tenant) y los mapea a eventos. Si no, usa la **fuente d
 Sin clave de LLM corre en **OFFLINE** (tria y deja el evento en auditoría, sin inventar
 diagnóstico).
 
+**Lazo evento → ticket:** por cada evento nuevo (tras dedup), el bucle **abre un ticket
+en GLPI** (`glpi.py`), lo vincula al CI correlacionado por host (`Item_Ticket`) y, en
+OFFLINE, le agrega un seguimiento con el triage; con LLM, el agente lo enriquece. Con
+`ITIER_GLPI_URL` + tokens usa GLPI real; si no, tickets en memoria (demo).
+
 > La correlación host→CI (`DatosDemo.ci_por_host`) es hoy un mapeo por nombre; en
 > producción es una consulta a GLPI. Un host sin correspondencia deja su nombre como
 > pista para que el agente lo busque en la CMDB.
 
 ## Lo que falta para producción
 
-- **Correlación de CMDB y tickets:** `zabbix.py` ya lee los problemas del servidor; falta
-  la resolución host→CI real contra GLPI (hoy es un mapeo por nombre) y la apertura/cierre
-  de tickets de GLPI por evento
+- **Adaptador de datos completo del agente:** el lazo evento→ticket ya usa Zabbix y GLPI
+  reales (lee problemas, abre y vincula tickets), pero las *tools* de lectura del agente
+  (CMDB, métricas, logs, KB, grafo de impacto) y la criticidad/roles que consume el motor
+  de políticas siguen en `DatosDemo`; falta el adaptador real para esa superficie
 - Servidores MCP reales (acá las tools son funciones locales; en producción son procesos
   MCP separados con su propio límite de privilegio)
 - Adaptador de GLPI contra la API v2 con OAuth2

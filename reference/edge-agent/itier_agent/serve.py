@@ -98,6 +98,24 @@ def _arrancar_bucle(parar: "threading.Event") -> str:
         fuente = FuenteDemo()
         fuente_desc = "DEMO (definí ITIER_ZBX_URL + ITIER_ZBX_TOKEN para el Zabbix real)"
 
+    # Puerto de tickets: GLPI real si hay URL+tokens; si no, tickets en memoria.
+    glpi_url = os.environ.get("ITIER_GLPI_URL")
+    glpi_app = os.environ.get("ITIER_GLPI_APP_TOKEN")
+    glpi_user = os.environ.get("ITIER_GLPI_USER_TOKEN")
+    if glpi_url and glpi_app and glpi_user:
+        from .glpi import GLPITickets
+
+        tickets = GLPITickets(
+            url=glpi_url, app_token=glpi_app, user_token=glpi_user,
+            entity_id=int(os.environ.get("ITIER_GLPI_ENTITY", "0") or 0),
+        )
+        tickets_desc = f"GLPI real ({glpi_url})"
+    else:
+        from .glpi import TicketsDemo
+
+        tickets = TicketsDemo()
+        tickets_desc = "DEMO (definí ITIER_GLPI_URL + APP/USER_TOKEN para GLPI real)"
+
     agente = None
     tiene_llm = any(os.environ.get(k) for k in _LLM)
     rutas = _rutas_policy()
@@ -122,12 +140,12 @@ def _arrancar_bucle(parar: "threading.Event") -> str:
         elif not rutas:
             log.info("Bucle en OFFLINE: no encontré el catálogo de políticas (solo triage).")
 
-    runner = Runner(auditoria=auditoria, datos=datos, agente=agente)
+    runner = Runner(auditoria=auditoria, datos=datos, agente=agente, tickets=tickets)
     intervalo = float(os.environ.get("ITIER_AGENT_INTERVALO_S", "60"))
 
     log.warning(
-        "Bucle de eventos ACTIVO (modo=%s, fuente=%s). Ver reference/README.",
-        modo, fuente_desc,
+        "Bucle de eventos ACTIVO (modo=%s, fuente=%s, tickets=%s). Ver reference/README.",
+        modo, fuente_desc, tickets_desc,
     )
     threading.Thread(
         target=runner.bucle, args=(fuente, intervalo, parar),

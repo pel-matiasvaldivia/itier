@@ -15,6 +15,7 @@ from pathlib import Path
 from .audit import Auditoria
 from .events import FuenteDemo
 from .fixtures import DatosDemo, _CIS
+from .glpi import TicketsDemo
 from .policy import MotorDePoliticas
 from .runner import Runner
 
@@ -111,7 +112,8 @@ def demo_bucle_eventos() -> None:
     _sep("BUCLE DE EVENTOS (Fase 3) — ingesta, dedup y triage (offline, sin LLM)")
 
     aud = Auditoria(tenant="acme-sa")
-    runner = Runner(auditoria=aud, datos=DatosDemo(), agente=None)  # OFFLINE
+    tickets = TicketsDemo()
+    runner = Runner(auditoria=aud, datos=DatosDemo(), agente=None, tickets=tickets)  # OFFLINE
     salidas = runner.correr(FuenteDemo())
 
     for s in salidas:
@@ -124,7 +126,8 @@ def demo_bucle_eventos() -> None:
         if s.get("motivo"):
             print(f"    motivo: {s['motivo']}")
 
-    print(f"\n  {len(salidas)} eventos: el duplicado se omite, los demás se trían.")
+    print(f"\n  {len(salidas)} eventos: el duplicado se omite, los demás abren ticket y se trían.")
+    print(f"  tickets abiertos: {[t for t, _ in tickets.abiertos]}  ·  seguimientos: {len(tickets.notas)}")
     print("  auditoría:", " · ".join(e["tipo"] for e in aud))
     ok, motivo = aud.verificar()
     print(f"  {'✅' if ok else '❌'} {motivo}")

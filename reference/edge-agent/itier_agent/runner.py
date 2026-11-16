@@ -24,24 +24,26 @@ from .audit import Auditoria
 from .events import Evento, FuenteDeEventos
 
 
-def formatear_disparador(ev: Evento) -> str:
+def formatear_disparador(ev: Evento, ticket_id: str | None = None) -> str:
     """Arma el turno de usuario a partir del evento. El texto del evento es DATO
     no confiable (el system prompt del agente lo trata como tal)."""
     cuando = ev.ts.strftime("%Y-%m-%d %H:%M")
+    tid = ticket_id or ev.ticket_id
     lineas = [
         f"Evento recibido de {ev.origen} a las {cuando} (UTC).",
         "",
         f"  origen:     {ev.origen}",
         f"  id:         {ev.id}",
         f"  ci:         {ev.ci_id}",
+        f"  host:       {ev.host or '—'}",
         f"  severidad:  {ev.severidad}",
         f"  disparador: {ev.disparador}",
         "",
     ]
-    if ev.ticket_id:
+    if tid:
         lineas.append(
             f"Diagnosticá el incidente y proponé cómo resolverlo. "
-            f"El ticket abierto es {ev.ticket_id}."
+            f"El ticket abierto es {tid}."
         )
     else:
         lineas.append(
@@ -60,12 +62,14 @@ class Runner:
         auditoria: Auditoria,
         datos: Any,
         agente: Any | None = None,
+        tickets: Any | None = None,
         ventana_dedup_min: int = 30,
         max_eventos_por_ci_hora: int = 6,
     ) -> None:
         self.auditoria = auditoria
         self.datos = datos
         self.agente = agente           # AgenteEdge o None (modo OFFLINE)
+        self.tickets = tickets         # puerto de tickets (GLPITickets/TicketsDemo) o None
         self.ventana = dt.timedelta(minutes=ventana_dedup_min)
         self.max_eventos_por_ci_hora = max_eventos_por_ci_hora
         self._vistos: dict[str, dt.datetime] = {}
@@ -96,31 +100,50 @@ class Runner:
             return {"accion": "suprimido", "motivo": "tormenta de eventos para el CI", "ci": ev.ci_id}
         self._por_ci.append((ahora, ev.ci_id))
 
-        # 3) registro del evento y armado del disparador.
+        # 3) registro del evento.
         self.auditoria.registrar(
             "evento_recibido",
             {"origen": ev.origen, "id": ev.id, "ci": ev.ci_id,
              "severidad": ev.severidad, "ticket": ev.ticket_id},
         )
-        disparador = formatear_disparador(ev)
+
+        # 3b) abrir el ticket del incidente (cierra el lazo evento → ticket).
+        # Un fallo al abrir el ticket NO frena el triage.
+        ticket_id = ev.ticket_id
+        if ticket_id is None and self.tickets is not None:
+            try:
+                ticket_id = self.tickets.abrir_desde_evento(ev)
+                self.auditoria.registrar("ticket_abierto", {"ci": ev.ci_id, "ticket": ticket_id})
+            except Exception as e:  # noqa: BLE001
+                self.auditoria.registrar("ticket_error", {"ci": ev.ci_id, "error": str(e)[:200]})
+
+        disparador = formatear_disparador(ev, ticket_id)
 
         # 4) despacho.
         if self.offline:
-            # Sin LLM: triage, no diagnóstico inventado.
+            # Sin LLM: triage, no diagnóstico inventado. Se anota en el ticket.
+            if self.tickets is not None and ticket_id:
+                self.tickets.anotar(
+                    ticket_id,
+                    f"iTier — triage automático. Evento {ev.origen}:{ev.id} sobre "
+                    f"{ev.host or ev.ci_id or '—'} (severidad {ev.severidad}): {ev.disparador}. "
+                    "Pendiente de diagnóstico por un técnico (razonamiento del LLM no disponible).",
+                )
             self.auditoria.registrar(
                 "triage_offline",
-                {"ci": ev.ci_id, "ticket": ev.ticket_id,
-                 "nota": "evento triado; el razonamiento del LLM no está disponible "
-                         "(sin clave ni gateway). Un técnico lo retoma desde el ticket."},
+                {"ci": ev.ci_id, "ticket": ticket_id,
+                 "nota": "evento triado y anotado en el ticket; el razonamiento del LLM no "
+                         "está disponible (sin clave ni gateway). Un técnico lo retoma."},
             )
             return {"accion": "triage_offline", "evento": clave, "ci": ev.ci_id,
-                    "ticket": ev.ticket_id, "disparador": disparador}
+                    "ticket": ticket_id, "disparador": disparador}
 
         r = self.agente.atender(disparador)
         return {
             "accion": "atendido",
             "evento": clave,
             "ci": ev.ci_id,
+            "ticket": ticket_id,
             "turnos": r.get("turnos"),
             "aprobaciones_pendientes": r.get("aprobaciones_pendientes"),
             "costo_usd": r.get("costo_usd"),
