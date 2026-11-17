@@ -238,3 +238,13 @@ bash crear-vm-proxmox.sh --nombre <slug-del-cliente> \
 
 Crea una VM Debian 12 (2 vCPU, 2 GB, 16 GB) con cloud-init que corre el instalador en el primer arranque.
 Pensado para correrse en el host Proxmox del cliente (o en uno propio y migrar la VM).
+
+### Host KVM / libvirt
+
+```sh
+bash crear-vm-kvm.sh --nombre <slug-del-cliente> --bridge br0 \
+     --url https://<consola>/enrolar/<TOKEN>/install.sh --ssh-key ~/.ssh/id_ed25519.pub
+```
+
+La VM debe ir en un bridge de la LAN del cliente (no en la red NAT `virbr0`): los equipos Windows llegan al proxy por
+la IP LAN de la VM.
