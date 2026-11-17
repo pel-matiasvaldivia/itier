@@ -253,13 +253,15 @@ respaldá la base.
 Saltá al paso 3 y cargá en el `.env` `ITIER_MESH_URL=https://remoto.pymesenlinea.com.ar` (si usás un *dominio* de MeshCentral
 con ruta, ej. `/cuyopack`, ponelo en la URL), una cuenta de servicio **sin 2FA** con permiso para crear grupos, y verificá que
 no tengas `lockAgentDownload` activado. Cada cliente de iTier tendrá su grupo `itier-<slug>` en ese servidor.
-Si no tenés uno, seguí los pasos 1-5 (el servicio propio se levanta con `docker compose --profile mesh up -d`).
+Si no tenés uno, seguí los pasos 1-5: el compose levanta el servicio `meshcentral` con la imagen que publica
+`build-meshcentral.yml` (GHCR; si es privada, `docker login ghcr.io`). Si querés NO levantarlo, `docker compose up -d` con
+`--scale meshcentral=0`.
 
 Cada equipo de un cliente lleva **GLPI Agent** (inventario) y **Mesh Agent** (soporte remoto y estado). Los dos hablan
 HTTPS/443 hacia el VPS: no hace falta túnel, VPN ni equipo central en el cliente (ADR-0011).
 
 1. **`.env`**: `MESH_HOSTNAME=itier-mesh.pymesenlinea.com.ar` (un solo nivel), `MESH_NEW_ACCOUNTS=true` (solo hoy).
-   `docker compose up -d meshcentral`.
+   `docker compose pull meshcentral && docker compose up -d meshcentral`.
 2. **Cloudflare** → tu túnel → *Public Hostname*: `itier-mesh.pymesenlinea.com.ar` → `HTTP` · `localhost:8886`.
    ⚠ **Sin** aplicación de Access: los agentes no pueden iniciar sesión. (Los WebSockets ya vienen habilitados.)
 3. Entrá a `https://itier-mesh.pymesenlinea.com.ar` y creá tu cuenta (la primera es administradora; activale 2FA).

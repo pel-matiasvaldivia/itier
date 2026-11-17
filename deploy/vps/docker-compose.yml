@@ -143,12 +143,11 @@ services:
   # el cliente. Hostname sugerido (un solo nivel): itier-mesh.pymesenlinea.com.ar
   # → Public Hostname del túnel: http://localhost:${MESH_PORT:-8886}.
   # ⚠ NO le pongas una aplicación de Cloudflare Access: los agentes no pueden loguearse.
-  # Solo si NO tenés ya un MeshCentral: `docker compose --profile mesh up -d`.
-  # Si usás uno existente, no se levanta (basta con ITIER_MESH_URL/USER/PASSWORD).
+  # La imagen la publica build-meshcentral.yml en GHCR (versión fijada en
+  # deploy/meshcentral/Dockerfile). Si el paquete es privado: `docker login ghcr.io`.
   meshcentral:
     <<: *comun
-    profiles: ["mesh"]
-    image: ghcr.io/ylianst/meshcentral:${MESH_VERSION:-latest}
+    image: ${MESHCENTRAL_IMAGE:-ghcr.io/pel-matiasvaldivia/itier-meshcentral:latest}
     environment:
       HOSTNAME: ${MESH_HOSTNAME:-localhost}
       # Detrás de Cloudflare: TLS lo termina el túnel (tlsOffload) y los agentes
