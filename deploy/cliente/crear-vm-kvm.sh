@@ -30,7 +30,7 @@ while [ $# -gt 0 ]; do
 done
 
 for c in virt-install virsh qemu-img curl; do
-  command -v "$c" >/dev/null || { echo "Falta '$c' (apt install qemu-kvm libvirt-daemon-system virtinst qemu-utils curl)." >&2; exit 1; }
+  command -v "$c" >/dev/null || { echo "Falta '$c' (Debian/Ubuntu: apt install qemu-kvm libvirt-daemon-system virtinst qemu-utils curl · CentOS/RHEL: yum install qemu-kvm libvirt virt-install qemu-img curl)." >&2; exit 1; }
 done
 [[ "$URL" =~ ^https://[A-Za-z0-9.-]+(:[0-9]+)?/enrolar/[A-Za-z0-9_-]+/install\.sh$ ]] \
   || { echo "--url inválida: tiene que ser https://<consola>/enrolar/<token>/install.sh" >&2; exit 2; }
@@ -68,13 +68,21 @@ if command -v cloud-localds >/dev/null; then
 elif command -v genisoimage >/dev/null; then
   genisoimage -quiet -output "$SEED" -volid cidata -joliet -rock "$TMP/user-data" "$TMP/meta-data"
 else
-  echo "Falta cloud-localds (apt install cloud-image-utils) o genisoimage." >&2; exit 1
+  echo "Falta cloud-localds (apt install cloud-image-utils) o genisoimage (yum/apt install genisoimage)." >&2; exit 1
+fi
+
+# Variante de SO: hosts viejos (CentOS 7) no conocen debian12 → se prueba una lista.
+OSARG="--os-type linux"
+if command -v osinfo-query >/dev/null; then
+  for v in debian12 debian11 debian10 debian9 rhel7.0 linux2020 generic; do
+    if osinfo-query os short-id="$v" 2>/dev/null | grep -q "$v"; then OSARG="--os-variant $v"; break; fi
+  done
 fi
 
 echo "[iTier] Creando la VM $VM en el bridge $BRIDGE…"
 virt-install --name "$VM" --memory "$RAM" --vcpus "$CORES" --cpu host-passthrough \
   --disk "path=$DISK,format=qcow2,bus=virtio" --disk "path=$SEED,device=cdrom" \
-  --network "bridge=$BRIDGE,model=virtio" --os-variant debian12 --import \
+  --network "bridge=$BRIDGE,model=virtio" $OSARG --import \
   --graphics none --console pty,target_type=serial --channel unix,target_type=virtio,name=org.qemu.guest_agent.0 \
   --noautoconsole
 virsh autostart "$VM" >/dev/null
@@ -88,5 +96,5 @@ cat <<FIN
 IP de la VM:  virsh domifaddr $VM --source agent
 La consola de iTier marca "Instalado" en Instaladores cuando termina.
 Por seguridad borrá la imagen de arranque (contiene el enlace de un solo uso):
-  virsh change-media $VM sda --eject --config; rm -f "$SEED"
+  virsh domblklist $VM    # (el CD-ROM es el de la ISO «-seed»)  →  virsh change-media $VM <destino> --eject --config; rm -f "$SEED"
 FIN
