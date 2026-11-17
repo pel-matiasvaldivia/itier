@@ -226,3 +226,15 @@ encendido:
 Es un relay, no un proxy: los agentes reportan al servidor a través del central (sin PSK de proxy; el tramo LAN va
 sin cifrar). Para monitoreo SNMP desde la LAN y buffer ante cortes, usar el appliance Linux.
 El instalador central **contiene el service token**: solo se descarga desde la consola con sesión.
+
+## Appliance en una VM de Proxmox (recomendado)
+
+En el host Proxmox, con el enlace generado en la consola (Instaladores → «Generar comando de instalación»):
+
+```sh
+bash crear-vm-proxmox.sh --nombre <slug-del-cliente> \
+     --url https://<consola>/enrolar/<TOKEN>/install.sh --ssh-key ~/.ssh/id_ed25519.pub
+```
+
+Crea una VM Debian 12 (2 vCPU, 2 GB, 16 GB) con cloud-init que corre el instalador en el primer arranque.
+Pensado para correrse en el host Proxmox del cliente (o en uno propio y migrar la VM).
