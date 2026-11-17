@@ -149,6 +149,10 @@ try {
 # --- Rol central: tunel a Zabbix (cloudflared) + acceso desde la LAN ---------
 if ($Rol -eq "central" -and -not $Detalle) {
   try {
+    # cloudflared (Go moderno) solo corre en Windows 10 / Server 2016 o superior.
+    if ([Environment]::OSVersion.Version.Major -lt 10) {
+      throw "Este Windows ($([Environment]::OSVersion.VersionString)) es demasiado viejo para el tunel: cloudflared requiere Windows 10 / Server 2016 o superior. Instale el equipo central en otro equipo (o use el appliance Linux)."
+    }
     $dirIt = Join-Path $env:ProgramFiles "iTier"
     New-Item -ItemType Directory -Force -Path $dirIt | Out-Null
     $exe = Join-Path $dirIt "cloudflared.exe"
@@ -156,6 +160,10 @@ if ($Rol -eq "central" -and -not $Detalle) {
     Start-Sleep -Seconds 2
     Anotar "Descargando cloudflared"
     Invoke-WebRequest -Uri $CloudflaredUrl -OutFile $exe -UseBasicParsing
+    $ver = ""
+    try { $ver = (& $exe --version 2>&1 | Out-String).Trim() } catch { $ver = "" }
+    if (-not $ver -or $LASTEXITCODE -ne 0) { throw "cloudflared.exe no se pudo ejecutar en este equipo ($([Environment]::OSVersion.VersionString))." }
+    Anotar "cloudflared: $ver"
     $run = Join-Path $dirIt "tunel.cmd"
     $lineas = @("@echo off",
       "set TUNNEL_SERVICE_TOKEN_ID=$CfId",
