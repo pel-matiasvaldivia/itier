@@ -156,7 +156,10 @@ services:
       # VPS (ADR-0010), que entra por loopback: dejá ZBX_SERVER_BIND=127.0.0.1
       # para que el 10051 NO quede expuesto a internet.
       - "${ZBX_SERVER_BIND:-0.0.0.0}:10051:10051"
-    networks: [interna]
+    # ⚠ Tiene que estar también en «publica»: Docker NO publica puertos de un
+    # contenedor que solo vive en una red `internal: true` (la config los muestra,
+    # pero el puerto no se abre). La base de datos sigue solo en «interna».
+    networks: [interna, publica]
 
   # ── Eventos y métricas: frontend web de Zabbix ────────────────────────────
   zabbix-web:
