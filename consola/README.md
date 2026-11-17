@@ -187,3 +187,10 @@ consola/
 │   └── static/            app.css, app.js
 ├── Dockerfile  ·  docker-compose.yml  ·  .env.example  ·  pyproject.toml
 ```
+
+
+## Soporte remoto (MeshCentral)
+
+`ITIER_MESH_URL`, `ITIER_MESH_USER`, `ITIER_MESH_PASSWORD` (cuenta de servicio **sin 2FA**). Al dar de alta o reprovisionar un
+cliente se crea su grupo `itier-<slug>` y el instalador de Windows instala el Mesh Agent de ese grupo (ADR-0011).
+Alta del servidor: `deploy/vps/README.md` → «Soporte remoto: MeshCentral».

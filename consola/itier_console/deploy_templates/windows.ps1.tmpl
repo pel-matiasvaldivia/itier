@@ -3,6 +3,7 @@
   iTier - instalador para equipos Windows del cliente "@@TENANT@@"
   Generado por la consola de iTier. Instala, en silencio y como servicios:
     - GLPI Agent      : inventario del equipo hacia GLPI (con el tag del cliente)
+    - Mesh Agent      : soporte remoto y estado del equipo (conexion saliente por HTTPS/443)
     - Zabbix Agent 2  : monitoreo, reportando al equipo central de iTier
 
   Hay dos roles (-Rol):
@@ -22,6 +23,7 @@
   avisa a la consola. No contiene secretos. Deja un registro en %ProgramData%\iTier\instalador.log
 #>
 param(
+  [switch]$SinMesh,
   # IP del appliance de iTier en la LAN del cliente (donde corre el zabbix-proxy).
   [ValidateSet("equipo", "central")]
   [string]$Rol = "@@ROL@@",
@@ -39,6 +41,8 @@ $GlpiServer = "@@GLPI_SERVER@@"
 $GlpiMsi    = "@@GLPI_MSI@@"
 $ZbxMsi     = "@@ZBX_MSI@@"
 $ReportUrl  = "@@URL_REPORTE@@"
+$MeshUrl    = '@@MESH_URL@@'
+$MeshHost   = "@@MESH_HOST@@"
 $CloudflaredUrl = "@@CLOUDFLARED_URL@@"
 $TunelHost  = "@@ZBX_TUNNEL_HOST@@"
 $CfId       = "@@CF_ID@@"
@@ -130,6 +134,15 @@ try {
     )
   }
 
+  if (-not $SinMesh -and -not [string]::IsNullOrWhiteSpace($MeshUrl)) {
+    $meshExe = Join-Path $Tmp "meshagent.exe"
+    Anotar "Descargando Mesh Agent"
+    Invoke-WebRequest -Uri $MeshUrl -OutFile $meshExe -UseBasicParsing
+    Anotar "Instalando Mesh Agent"
+    $pm = Start-Process -FilePath $meshExe -ArgumentList "-fullinstall" -Wait -PassThru
+    if ($pm.ExitCode -ne 0) { throw "La instalacion de Mesh Agent fallo (codigo $($pm.ExitCode))." }
+  }
+
   if (-not $SinZabbix -and -not [string]::IsNullOrWhiteSpace($ProxyHost)) {
     Instalar-Msi "zabbix-agent2" $ZbxMsi @(
       "SERVER=$ProxyHost",
@@ -212,11 +225,16 @@ if (-not $SinGlpi) {
   Linea "Inventario - servicio GLPI Agent" $GlpiSvc ($GlpiSvc -eq "activo")
   Linea "Inventario - conexion al servidor" "$GlpiCon ($($u.Host))" ($GlpiCon -eq "ok")
 }
-if ($SinZabbix) {
-  Write-Host "  [  -  ] Monitoreo: omitido (-SinZabbix)"
-} elseif ([string]::IsNullOrWhiteSpace($ProxyHost)) {
-  $ZbxSvc = "pendiente"
-  Write-Host "  [  -  ] Monitoreo: pendiente (todavia no esta instalado el equipo central de iTier)" -ForegroundColor Yellow
+$MeshSvc = "omitido"; $MeshCon = "omitido"
+if (-not $SinMesh -and -not [string]::IsNullOrWhiteSpace($MeshUrl)) {
+  $MeshSvc = Estado-Servicio "Mesh Agent"
+  $MeshCon = Probar-Tcp $MeshHost 443
+  Linea "Soporte remoto - servicio Mesh Agent" $MeshSvc ($MeshSvc -eq "activo")
+  Linea "Soporte remoto - conexion al servidor" "$MeshCon ($MeshHost)" ($MeshCon -eq "ok")
+}
+if ($SinZabbix -or [string]::IsNullOrWhiteSpace($ProxyHost)) {
+  # Monitoreo avanzado (Zabbix) solo si el cliente lo tiene contratado: no es un error.
+  $ZbxSvc = "omitido"
 } else {
   $ZbxSvc = Estado-Servicio "Zabbix Agent 2"
   if ($Rol -ne "central") { $ZbxCon = Probar-Tcp $ProxyHost 10051 }
@@ -237,7 +255,7 @@ if ($SinZabbix) {
   }
 }
 
-$Mal = @($GlpiSvc, $GlpiCon, $ZbxSvc, $ZbxCon) | Where-Object { $_ -in @("ausente", "detenido", "sin_respuesta", "dns_no_resuelve") }
+$Mal = @($GlpiSvc, $GlpiCon, $MeshSvc, $MeshCon, $ZbxSvc, $ZbxCon) | Where-Object { $_ -in @("ausente", "detenido", "sin_respuesta", "dns_no_resuelve") }
 $Estado = "ok"
 if ($Detalle -or $Mal) { $Estado = "error" }
 if (-not $Detalle -and $GlpiCon -eq "dns_no_resuelve") { $Detalle = "El nombre del servidor de inventario no existe en DNS: $(([Uri]$GlpiServer).Host)" }
@@ -251,6 +269,7 @@ if ($ReportUrl) {
       host = $env:COMPUTERNAME; estado = $Estado; os = "$os"
       glpi_servicio = $GlpiSvc; glpi_conexion = $GlpiCon
       zbx_servicio = $ZbxSvc; zbx_conexion = $ZbxCon; detalle = $Detalle; ip = (Ip-Lan)
+      mesh_servicio = $MeshSvc; mesh_conexion = $MeshCon
     } | Out-Null
     $Avisado = $true
   } catch { Anotar ("No se pudo avisar a la consola: " + $_.Exception.Message) }

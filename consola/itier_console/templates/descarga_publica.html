@@ -13,7 +13,7 @@
     {% if cli %}
       <h1>Instalación del agente de soporte</h1>
       <p class="muted">{{ cli.nombre }}</p>
-      <p>Este instalador deja la computadora bajo monitoreo y soporte. Es automático: no hay que configurar nada.</p>
+      <p>Este instalador deja la computadora registrada y lista para recibir soporte técnico. Es automático: no hay que configurar nada.</p>
       <p><a class="btn btn-primary" href="/descargar/{{ token }}/instalador.cmd">Descargar instalador para Windows</a></p>
       <h2>Pasos</h2>
       <ol>
@@ -26,7 +26,7 @@
         <li>Esperá a que la ventana se cierre sola. Listo.</li>
       </ol>
       <p class="muted small">Repetí estos pasos en cada computadora con Windows. Instala GLPI Agent (inventario)
-        y Zabbix Agent (monitoreo) como servicios del sistema.</p>
+        y Mesh Agent (soporte remoto) como servicios del sistema.</p>
     {% else %}
       <h1>Enlace no disponible</h1>
       <p>Este enlace de instalación venció o ya no es válido. Pedile uno nuevo a tu proveedor de soporte.</p>

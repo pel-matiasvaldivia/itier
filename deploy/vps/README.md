@@ -247,6 +247,26 @@ docker compose up -d
 Antes de subir versiones mayores de GLPI o Zabbix, leé sus notas de migración y
 respaldá la base.
 
+## Soporte remoto: MeshCentral (una sola vez; sirve para todos los clientes)
+
+Cada equipo de un cliente lleva **GLPI Agent** (inventario) y **Mesh Agent** (soporte remoto y estado). Los dos hablan
+HTTPS/443 hacia el VPS: no hace falta túnel, VPN ni equipo central en el cliente (ADR-0011).
+
+1. **`.env`**: `MESH_HOSTNAME=itier-mesh.pymesenlinea.com.ar` (un solo nivel), `MESH_NEW_ACCOUNTS=true` (solo hoy).
+   `docker compose up -d meshcentral`.
+2. **Cloudflare** → tu túnel → *Public Hostname*: `itier-mesh.pymesenlinea.com.ar` → `HTTP` · `localhost:8886`.
+   ⚠ **Sin** aplicación de Access: los agentes no pueden iniciar sesión. (Los WebSockets ya vienen habilitados.)
+3. Entrá a `https://itier-mesh.pymesenlinea.com.ar` y creá tu cuenta (la primera es administradora; activale 2FA).
+   Creá además una cuenta **de servicio** `itier-api` **sin 2FA** (la API por contraseña no soporta TOTP).
+4. `.env`: `MESH_NEW_ACCOUNTS=false`, `ITIER_MESH_URL`, `ITIER_MESH_USER=itier-api`, `ITIER_MESH_PASSWORD`.
+   `docker compose up -d` (recrea la consola y MeshCentral).
+5. En la consola, ficha del cliente → **Reintentar aprovisionamiento**: crea el grupo `itier-<slug>` en MeshCentral.
+   Desde ahí, **Instaladores** ya incluye el Mesh Agent en el instalador de Windows.
+
+> El instalador baja el agente de `/meshagents?id=4&meshid=…&installflags=2` sin login (mientras no actives
+> `lockAgentDownload` en MeshCentral). El enlace lleva el id del grupo del cliente, que no es un secreto fuerte: solo
+> permite instalar un agente en ese grupo. Para revocarlo, borrá el grupo.
+
 ## Túnel a Zabbix (una sola vez; sirve para todos los clientes)
 
 Los `zabbix-proxy` de los clientes llegan al server por el Cloudflare Tunnel de

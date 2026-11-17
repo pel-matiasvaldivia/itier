@@ -29,7 +29,7 @@ from fastapi.responses import HTMLResponse, PlainTextResponse, RedirectResponse,
 
 from .. import audit, security
 from ..deps import flash, get_db, render, require_user
-from ..adapters import glpi as glpi_mod, zabbix as zbx_mod
+from ..adapters import glpi as glpi_mod, mesh as mesh_mod, zabbix as zbx_mod
 from ..deps import templates
 from ..services import ServiceError, correo, enrolamiento, onboarding
 
@@ -50,6 +50,17 @@ def _ip(request: Request) -> str:
 def _url_reporte_equipos(request: Request, conn: sqlite3.Connection, cli: dict, rol: str = "equipo") -> str:
     clave = enrolamiento.clave_central(conn, cli) if rol == "central" else enrolamiento.clave_reporte(conn, cli)
     return f"{_base_publica(request)}/equipos/{clave}/reporte"
+
+
+def _mesh_en_linea(cfg, cli: dict) -> tuple[dict, str]:
+    """Equipos del grupo de Mesh con su estado de conexión. Best-effort."""
+    if not (cfg.mesh_enabled and cli.get("mesh_id")):
+        return {}, ""
+    try:
+        with mesh_mod.cliente(cfg) as m:
+            return {e["nombre"]: e["conectado"] for e in m.equipos(cli["mesh_id"])}, ""
+    except Exception as e:  # noqa: BLE001
+        return {}, f"MeshCentral no respondió ({str(e)[:80]}). "
 
 
 def _transmision(cfg, cli: dict) -> tuple[dict, set, str]:
@@ -97,7 +108,11 @@ def pagina(request: Request, slug: str, user: dict = Depends(require_user),
     nota_tx = ""
     if equipos:
         zbx, glpi, nota_tx = _transmision(cfg, cli)
+        mesh_on, nota_m = _mesh_en_linea(cfg, cli)
+        nota_tx += nota_m
         for e in equipos:
+            e["en_mesh"] = e["host"] in mesh_on
+            e["mesh_online"] = mesh_on.get(e["host"], False)
             e["en_glpi"] = e["host"] in glpi
             e["en_zabbix"] = e["host"] in zbx
             e["zbx_disponible"] = zbx.get(e["host"]) == "1"
@@ -113,6 +128,8 @@ def pagina(request: Request, slug: str, user: dict = Depends(require_user),
         enlaces=enrolamiento.listar_enlaces(conn, cli["id"]),
         ttl_h=cfg.enroll_ttl_h, max_usos=cfg.enroll_max_usos,
         equipos=equipos, nota_tx=nota_tx,
+        mesh_ok=cfg.mesh_enabled, mesh_url=cfg.mesh_url or '', mesh_grupo=bool(cli.get('mesh_id')),
+        hay_zbx=any((e.get('zbx_servicio') or 'omitido') not in ('omitido', 'desconocido', None) for e in equipos),
         tunel_ok=enrolamiento.tunel_configurado(cfg), glpi_url=cfg.public_glpi_url or '', tunel_host=cfg.zbx_tunnel_hostname, smtp=correo.configurado(cfg),
         enlace_equipos=enlace_equipos, mailto=mailto, equipos_dias=cfg.equipos_ttl_h // 24,
     )
@@ -295,6 +312,7 @@ async def reporte_equipo(request: Request, clave: str, conn: sqlite3.Connection 
         return PlainTextResponse("demasiado grande\n", status_code=413)
     form = await request.form()
     datos = {k: str(form.get(k) or "") for k in (
-        "host", "estado", "os", "glpi_servicio", "glpi_conexion", "zbx_servicio", "zbx_conexion", "detalle", "ip")}
+        "host", "estado", "os", "glpi_servicio", "glpi_conexion", "zbx_servicio", "zbx_conexion", "detalle", "ip",
+        "mesh_servicio", "mesh_conexion")}
     ok = enrolamiento.registrar_equipo(conn, clave, _ip(request), datos)
     return PlainTextResponse("ok\n" if ok else "rechazado\n", status_code=200 if ok else 404, headers=_NO_CACHE)

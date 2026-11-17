@@ -246,6 +246,20 @@ check("IP inválida del central se ignora", "999.1.1.1" not in c.get(INST).text)
 check("los equipos comunes ahora apuntan al central",
       '$ProxyHost = "192.168.50.10"' in c.get(INST + "/windows.ps1").text)
 
+# MeshCentral: el instalador de Windows lleva el agente del grupo del cliente
+r = c.get(INST + "/windows.ps1")
+check("windows: instala Mesh Agent desde el grupo del cliente (comillas simples por el «$»)",
+      "-fullinstall" in r.text and "meshagent.exe" in r.text
+      and re.search(r"\$MeshUrl    = 'https://itier-mesh\.demo\.example/meshagents\?id=4&meshid=[^']+&installflags=2'", r.text) is not None)
+check("windows: Mesh no usa Zabbix ni muestra «pendiente» sin equipo central",
+      "pendiente (todavia no esta instalado el equipo central" not in r.text and 'Estado-Servicio "Mesh Agent"' in r.text)
+pub.post(ruta_rep, data={"host": "pc-ventas-01", "estado": "ok", "glpi_servicio": "activo", "glpi_conexion": "ok",
+                         "mesh_servicio": "activo", "mesh_conexion": "ok", "zbx_servicio": "omitido", "zbx_conexion": "omitido"})
+pagM = c.get(INST).text
+check("instaladores: muestra el equipo en línea en Mesh", "en línea" in pagM and "Soporte remoto (Mesh)" in pagM)
+check("instaladores: Zabbix queda en «Avanzado»", "<details" in pagM and "Avanzado" in pagM)
+check("el cliente quedó con su grupo de Mesh", "Grupo del cliente: creado" in pagM)
+
 check("descargas exigen sesión", pub.get(INST + "/appliance.sh", follow_redirects=False).status_code == 303)
 aud = c.get("/auditoria").text
 check("auditoría registra el enrolamiento", "enrolamiento.instalador.descargado" in aud and "enrolamiento.appliance.reporte" in aud)

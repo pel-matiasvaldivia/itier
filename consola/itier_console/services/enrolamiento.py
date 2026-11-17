@@ -30,6 +30,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from .. import audit
+from ..adapters import mesh as mesh_adapter
 from . import ServiceError
 
 _PLANTILLAS = Path(__file__).resolve().parent.parent / "deploy_templates"
@@ -196,6 +197,16 @@ def registrar_reporte(conn: sqlite3.Connection, token: str, ip_origen: str,
 
 # ── Generación de artefactos ─────────────────────────────────────────────────
 
+_RE_URL_MESH = re.compile(r"^https://[A-Za-z0-9.\-]+(:\d+)?/meshagents\?id=\d+&meshid=[A-Za-z0-9@$_+\-]+&installflags=\d$")
+
+
+def _url_mesh(url: str) -> str:
+    """El enlace del agente va entre comillas SIMPLES en PowerShell (lleva «$» y «@»)."""
+    if url and not _RE_URL_MESH.match(url):
+        raise ServiceError("La URL del agente de MeshCentral tiene un formato no admitido.")
+    return url
+
+
 def _seguro(nombre: str, valor: str) -> str:
     if not _RE_SEGURO.match(valor or ""):
         raise ServiceError(f"El valor de {nombre} tiene caracteres no admitidos para el instalador.")
@@ -307,12 +318,13 @@ def registrar_equipo(conn: sqlite3.Connection, clave: str, ip_origen: str, datos
     estado = "ok" if datos.get("estado") == "ok" else "error"
     conn.execute(
         "INSERT INTO endpoint_reports(client_id, host, estado, glpi_servicio, glpi_conexion, zbx_servicio, "
-        "zbx_conexion, os, detalle, rol, ip_origen, ts) VALUES (?,?,?,?,?,?,?,?,?,?,?,?) "
+        "zbx_conexion, mesh_servicio, mesh_conexion, os, detalle, rol, ip_origen, ts) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?) "
         "ON CONFLICT(client_id, host) DO UPDATE SET estado=excluded.estado, glpi_servicio=excluded.glpi_servicio, "
         "glpi_conexion=excluded.glpi_conexion, zbx_servicio=excluded.zbx_servicio, zbx_conexion=excluded.zbx_conexion, "
+        "mesh_servicio=excluded.mesh_servicio, mesh_conexion=excluded.mesh_conexion, "
         "os=excluded.os, detalle=excluded.detalle, rol=excluded.rol, ip_origen=excluded.ip_origen, ts=excluded.ts",
         (r["id"], host, estado, v("glpi_servicio"), v("glpi_conexion"), v("zbx_servicio"), v("zbx_conexion"),
-         txt("os", 80), txt("detalle", 300), rol, ip_origen, _ahora().isoformat(timespec="seconds")))
+         v("mesh_servicio"), v("mesh_conexion"), txt("os", 80), txt("detalle", 300), rol, ip_origen, _ahora().isoformat(timespec="seconds")))
     ip_lan = (datos.get("ip") or "").strip()
     if es_central and estado == "ok" and _RE_IPV4.match(ip_lan) and all(int(o) < 256 for o in ip_lan.split(".")):
         # El equipo central es el que reciben los demás agentes de Zabbix.
@@ -351,6 +363,10 @@ def instalador_windows(cfg, cli: dict, formato: str = "cmd", url_reporte: str = 
     else:
         tunel = ("", "", "")
         glpi_servers = glpi + "/"
+    mesh_url = mesh_host = ""
+    if cfg.mesh_enabled and cli.get("mesh_id"):   # soporte remoto (MeshCentral): agente del grupo del cliente
+        mesh_url = mesh_adapter.url_agente_windows(cfg, cli["mesh_id"])
+        mesh_host = cfg.mesh_url.split("://", 1)[-1].split("/")[0].split(":")[0]
     plantilla = (_PLANTILLAS / "windows.ps1.tmpl").read_text(encoding="utf-8")
     if formato == "cmd":
         plantilla = (_PLANTILLAS / "windows.cmd.tmpl").read_text(encoding="utf-8") + plantilla
@@ -358,6 +374,8 @@ def instalador_windows(cfg, cli: dict, formato: str = "cmd", url_reporte: str = 
     return _crlf(plantilla
             .replace("@@TENANT@@", _seguro("tenant", cli["slug"]))
             .replace("@@GLPI_SERVER@@", glpi_servers)  # raíz: inventario nativo de GLPI 10+
+            .replace("@@MESH_URL@@", _url_mesh(mesh_url))
+            .replace("@@MESH_HOST@@", _seguro("host de Mesh", mesh_host))
             .replace("@@ROL@@", rol)
             .replace("@@CLOUDFLARED_URL@@", _seguro("URL de cloudflared", cfg.cloudflared_win_url if rol == "central" else ""))
             .replace("@@ZBX_TUNNEL_HOST@@", _seguro("host del túnel", tunel[0]))

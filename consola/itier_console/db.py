@@ -64,7 +64,8 @@ CREATE TABLE IF NOT EXISTS clients (
     autoasig_detalle TEXT,
     -- Clave con la que los instaladores de equipos reportan su resultado.
     report_key      TEXT,
-    central_key     TEXT
+    central_key     TEXT,
+    mesh_id         TEXT      -- id corto del grupo de dispositivos del cliente en MeshCentral
 );
 
 -- Resultado que reporta cada equipo Windows al terminar su instalación
@@ -76,6 +77,7 @@ CREATE TABLE IF NOT EXISTS endpoint_reports (
     estado        TEXT    NOT NULL,          -- ok | error
     glpi_servicio TEXT, glpi_conexion TEXT,
     zbx_servicio  TEXT, zbx_conexion  TEXT,
+    mesh_servicio TEXT, mesh_conexion TEXT,
     os            TEXT,
     detalle       TEXT,
     rol           TEXT    NOT NULL DEFAULT 'equipo',   -- equipo | central
@@ -158,12 +160,15 @@ def _migrar(conn: sqlite3.Connection) -> None:
         conn.execute("ALTER TABLE users ADD COLUMN client_id INTEGER")
     ccols = {r["name"] for r in conn.execute("PRAGMA table_info(clients)").fetchall()}
     for col in ("mesh_token", "enrolado_at", "enrolado_host", "enrolado_ip", "enrolado_estado",
-                "glpi_rule_id", "zbx_action_id", "autoasig_detalle", "report_key", "central_key"):
+                "glpi_rule_id", "zbx_action_id", "autoasig_detalle", "report_key", "central_key", "mesh_id"):
         if col not in ccols:
             conn.execute(f"ALTER TABLE clients ADD COLUMN {col} TEXT")
     ecols = {r["name"] for r in conn.execute("PRAGMA table_info(endpoint_reports)").fetchall()}
     if ecols and "rol" not in ecols:
         conn.execute("ALTER TABLE endpoint_reports ADD COLUMN rol TEXT NOT NULL DEFAULT 'equipo'")
+    for col in ("mesh_servicio", "mesh_conexion"):
+        if ecols and col not in ecols:
+            conn.execute(f"ALTER TABLE endpoint_reports ADD COLUMN {col} TEXT")
     tcols = {r["name"] for r in conn.execute("PRAGMA table_info(enroll_tokens)").fetchall()}
     if tcols and "tipo" not in tcols:
         conn.execute("ALTER TABLE enroll_tokens ADD COLUMN tipo TEXT NOT NULL DEFAULT 'appliance'")

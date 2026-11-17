@@ -137,6 +137,35 @@ services:
       # usa otro puerto). En NPM: Proxy Host → http://<IP-LAN>:${GLPI_HTTP_PORT:-8884}
       - "${WEB_BIND:-0.0.0.0}:${GLPI_HTTP_PORT:-8884}:80"
 
+  # ── Soporte remoto y estado de los equipos: MeshCentral (ADR-0011) ────────
+  # Los agentes de los clientes se conectan por WebSocket (wss://<host>/agent.ashx,
+  # HTTPS/443 de salida): por eso pasa por el Cloudflare Tunnel sin nada extra en
+  # el cliente. Hostname sugerido (un solo nivel): itier-mesh.pymesenlinea.com.ar
+  # → Public Hostname del túnel: http://localhost:${MESH_PORT:-8886}.
+  # ⚠ NO le pongas una aplicación de Cloudflare Access: los agentes no pueden loguearse.
+  meshcentral:
+    <<: *comun
+    image: ghcr.io/ylianst/meshcentral:${MESH_VERSION:-latest}
+    environment:
+      HOSTNAME: ${MESH_HOSTNAME:?falta MESH_HOSTNAME (p. ej. itier-mesh.pymesenlinea.com.ar)}
+      # Detrás de Cloudflare: TLS lo termina el túnel (tlsOffload) y los agentes
+      # usan el puerto 443 público.
+      REVERSE_PROXY: ${MESH_HOSTNAME}
+      REVERSE_PROXY_TLS_PORT: "443"
+      PORT: "4430"
+      REDIR_PORT: "0"
+      TRUSTED_PROXY: ${MESH_TRUSTED_PROXY:-}
+      # Solo true el primer día, para crear tu cuenta (la primera es administradora).
+      ALLOW_NEW_ACCOUNTS: ${MESH_NEW_ACCOUNTS:-false}
+      IFRAME: "false"
+      TZ: ${TZ:-America/Argentina/Buenos_Aires}
+    volumes:
+      - mesh_data:/opt/meshcentral/meshcentral-data
+      - mesh_files:/opt/meshcentral/meshcentral-files
+    networks: [interna, publica]
+    ports:
+      - "${WEB_BIND:-0.0.0.0}:${MESH_PORT:-8886}:4430"
+
   # ── Eventos y métricas: servidor Zabbix ───────────────────────────────────
   zabbix-server:
     <<: *comun
@@ -228,6 +257,10 @@ services:
       ITIER_CF_ACCESS_CLIENT_ID: ${ITIER_CF_ACCESS_CLIENT_ID:-}
       ITIER_CF_ACCESS_CLIENT_SECRET: ${ITIER_CF_ACCESS_CLIENT_SECRET:-}
       # SMTP (opcional): para enviarle al cliente el enlace de instalación.
+      # MeshCentral (soporte remoto): URL pública + cuenta de servicio SIN 2FA.
+      ITIER_MESH_URL: ${ITIER_MESH_URL:-}
+      ITIER_MESH_USER: ${ITIER_MESH_USER:-}
+      ITIER_MESH_PASSWORD: ${ITIER_MESH_PASSWORD:-}
       ITIER_SMTP_HOST: ${ITIER_SMTP_HOST:-}
       ITIER_SMTP_PORT: ${ITIER_SMTP_PORT:-587}
       ITIER_SMTP_USER: ${ITIER_SMTP_USER:-}
@@ -262,3 +295,5 @@ volumes:
   glpi_config:
   glpi_marketplace:
   consola_data:
+  mesh_data:
+  mesh_files:

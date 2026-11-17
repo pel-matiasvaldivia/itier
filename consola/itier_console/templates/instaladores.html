@@ -7,6 +7,114 @@
   </div>
 
   <div class="card">
+    <h2>Servidor GLPI que usan los agentes</h2>
+    <p>{% if glpi_url %}<code>{{ glpi_url }}</code> <span class="muted small">(ITIER_PUBLIC_GLPI_URL; los instaladores apuntan acá, así que tiene que resolver desde internet)</span>
+    {% else %}<span class="dot bad"></span>No está configurada <code>ITIER_PUBLIC_GLPI_URL</code>.{% endif %}</p>
+  </div>
+
+  <div class="card">
+    <h2>Soporte remoto (MeshCentral)</h2>
+    {% if mesh_ok %}<p><span class="dot ok"></span>Configurado: <code>{{ mesh_url }}</code>. Cada cliente tiene su grupo de equipos; desde ahí tomás el control remoto.
+      {% if mesh_grupo %}Grupo del cliente: creado.{% else %}<span class="dot warn"></span>Este cliente aún no tiene grupo.{% endif %}</p>
+    {% else %}<p><span class="dot bad"></span>Sin configurar (<code>ITIER_MESH_URL</code>, <code>ITIER_MESH_USER</code>, <code>ITIER_MESH_PASSWORD</code>). Ver <code>deploy/vps/README.md</code>.</p>{% endif %}
+  </div>
+
+  <div class="card">
+    <h2>Equipos Windows del cliente</h2>
+    <p class="muted">Un solo instalador deja en cada equipo <strong>GLPI Agent</strong> (inventario) y
+      <strong>Mesh Agent</strong> (soporte remoto y estado), como servicios y en silencio. Los equipos aparecen solos
+      en la entidad y el grupo de este cliente. No contiene secretos.</p>
+    {% if not mesh_ok %}<div class="note note-bad small">Soporte remoto sin configurar: faltan <code>ITIER_MESH_URL</code>,
+      <code>ITIER_MESH_USER</code> y <code>ITIER_MESH_PASSWORD</code> en la consola. Mientras tanto el instalador
+      solo pone el inventario.</div>
+    {% elif not mesh_grupo %}<div class="note note-bad small">Este cliente todavía no tiene su grupo en MeshCentral:
+      usá «Reintentar aprovisionamiento» en la ficha del cliente.</div>{% endif %}
+
+    <h3>Enviar al cliente</h3>
+    <p class="muted small">Se manda un <strong>enlace</strong> (los correos bloquean ejecutables adjuntos). El cliente
+      descarga un instalador de doble clic: acepta el aviso de Windows una vez y el resto es automático.</p>
+    {% if enlace_equipos %}
+      <div class="bundle-head">
+        <span class="bundle-t">Enlace para el cliente (vence en {{ equipos_dias }} días)</span>
+        <button class="btn btn-sm" type="button" data-copy="#enlace-equipos">Copiar</button>
+      </div>
+      <pre class="codeblock" id="enlace-equipos">{{ enlace_equipos }}</pre>
+      <p><a class="btn btn-sm" href="{{ mailto }}">Abrir en mi programa de correo</a></p>
+    {% endif %}
+    <form method="post" action="/clientes/{{ cli.slug }}/instaladores/enlace-equipos" class="form row">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <label>Correo del cliente <span class="muted small">({% if smtp %}se envía desde la consola{% else %}opcional — sin SMTP configurado, se genera el enlace para que lo envíes vos{% endif %})</span>
+        <input type="email" name="email" placeholder="contacto@cliente.com">
+      </label>
+      <button class="btn btn-primary" type="submit">{% if smtp %}Generar y enviar{% else %}Generar enlace{% endif %}</button>
+    </form>
+
+    <h3>Descargar</h3>
+    <div class="acciones">
+      <a class="btn" href="/clientes/{{ cli.slug }}/instaladores/windows.cmd">Instalador de doble clic (.cmd)</a>
+      <a class="btn" href="/clientes/{{ cli.slug }}/instaladores/windows.ps1">Script para GPO / RMM (.ps1)</a>
+    </div>
+    <p class="muted small">
+      <strong>Sin ninguna interacción:</strong> distribuí el <code>.ps1</code> por GPO, Intune o tu RMM (corre como
+      SYSTEM, sin UAC). El <code>.cmd</code> es para que lo ejecute una persona: pide permisos de administrador una vez.
+      {% if cli.enrolado_ip %}Además se instala Zabbix Agent apuntando a <code>{{ cli.enrolado_ip }}</code> (monitoreo avanzado).{% endif %}
+    </p>
+    <h3>Equipos instalados</h3>
+    {% if equipos %}
+    <table class="tabla">
+      <thead><tr><th>Equipo</th><th>Instalación</th><th>Inventario (GLPI)</th><th>Soporte remoto (Mesh)</th>{% if hay_zbx %}<th>Monitoreo (Zabbix)</th>{% endif %}<th>Último reporte</th></tr></thead>
+      <tbody>
+        {% for e in equipos %}
+        <tr>
+          <td><strong>{{ e.host }}</strong>{% if e.rol == 'central' %} <span class="muted small">(central)</span>{% endif %}<div class="muted small">{{ e.os or '' }}</div></td>
+          <td>{% if e.estado == 'ok' %}<span class="dot ok"></span>correcta{% else %}<span class="dot bad"></span>con problemas{% endif %}
+            {% if e.detalle %}<div class="muted small">{{ e.detalle }}</div>{% endif %}</td>
+          <td>
+            {% if e.en_glpi %}<span class="dot ok"></span>transmitiendo (ya inventariado)
+            {% elif e.glpi_servicio == 'activo' and e.glpi_conexion == 'ok' %}<span class="dot warn"></span>instalado, esperando el primer inventario
+            {% elif e.glpi_servicio == 'omitido' %}<span class="muted">omitido</span>
+            {% else %}<span class="dot bad"></span>servicio {{ e.glpi_servicio }} · conexión {{ e.glpi_conexion }}{% endif %}
+          </td>
+          <td>
+            {% if e.en_mesh and e.mesh_online %}<span class="dot ok"></span>en línea
+            {% elif e.en_mesh %}<span class="dot warn"></span>registrado, sin conexión ahora
+            {% elif e.mesh_servicio == 'activo' and e.mesh_conexion == 'ok' %}<span class="dot warn"></span>instalado, esperando que se conecte
+            {% elif e.mesh_servicio in ('omitido', 'desconocido', None) %}<span class="muted">omitido</span>
+            {% else %}<span class="dot bad"></span>servicio {{ e.mesh_servicio }} · conexión {{ e.mesh_conexion }}{% endif %}
+          </td>
+{% if hay_zbx %}
+          <td>
+            {% if e.en_zabbix and e.zbx_disponible %}<span class="dot ok"></span>transmitiendo
+            {% elif e.en_zabbix %}<span class="dot warn"></span>registrado, todavía sin datos
+            {% elif e.zbx_servicio == 'activo' and e.zbx_conexion == 'ok' %}<span class="dot warn"></span>instalado, esperando el autorregistro
+            {% elif e.zbx_servicio in ('omitido', 'pendiente') %}<span class="muted">{{ e.zbx_servicio }}</span>
+            {% else %}<span class="dot bad"></span>servicio {{ e.zbx_servicio }} · conexión {{ e.zbx_conexion }}{% endif %}
+          </td>
+{% endif %}
+          <td class="muted">{{ e.ts }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% if nota_tx %}<p class="muted small">{{ nota_tx }}</p>{% endif %}
+    <p class="muted small">«Instalación» es lo que informó el instalador al terminar (servicios corriendo y conexión).
+      «En línea» y «transmitiendo» se confirman del lado del servidor: el equipo ya aparece en GLPI y conectado en MeshCentral.</p>
+    {% else %}
+    <p class="muted">Todavía no reportó ningún equipo. Cada instalador avisa solo al terminar.</p>
+    {% endif %}
+
+    {% if cli.autoasig_detalle %}
+      <div class="note note-bad small">La asignación automática quedó incompleta: {{ cli.autoasig_detalle }}.
+        Usá «Reintentar aprovisionamiento» en la ficha del cliente.</div>
+    {% elif cli.glpi_rule_id and cli.zbx_action_id %}
+      <p class="small"><span class="dot ok"></span>Asignación automática activa: regla de GLPI (tag
+        <code>itier-{{ cli.slug }}</code>) y autorregistro de Zabbix.</p>
+    {% endif %}
+  </div>
+  <details class="card">
+    <summary><strong>Avanzado — monitoreo de infraestructura (Zabbix)</strong> <span class="muted small">solo si el cliente contrata monitoreo de servidores, redes o impresoras</span></summary>
+    <p class="muted small">Zabbix necesita un puerto TCP dedicado (10051), por eso usa un appliance Linux en el cliente con un túnel propio. Los equipos de escritorio no lo necesitan: usan GLPI + Mesh.</p>
+  <div>
     <h2>Estado del appliance</h2>
     {% if cli.enrolado_at %}
       <p>
@@ -26,13 +134,7 @@
   </div>
   {% endif %}
 
-  <div class="card">
-    <h2>Servidor GLPI que usan los agentes</h2>
-    <p>{% if glpi_url %}<code>{{ glpi_url }}</code> <span class="muted small">(ITIER_PUBLIC_GLPI_URL; los instaladores apuntan acá, así que tiene que resolver desde internet)</span>
-    {% else %}<span class="dot bad"></span>No está configurada <code>ITIER_PUBLIC_GLPI_URL</code>.{% endif %}</p>
-  </div>
-
-  <div class="card">
+  <div>
     <h2>1 · Túnel seguro al servidor Zabbix</h2>
     {% if tunel_ok %}
       <p><span class="dot ok"></span>Configurado: los appliances llegan al servidor Zabbix por
@@ -45,7 +147,7 @@
     {% endif %}
   </div>
 
-  <div class="card">
+  <div>
     <h2>2 · Appliance del cliente (Linux)</h2>
     <p class="muted">Un solo comando en el equipo del cliente (VM o mini-PC con Debian/Ubuntu). Instala Docker si
       falta, escribe toda la configuración, deja el stack como servicio (<code>itier.service</code>) y avisa a
@@ -99,32 +201,7 @@
     {% endif %}
   </div>
 
-  <div class="card">
-    <h2>3 · Equipos Windows del cliente</h2>
-    <p class="muted">Instala <strong>GLPI Agent</strong> (inventario) y <strong>Zabbix Agent 2</strong> (monitoreo)
-      como servicios, en silencio. Los equipos aparecen solos en la entidad y el grupo de este cliente.
-      No contiene secretos.</p>
-
-    <h3>Enviar al cliente</h3>
-    <p class="muted small">Se manda un <strong>enlace</strong> (los correos bloquean ejecutables adjuntos). El cliente
-      descarga un instalador de doble clic: acepta el aviso de Windows una vez y el resto es automático.</p>
-    {% if enlace_equipos %}
-      <div class="bundle-head">
-        <span class="bundle-t">Enlace para el cliente (vence en {{ equipos_dias }} días)</span>
-        <button class="btn btn-sm" type="button" data-copy="#enlace-equipos">Copiar</button>
-      </div>
-      <pre class="codeblock" id="enlace-equipos">{{ enlace_equipos }}</pre>
-      <p><a class="btn btn-sm" href="{{ mailto }}">Abrir en mi programa de correo</a></p>
-    {% endif %}
-    <form method="post" action="/clientes/{{ cli.slug }}/instaladores/enlace-equipos" class="form row">
-      <input type="hidden" name="csrf" value="{{ csrf }}">
-      <label>Correo del cliente <span class="muted small">({% if smtp %}se envía desde la consola{% else %}opcional — sin SMTP configurado, se genera el enlace para que lo envíes vos{% endif %})</span>
-        <input type="email" name="email" placeholder="contacto@cliente.com">
-      </label>
-      <button class="btn btn-primary" type="submit">{% if smtp %}Generar y enviar{% else %}Generar enlace{% endif %}</button>
-    </form>
-
-    <h3>Equipo central (uno por cliente) — túnel a Zabbix + escaneo de red</h3>
+    <h3>Equipo central Windows (alternativa sin appliance)</h3>
     <p class="muted small">Se instala <strong>primero</strong>, en un equipo Windows que quede encendido (ideal: un
       servidor). Además de GLPI Agent y Zabbix Agent, deja corriendo el túnel seguro a Zabbix (cloudflared, tarea de
       arranque como SYSTEM) y lo ofrece a los demás equipos de la LAN en el puerto 10051; el GLPI Agent también contacta
@@ -138,58 +215,5 @@
       ({{ cli.enrolado_ip }}). Los demás equipos ya apuntan ahí.{% else %}<span class="dot warn"></span>Todavía no hay equipo central:
       hasta que uno reporte, los demás equipos instalan solo el inventario.{% endif %}</p>
 
-    <h3>Descargar (equipos comunes)</h3>
-    <div class="acciones">
-      <a class="btn" href="/clientes/{{ cli.slug }}/instaladores/windows.cmd">Instalador de doble clic (.cmd)</a>
-      <a class="btn" href="/clientes/{{ cli.slug }}/instaladores/windows.ps1">Script para GPO / RMM (.ps1)</a>
-    </div>
-    <p class="muted small">
-      <strong>Sin ninguna interacción:</strong> distribuí el <code>.ps1</code> por GPO, Intune o tu RMM (corre como
-      SYSTEM, sin UAC). El <code>.cmd</code> es para que lo ejecute una persona: pide permisos de administrador una vez.
-      {% if cli.enrolado_ip %}El agente de Zabbix reporta al equipo central (<code>{{ cli.enrolado_ip }}</code>).
-      {% else %}Hasta que el equipo central (o el appliance Linux) reporte su IP, solo se instala el inventario (GLPI Agent).{% endif %}
-    </p>
-    <h3>Equipos instalados</h3>
-    {% if equipos %}
-    <table class="tabla">
-      <thead><tr><th>Equipo</th><th>Instalación</th><th>Inventario (GLPI)</th><th>Monitoreo (Zabbix)</th><th>Último reporte</th></tr></thead>
-      <tbody>
-        {% for e in equipos %}
-        <tr>
-          <td><strong>{{ e.host }}</strong>{% if e.rol == 'central' %} <span class="muted small">(central)</span>{% endif %}<div class="muted small">{{ e.os or '' }}</div></td>
-          <td>{% if e.estado == 'ok' %}<span class="dot ok"></span>correcta{% else %}<span class="dot bad"></span>con problemas{% endif %}
-            {% if e.detalle %}<div class="muted small">{{ e.detalle }}</div>{% endif %}</td>
-          <td>
-            {% if e.en_glpi %}<span class="dot ok"></span>transmitiendo (ya inventariado)
-            {% elif e.glpi_servicio == 'activo' and e.glpi_conexion == 'ok' %}<span class="dot warn"></span>instalado, esperando el primer inventario
-            {% elif e.glpi_servicio == 'omitido' %}<span class="muted">omitido</span>
-            {% else %}<span class="dot bad"></span>servicio {{ e.glpi_servicio }} · conexión {{ e.glpi_conexion }}{% endif %}
-          </td>
-          <td>
-            {% if e.en_zabbix and e.zbx_disponible %}<span class="dot ok"></span>transmitiendo
-            {% elif e.en_zabbix %}<span class="dot warn"></span>registrado, todavía sin datos
-            {% elif e.zbx_servicio == 'activo' and e.zbx_conexion == 'ok' %}<span class="dot warn"></span>instalado, esperando el autorregistro
-            {% elif e.zbx_servicio in ('omitido', 'pendiente') %}<span class="muted">{{ e.zbx_servicio }}</span>
-            {% else %}<span class="dot bad"></span>servicio {{ e.zbx_servicio }} · conexión {{ e.zbx_conexion }}{% endif %}
-          </td>
-          <td class="muted">{{ e.ts }}</td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-    {% if nota_tx %}<p class="muted small">{{ nota_tx }}</p>{% endif %}
-    <p class="muted small">«Instalación» es lo que informó el instalador al terminar (servicios corriendo y conexión).
-      «Transmitiendo» se confirma del lado del servidor: el equipo ya aparece en GLPI / ya envía datos a Zabbix.</p>
-    {% else %}
-    <p class="muted">Todavía no reportó ningún equipo. Cada instalador avisa solo al terminar.</p>
-    {% endif %}
-
-    {% if cli.autoasig_detalle %}
-      <div class="note note-bad small">La asignación automática quedó incompleta: {{ cli.autoasig_detalle }}.
-        Usá «Reintentar aprovisionamiento» en la ficha del cliente.</div>
-    {% elif cli.glpi_rule_id and cli.zbx_action_id %}
-      <p class="small"><span class="dot ok"></span>Asignación automática activa: regla de GLPI (tag
-        <code>itier-{{ cli.slug }}</code>) y autorregistro de Zabbix.</p>
-    {% endif %}
-  </div>
+  </details>
 {% endblock %}

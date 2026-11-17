@@ -89,6 +89,9 @@ class Config:
     glpi_agent_msi_url: str = ""
     zbx_agent_msi_url: str = ""
     cloudflared_win_url: str = ""
+    mesh_url: str | None = None          # https://itier-mesh.<dominio> (MeshCentral, soporte remoto)
+    mesh_user: str | None = None
+    mesh_password: str | None = None
 
     @classmethod
     def from_env(cls) -> "Config":
@@ -155,6 +158,9 @@ class Config:
             zbx_agent_msi_url=os.environ.get("ITIER_ZBX_AGENT_MSI_URL") or (
                 "https://cdn.zabbix.com/zabbix/binaries/stable/7.0/7.0.22/"
                 "zabbix_agent2-7.0.22-windows-amd64-openssl.msi"),
+            mesh_url=(os.environ.get("ITIER_MESH_URL") or "").rstrip("/") or ("https://itier-mesh.demo.example" if demo else None),
+            mesh_user=os.environ.get("ITIER_MESH_USER") or None,
+            mesh_password=os.environ.get("ITIER_MESH_PASSWORD") or None,
             cloudflared_win_url=os.environ.get("ITIER_CLOUDFLARED_WIN_URL") or (
                 "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-windows-amd64.exe"),
         )
@@ -168,3 +174,7 @@ class Config:
     @property
     def zbx_configurado(self) -> bool:
         return self.demo or bool(self.zbx_url and (self.zbx_token or (self.zbx_user and self.zbx_password)))
+
+    @property
+    def mesh_enabled(self) -> bool:
+        return self.demo or bool(self.mesh_url and self.mesh_user and self.mesh_password)

@@ -24,7 +24,7 @@ import sqlite3
 from datetime import datetime, timezone
 
 from .. import audit, security
-from ..adapters import AdapterError, glpi as glpi_mod, zabbix as zbx_mod
+from ..adapters import AdapterError, glpi as glpi_mod, mesh as mesh_mod, zabbix as zbx_mod
 from . import ServiceError, slugify
 
 
@@ -118,6 +118,13 @@ def autoasignar(conn: sqlite3.Connection, cfg, actor: str, cid: int) -> None:
     marca = f"itier-{cli['slug']}"
     rule_id, action_id = cli.get("glpi_rule_id"), cli.get("zbx_action_id")
     errores = []
+    if cfg.mesh_enabled and not cli.get("mesh_id"):
+        try:
+            with mesh_mod.cliente(cfg) as m:
+                mesh_id = m.asegurar_grupo(marca)
+            conn.execute("UPDATE clients SET mesh_id=? WHERE id=?", (mesh_id, cid))
+        except AdapterError as e:
+            errores.append(f"MeshCentral (grupo): {e.detalle}")
     if not rule_id:
         try:
             with glpi_mod.cliente(cfg) as g:

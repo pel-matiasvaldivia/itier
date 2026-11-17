@@ -257,6 +257,52 @@ with glpi_mod.cliente(cfg) as g:
     check("glpi.listar_tickets tolera el 400 de rango vacío", g.listar_tickets() == [])
 TICKET_EMPTY = False
 
+# ── MeshCentral: protocolo de /control.ashx contra un servidor WebSocket falso ─
+import base64  # noqa: E402
+import threading  # noqa: E402
+from websockets.sync.server import serve  # noqa: E402
+from itier_console.adapters import mesh as mesh_mod  # noqa: E402
+
+_mesh_visto = {"auth": None, "acciones": []}
+_mesh_grupos = [{"_id": "mesh//OTRO@$x", "name": "otro", "mtype": 2}]
+
+
+def _mesh_servidor(ws):
+    _mesh_visto["auth"] = ws.request.headers.get("x-meshauth")
+    for raw in ws:
+        m = json.loads(raw)
+        _mesh_visto["acciones"].append(m["action"])
+        if m["action"] == "meshes":
+            ws.send(json.dumps({"action": "meshes", "responseid": m["responseid"], "meshes": _mesh_grupos}))
+        elif m["action"] == "createmesh":
+            _mesh_grupos.append({"_id": "mesh//NUEVO@$id", "name": m["meshname"], "mtype": m["meshtype"]})
+            ws.send(json.dumps({"action": "createmesh", "responseid": m["responseid"], "result": "ok"}))
+        elif m["action"] == "nodes":
+            ws.send(json.dumps({"action": "userinfo"}))  # ruido que debe ignorarse
+            ws.send(json.dumps({"action": "nodes", "responseid": m["responseid"], "nodes": {
+                "mesh//NUEVO@$id": [{"name": "pc-1", "conn": 1}, {"name": "pc-2", "conn": 0}]}}))
+
+
+_srv = serve(_mesh_servidor, "127.0.0.1", 0)
+threading.Thread(target=_srv.serve_forever, daemon=True).start()
+cfg_mesh = dataclasses.replace(cfg, mesh_url=f"http://127.0.0.1:{_srv.socket.getsockname()[1]}",
+                               mesh_user="itier", mesh_password="clave")
+with mesh_mod.cliente(cfg_mesh) as mc:
+    mid = mc.asegurar_grupo("itier-x")
+    eq = mc.equipos(mid)
+check("mesh: autentica con x-meshauth (usuario,clave en base64)",
+      _mesh_visto["auth"] == base64.b64encode(b"itier").decode() + "," + base64.b64encode(b"clave").decode())
+check("mesh: crea el grupo si no existe y devuelve el id corto", mid == "NUEVO@$id" and "createmesh" in _mesh_visto["acciones"])
+check("mesh: lista equipos con su estado (ignora mensajes ajenos)",
+      eq == [{"nombre": "PC-1", "conectado": True}, {"nombre": "PC-2", "conectado": False}], eq)
+with mesh_mod.cliente(cfg_mesh) as mc2:
+    antes = _mesh_visto["acciones"].count("createmesh")
+    check("mesh: si el grupo existe no lo crea de nuevo", mc2.asegurar_grupo("itier-x") == "NUEVO@$id"
+          and _mesh_visto["acciones"].count("createmesh") == antes)
+check("mesh: URL del agente Windows x64, en segundo plano",
+      mesh_mod.url_agente_windows(cfg_mesh, "NUEVO@$id").endswith("/meshagents?id=4&meshid=NUEVO@$id&installflags=2"))
+_srv.shutdown()
+
 httpx.Client = _real_Client  # type: ignore[assignment]
 print("\nRESULTADO:", "TODO OK" if not fails else f"{len(fails)} FALLAS: {fails}")
 sys.exit(1 if fails else 0)
