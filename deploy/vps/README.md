@@ -249,6 +249,12 @@ respaldá la base.
 
 ## Soporte remoto: MeshCentral (una sola vez; sirve para todos los clientes)
 
+**¿Ya tenés un MeshCentral (p. ej. `remoto.pymesenlinea.com.ar`)?** Usalo: no levantes el contenedor de este compose.
+Saltá al paso 3 y cargá en el `.env` `ITIER_MESH_URL=https://remoto.pymesenlinea.com.ar` (si usás un *dominio* de MeshCentral
+con ruta, ej. `/cuyopack`, ponelo en la URL), una cuenta de servicio **sin 2FA** con permiso para crear grupos, y verificá que
+no tengas `lockAgentDownload` activado. Cada cliente de iTier tendrá su grupo `itier-<slug>` en ese servidor.
+Si no tenés uno, seguí los pasos 1-5 (el servicio propio se levanta con `docker compose --profile mesh up -d`).
+
 Cada equipo de un cliente lleva **GLPI Agent** (inventario) y **Mesh Agent** (soporte remoto y estado). Los dos hablan
 HTTPS/443 hacia el VPS: no hace falta túnel, VPN ni equipo central en el cliente (ADR-0011).
 
