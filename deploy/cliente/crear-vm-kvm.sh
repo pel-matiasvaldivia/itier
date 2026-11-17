@@ -6,6 +6,7 @@
 #
 #   bash crear-vm-kvm.sh --nombre cuyopack-srl \
 #        --url https://<consola>/enrolar/<TOKEN>/install.sh \
+#        [--ip 192.168.62.230/24 --gw 192.168.62.250 --dns 192.168.62.250,192.168.62.200]
 #        [--bridge br0] [--disco 16] [--ram 2048] [--cores 2] [--ssh-key ~/.ssh/id_ed25519.pub]
 #
 # ⚠ La VM debe ir en un BRIDGE de la LAN del cliente (br0): los equipos Windows
@@ -15,6 +16,7 @@
 # ─────────────────────────────────────────────────────────────────────────────
 set -euo pipefail
 
+IP=""; GW=""; DNS=""
 URL=""; NOMBRE=""; BRIDGE="br0"; DISCO="16"; RAM="2048"; CORES="2"; SSHKEY=""
 DIR="${ITIER_VM_DIR:-/var/lib/libvirt/images}"
 IMG_URL="https://cloud.debian.org/images/cloud/bookworm/latest/debian-12-genericcloud-amd64.qcow2"
@@ -25,6 +27,8 @@ while [ $# -gt 0 ]; do
     --bridge) BRIDGE="$2"; shift 2;; --disco) DISCO="$2"; shift 2;;
     --ram) RAM="$2"; shift 2;;       --cores) CORES="$2"; shift 2;;
     --ssh-key) SSHKEY="$2"; shift 2;;
+    --ip) IP="$2"; shift 2;;         --gw) GW="$2"; shift 2;;
+    --dns) DNS="$2"; shift 2;;
     *) echo "Opción desconocida: $1" >&2; exit 2;;
   esac
 done
@@ -63,10 +67,19 @@ umask 077
   echo "  - [ bash, -c, \"curl -fsSL '$URL' | bash >> /var/log/itier-instalacion.log 2>&1\" ]"
 } > "$TMP/user-data"
 printf 'instance-id: %s\nlocal-hostname: %s\n' "$VM" "$VM" > "$TMP/meta-data"
+FILES=("$TMP/user-data" "$TMP/meta-data"); NETCFG=()
+if [ -n "$IP" ]; then   # IP fija (recomendado: los equipos la usan como proxy)
+  [[ "$IP" =~ ^[0-9.]+/[0-9]+$ && "$GW" =~ ^[0-9.]+$ ]] || { echo "--ip debe ser A.B.C.D/24 y --gw A.B.C.D" >&2; exit 2; }
+  { echo "version: 2"; echo "ethernets:"; echo "  nic0:"; echo "    match: {name: \"e*\"}"
+    echo "    dhcp4: false"; echo "    addresses: [$IP]"
+    echo "    routes: [{to: 0.0.0.0/0, via: $GW}]"
+    echo "    nameservers: {addresses: [${DNS:-$GW}]}"; } > "$TMP/network-config"
+  FILES+=("$TMP/network-config"); NETCFG=(--network-config "$TMP/network-config")
+fi
 if command -v cloud-localds >/dev/null; then
-  cloud-localds "$SEED" "$TMP/user-data" "$TMP/meta-data"
+  cloud-localds "${NETCFG[@]}" "$SEED" "$TMP/user-data" "$TMP/meta-data"
 elif command -v genisoimage >/dev/null; then
-  genisoimage -quiet -output "$SEED" -volid cidata -joliet -rock "$TMP/user-data" "$TMP/meta-data"
+  genisoimage -quiet -output "$SEED" -volid cidata -joliet -rock "${FILES[@]}"
 else
   echo "Falta cloud-localds (apt install cloud-image-utils) o genisoimage (yum/apt install genisoimage)." >&2; exit 1
 fi
