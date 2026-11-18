@@ -268,6 +268,10 @@ HTTPS/443 hacia el VPS: no hace falta túnel, VPN ni equipo central en el client
    Creá además una cuenta **de servicio** `itier-api` **sin 2FA** (la API por contraseña no soporta TOTP).
 4. `.env`: `MESH_NEW_ACCOUNTS=false`, `ITIER_MESH_URL`, `ITIER_MESH_USER=itier-api`, `ITIER_MESH_PASSWORD`.
    `docker compose up -d` (recrea la consola y MeshCentral).
+   Si el servicio ya había arrancado con otra configuración (502 en el hostname, o el log dice
+   `running on myserver.mydomain.com:443`), la config quedó guardada en el volumen: como todavía no hay usuarios,
+   reiniciá limpio: `docker compose stop meshcentral && docker compose rm -f meshcentral &&
+   docker volume rm itier-vps_mesh_data itier-vps_mesh_files && docker compose up -d meshcentral`.
 5. En la consola, ficha del cliente → **Reintentar aprovisionamiento**: crea el grupo `itier-<slug>` en MeshCentral.
    Desde ahí, **Instaladores** ya incluye el Mesh Agent en el instalador de Windows.
 
