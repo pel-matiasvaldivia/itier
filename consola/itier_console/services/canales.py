@@ -87,6 +87,12 @@ def normalizar_whatsapp(s: str | None) -> str | None:
     """Solo dígitos, formato internacional de Argentina para celulares: 549 + área + número."""
     if not s:
         return None
+    s = s.strip()
+    # WhatsApp ya no siempre muestra el número: a veces identifica al contacto con un ID interno
+    # («168199593165032@lid» o «lid:168199593165032»). Se guarda tal cual, con el prefijo «lid:».
+    if s.lower().endswith("@lid") or s.lower().startswith("lid:"):
+        d = re.sub(r"\D", "", s)
+        return f"lid:{d}" if 8 <= len(d) <= 20 else None
     s = s.split("@", 1)[0]                       # 5491155551234@c.us
     d = re.sub(r"\D", "", s)
     if d.startswith("00"):
@@ -372,12 +378,38 @@ def responder_whatsapp(cfg, numero: str, texto: str) -> None:
     if not cfg.wa_api_url or cfg.demo:
         return
     headers = {"X-API-Key": cfg.wa_api_key, "api_key": cfg.wa_api_key} if cfg.wa_api_key else {}
+    destino = f"{numero[4:]}@lid" if numero.startswith("lid:") else f"{numero}@c.us"
     r = httpx.post(f"{cfg.wa_api_url}/api/messages/sendText", headers=headers, timeout=10,
-                   json={"to": f"{numero}@c.us", "content": texto})
+                   json={"to": destino, "content": texto})
     r.raise_for_status()
 
 
 # --------------------------------------------------------------------------- WhatsApp (webhook de OpenWA)
+
+_RE_PN = re.compile(r"^(\d{8,15})@(c\.us|s\.whatsapp\.net)$")
+
+
+def _numero_real(m: dict) -> str | None:
+    """Busca el teléfono del remitente cuando el chat viene identificado por un @lid."""
+    candidatos = [m.get(k) for k in ("senderPn", "participantPn", "phoneNumber", "pn", "authorPn")]
+    for k in ("sender", "contact", "chat"):
+        sub = m.get(k)
+        if isinstance(sub, dict):
+            candidatos += [sub.get(x) for x in ("id", "phoneNumber", "number", "pn", "user", "_serialized")]
+            if isinstance(sub.get("contact"), dict):
+                candidatos += [sub["contact"].get(x) for x in ("id", "phoneNumber", "number")]
+    for c in candidatos:
+        if isinstance(c, dict):
+            c = c.get("_serialized") or c.get("user")
+        if not isinstance(c, str):
+            continue
+        mm = _RE_PN.match(c.strip())
+        if mm:
+            return normalizar_whatsapp(mm.group(1))
+        if re.fullmatch(r"\+?\d{10,15}", c.strip()):
+            return normalizar_whatsapp(c)
+    return None
+
 
 def parsear_whatsapp(body: dict) -> dict | None:
     """Del sobre del webhook de OpenWA al mensaje que nos interesa; None si hay que ignorarlo."""
@@ -403,6 +435,11 @@ def parsear_whatsapp(body: dict) -> dict | None:
         return None
     texto = str(m.get("body") or m.get("text") or m.get("content") or "").strip()
     numero = normalizar_whatsapp(origen)
+    if numero and numero.startswith("lid:"):
+        # El número real a veces viene en otro campo del mensaje (nunca en `to`: ese es el de soporte).
+        pn = _numero_real(m)
+        if pn:
+            numero = pn
     if not texto or not numero:
         return None
     sender = m.get("sender") if isinstance(m.get("sender"), dict) else {}
@@ -418,6 +455,13 @@ def procesar_whatsapp(cfg, conn, body: dict) -> dict:
     msg = parsear_whatsapp(body)
     if not msg:
         return {"estado": "ignorado"}
+    if msg["remitente"].startswith("lid:"):
+        # Sin número visible: se deja constancia (sin el texto del mensaje) para poder ajustar el parser.
+        m = body.get("payload") or body.get("data") or body
+        m = m.get("message", m) if isinstance(m, dict) else {}
+        log.info("WhatsApp sin número (ID interno): campos del mensaje=%s",
+                 {k: (v if isinstance(v, (int, float, bool)) or (isinstance(v, str) and len(v) < 60 and k not in ("body", "text", "content", "caption")) else type(v).__name__)
+                  for k, v in (m.items() if isinstance(m, dict) else [])})
     return registrar_entrante(cfg, conn, canal="whatsapp", asunto=None, **msg)
 
 

@@ -24,7 +24,7 @@
       {% for e in pend %}
         <tr>
           <td class="nowrap">{{ via(e.canal) }}</td>
-          <td><b>{{ e.nombre or e.remitente }}</b>{% if e.nombre %}<br><span class="muted small">{{ e.remitente }}</span>{% endif %}<br><span class="muted small">{{ e.recibido_at[:16]|replace('T', ' ') }}</span></td>
+          <td>{% set rem = ('ID interno de WhatsApp ' ~ e.remitente[4:]) if e.remitente.startswith('lid:') else e.remitente %}<b>{{ e.nombre or rem }}</b>{% if e.nombre %}<br><span class="muted small">{{ rem }}</span>{% endif %}<br><span class="muted small">{{ e.recibido_at[:16]|replace('T', ' ') }}</span></td>
           <td style="max-width:28rem">{% if e.asunto %}<b>{{ e.asunto }}</b><br>{% endif %}<span class="small">{{ (e.cuerpo or '')[:300] }}</span></td>
           <td class="small"><span class="l-pill {{ 'bad' if e.estado == 'error' else 'warn' }}">{{ {'sin_cliente': 'Sin cliente', 'revisar': 'Revisar', 'error': 'Error'}[e.estado] }}</span><br>{{ e.detalle or '' }}</td>
           <td>

@@ -149,7 +149,7 @@
           {% if wa_numero %}<span class="muted">· escriben al {{ wa_numero }}</span>{% endif %}</p>
         {% for c in contactos %}
         <div class="d-meta" style="align-items:center">
-          <span class="l-pill off">{{ c.nombre or 'Sin nombre' }}{% if c.email %} · ✉️ {{ c.email }}{% endif %}{% if c.whatsapp %} · 💬 +{{ c.whatsapp }}{% endif %}</span>
+          <span class="l-pill off">{{ c.nombre or 'Sin nombre' }}{% if c.email %} · ✉️ {{ c.email }}{% endif %}{% if c.whatsapp %} · 💬 {{ 'ID interno ' ~ c.whatsapp[4:] if c.whatsapp.startswith('lid:') else '+' ~ c.whatsapp }}{% endif %}</span>
           {% if puede('clientes.editar') %}<form method="post" action="/clientes/{{ cli.slug }}/contactos/{{ c.id }}/quitar" class="inline">
             <input type="hidden" name="csrf" value="{{ csrf }}"><button class="u-b danger" type="submit" title="Quitar">✕</button></form>{% endif %}
         </div>

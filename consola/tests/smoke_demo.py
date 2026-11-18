@@ -616,6 +616,21 @@ _v5 = {"webhookId": "w", "sessionId": "itier-soporte", "event": "message.receive
        "payload": {"message": {"id": "v5-1", "from": "5491155551234@c.us", "body": "Consulta por el formato v5"}}}
 check("webhook: el sobre de OpenWA v5 (payload.message) se entiende", anon.post(hook, json=_v5).json()["estado"] in ("ticket", "seguimiento"))
 check("webhook: otros eventos de v5 se ignoran", anon.post(hook, json={"event": "session.state.changed", "payload": {"state": "READY"}}).json()["estado"] == "ignorado")
+# WhatsApp con ID interno (@lid): sin número visible
+check("lid: se normaliza como ID interno", _cn.normalizar_whatsapp("168199593165032@lid") == "lid:168199593165032"
+      and _cn.normalizar_whatsapp("lid:168199593165032") == "lid:168199593165032")
+_lid = {"event": "message.received", "payload": {"message": {"id": "lid-1", "from": "168199593165032@lid", "body": "Q paso pa?", "to": "5492615708516@c.us", "sender": {"pushname": "Bruno"}}}}
+r = anon.post(hook, json=_lid)
+check("lid: sin número real va a la Bandeja con su ID interno (nunca toma el `to` de soporte)", r.json()["estado"] == "sin_cliente"
+      and _conn.execute("SELECT remitente FROM entrantes WHERE msg_id='lid-1'").fetchone()["remitente"] == "lid:168199593165032")
+check("lid: la Bandeja lo muestra como ID interno", "ID interno de WhatsApp 168199593165032" in c.get("/bandeja").text)
+_e_lid = _conn.execute("SELECT id FROM entrantes WHERE msg_id='lid-1'").fetchone()["id"]
+c.post(f"/bandeja/{_e_lid}/asignar", data={"cliente": "canal-sa", "recordar": "1", "csrf": csrf_de(c.get("/bandeja").text)})
+_lid["payload"]["message"]["id"] = "lid-2"
+check("lid: tras «Recordar», el siguiente mensaje ya abre ticket solo", anon.post(hook, json=_lid).json()["estado"] in ("ticket", "seguimiento"))
+check("lid: la ficha del cliente lo muestra como ID interno", "ID interno 168199593165032" in c.get("/clientes/canal-sa").text)
+_lid2 = {"event": "message.received", "payload": {"message": {"id": "lid-3", "from": "999888777666555@lid", "body": "hola", "sender": {"id": "5491155551234@c.us"}}}}
+check("lid: si el mensaje trae el teléfono real, se usa ese", _cn.parsear_whatsapp(_lid2)["remitente"] == "5491155551234")
 check("webhook: JSON inválido → 400", anon.post(hook, content=b"no es json").status_code == 400)
 
 band = c.get("/bandeja")
