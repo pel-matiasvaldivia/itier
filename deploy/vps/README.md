@@ -338,6 +338,11 @@ el control remoto de MeshCentral dentro del panel (iframe).
 
 ## Canales de entrada: correo y WhatsApp → tickets
 
+> **Todo se configura desde la consola, en _Canales_ (solo administrador):** la cuenta IMAP (servidor, puerto, cifrado,
+> usuario, contraseña, carpeta) con botón «Guardar y probar conexión», y el **QR de WhatsApp** para vincular el número.
+> Lo que se cargue ahí pisa al `.env` y se aplica sin reiniciar; la contraseña se guarda cifrada. Las variables `ITIER_IMAP_*`
+> quedan solo como valores iniciales. Si el QR no aparece en la pantalla, también sale en `docker compose logs -f openwa`.
+
 Varias personas de un cliente piden soporte; ya no hace falta que entren a la consola. Todo lo que llega queda en la
 **Bandeja** (PM/administrador) y, si se reconoce al cliente, se convierte solo en un ticket de su entidad de GLPI.
 Después el técnico lo toma («Tomar este caso») o el PM lo asigna.

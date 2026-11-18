@@ -521,20 +521,55 @@ def sondear_buzon(cfg, conectar=None) -> int:
     return vistos
 
 
+def probar_imap(cfg) -> str:
+    """Prueba usuario/clave y carpeta; devuelve un texto para mostrar o levanta ServiceError."""
+    if not cfg.imap_configurado:
+        raise ServiceError("Completá servidor, usuario y contraseña.")
+    try:
+        imap = _conectar_imap(cfg)
+    except imaplib.IMAP4.error as e:
+        raise ServiceError("El servidor rechazó el usuario o la contraseña (¿hace falta una contraseña de aplicación?): "
+                           + str(e)[:120]) from e
+    except (OSError, TimeoutError) as e:
+        raise ServiceError(f"No se pudo conectar a {cfg.imap_host}:{cfg.imap_port} ({e.__class__.__name__}). "
+                           "Revisá servidor, puerto y cifrado.") from e
+    try:
+        typ, d = imap.select(cfg.imap_folder, readonly=True)
+        if typ != "OK":
+            raise ServiceError(f"La carpeta «{cfg.imap_folder}» no existe en el buzón.")
+        typ, n = imap.search(None, "UNSEEN")
+        sin_leer = len(n[0].split()) if typ == "OK" and n and n[0] else 0
+        return f"Conexión correcta. {sin_leer} correo(s) sin leer en {cfg.imap_folder}."
+    finally:
+        try:
+            imap.logout()
+        except Exception:  # noqa: BLE001
+            pass
+
+
 def iniciar_poller(cfg) -> threading.Event | None:
-    """Hilo que mira el buzón de soporte cada `imap_poll_s`. Solo si está configurado y no es demo."""
-    if cfg.demo or not cfg.imap_configurado:
+    """Hilo que mira el buzón de soporte. La config se relee en cada vuelta: lo que se cargue en
+    la pantalla de Canales aplica sin reiniciar. Sin buzón configurado, la vuelta no hace nada."""
+    if cfg.demo:
         return None
+    from . import ajustes
     parar = threading.Event()
 
     def _loop():
-        log.info("Buzón de soporte: leyendo %s cada %s s", cfg.imap_user, cfg.imap_poll_s)
         while not parar.is_set():
+            espera = cfg.imap_poll_s
             try:
-                sondear_buzon(cfg)
+                conn = db_mod.connect(cfg.db_path)
+                try:
+                    ef = ajustes.efectiva(conn, cfg)
+                finally:
+                    conn.close()
+                espera = ef.imap_poll_s
+                if ef.imap_configurado:
+                    sondear_buzon(ef)
             except Exception as e:  # noqa: BLE001
                 log.warning("No se pudo leer el buzón de soporte: %s", e)
-            parar.wait(cfg.imap_poll_s)
+            parar.wait(espera)
 
     threading.Thread(target=_loop, name="itier-imap", daemon=True).start()
     return parar

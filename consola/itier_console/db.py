@@ -148,6 +148,15 @@ CREATE TABLE IF NOT EXISTS conversaciones (
     PRIMARY KEY (canal, remitente)
 );
 
+-- Ajustes editables desde la consola (canales de comunicación). Los secretos van cifrados.
+CREATE TABLE IF NOT EXISTS ajustes (
+    clave      TEXT PRIMARY KEY,
+    valor      TEXT,
+    secreto    INTEGER NOT NULL DEFAULT 0,
+    updated_at TEXT NOT NULL,
+    updated_by TEXT
+);
+
 -- Enlaces de instalación del appliance: token de un solo propósito, con
 -- vencimiento y usos acotados. Se guarda SOLO el hash (el token se muestra una vez).
 CREATE TABLE IF NOT EXISTS enroll_tokens (

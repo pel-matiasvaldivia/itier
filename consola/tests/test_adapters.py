@@ -33,6 +33,7 @@ from itier_console.config import Config  # noqa: E402
 
 fails = []
 captured = []
+WA_ESTADO = "UNPAIRED"
 TICKET_EMPTY = False  # cuando True, GET /Ticket simula el 400 de rango vacío
 
 
@@ -74,6 +75,10 @@ def handler(request: httpx.Request) -> httpx.Response:
         if request.method == "POST":
             return httpx.Response(201, json={"id": 42})
         return httpx.Response(200, json=[{"id": 0, "name": "Root"}])
+    if p == "/getConnectionState":
+        return httpx.Response(200, json={"success": True, "response": WA_ESTADO})
+    if p == "/qr":
+        return httpx.Response(200, content=b"\x89PNG-fake", headers={"content-type": "image/png"})
     if "/ITILFollowup" in p:
         return httpx.Response(201, json={"id": 9})
     if "/Ticket_User" in p:
@@ -517,6 +522,16 @@ with glpi_mod.cliente(cfg) as g:
 _f = [x for x in captured[_n2:] if x["path"].endswith("/ITILFollowup")]
 check("GLPI: agregar_seguimiento hace POST /ITILFollowup sobre el ticket",
       len(_f) == 1 and _f[0]["method"] == "POST" and _f[0]["body"]["input"] == {"itemtype": "Ticket", "items_id": 1042, "content": "Ya volvió, gracias"}, _f)
+# WhatsApp (OpenWA): estado y QR
+from itier_console.services import whatsapp as wa_svc  # noqa: E402
+import dataclasses as _dc  # noqa: E402
+_cw = _dc.replace(cfg, wa_api_url="http://openwa:8080", wa_api_key="k")
+_e = wa_svc.estado(_cw)
+check("WhatsApp: sesión sin vincular devuelve el QR", _e["estado"] == "esperando_qr" and _e["qr"].startswith("data:image/png;base64,"), _e)
+WA_ESTADO = "CONNECTED"
+check("WhatsApp: sesión conectada no pide QR", wa_svc.estado(_cw)["estado"] == "conectado" and wa_svc.estado(_cw)["qr"] is None)
+check("WhatsApp: la API key viaja en los encabezados", any(x["headers"].get("api_key") == "k" for x in captured if x["path"] == "/getConnectionState"))
+check("WhatsApp: sin URL queda «no configurado»", wa_svc.estado(_dc.replace(cfg, wa_api_url=None))["estado"] == "no_configurado")
 httpx.Client = _real_Client  # type: ignore[assignment]
 print("\nRESULTADO:", "TODO OK" if not fails else f"{len(fails)} FALLAS: {fails}")
 sys.exit(1 if fails else 0)

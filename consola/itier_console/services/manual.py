@@ -43,6 +43,7 @@ RESPONSABILIDADES = {
         "Administrar los usuarios y sus roles con el criterio de mínimo privilegio; dar de baja de inmediato a quien deja de operar.",
         "Custodiar las cuentas de servicio y los secretos (tokens de GLPI y Zabbix, cuenta de Mesh, SMTP): rotarlos y no compartirlos.",
         "Mantener operativos y actualizados GLPI, Zabbix, MeshCentral y la consola, y verificar los respaldos.",
+        "Mantener los canales de entrada (pantalla Canales): la cuenta IMAP del correo de soporte y el número de WhatsApp vinculado por QR; si WhatsApp se desvincula, volver a escanear.",
         "Revisar la auditoría y la integridad de su cadena de hash; investigar cualquier anomalía.",
         "Autorizar y ejecutar las bajas de clientes (borra su configuración), sabiendo que es irreversible.",
         "Gestionar los incidentes de seguridad: contener, avisar a los afectados y dejar constancia.",

@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+{% block titulo %}Canales · Consola de iTier{% endblock %}
+{% block contenido %}
+  <div class="l-head">
+    <div>
+      <h1>Canales de comunicación</h1>
+      <p class="u-sub">Por dónde piden soporte los clientes. Lo que cargues acá se aplica solo, sin reiniciar nada.</p>
+    </div>
+    <a class="u-b" href="/bandeja" style="text-decoration:none">📥 Bandeja{% if pendientes %} ({{ pendientes }}){% endif %}</a>
+  </div>
+
+  <div class="d-cols">
+    <section class="u-card">
+      <h2>✉️ Correo de soporte</h2>
+      <p class="u-lead">La consola lee este buzón por IMAP: cada correo de un cliente reconocido abre un ticket.</p>
+      <form method="post" action="/canales/correo" class="form">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <label>Casilla de soporte (la que ven los clientes)
+          <input type="email" name="soporte_email" value="{{ ef.soporte_email or '' }}" placeholder="soporte@pymesenlinea.com.ar"></label>
+        <label>Servidor IMAP
+          <input type="text" name="imap_host" value="{{ ef.imap_host or '' }}" placeholder="imap.gmail.com / outlook.office365.com / mail.tudominio.com"></label>
+        <div class="d-meta" style="gap:.8rem">
+          <label style="flex:1">Puerto <input type="number" name="imap_port" value="{{ ef.imap_port }}" min="1" max="65535"></label>
+          <label style="flex:1">Cifrado
+            <select name="imap_tls">
+              <option value="ssl" {{ 'selected' if ef.imap_tls == 'ssl' else '' }}>SSL/TLS (993)</option>
+              <option value="starttls" {{ 'selected' if ef.imap_tls == 'starttls' else '' }}>STARTTLS (143)</option>
+              <option value="no" {{ 'selected' if ef.imap_tls == 'no' else '' }}>Sin cifrado</option>
+            </select></label>
+        </div>
+        <label>Usuario
+          <input type="text" name="imap_user" value="{{ ef.imap_user or '' }}" autocomplete="off" placeholder="soporte@pymesenlinea.com.ar"></label>
+        <label>Contraseña
+          <input type="password" name="imap_password" autocomplete="new-password"
+                 placeholder="{{ '•••••••• (guardada: dejá vacío para conservarla)' if ef.imap_password else 'Contraseña o contraseña de aplicación' }}"></label>
+        <div class="d-meta" style="gap:.8rem">
+          <label style="flex:1">Carpeta <input type="text" name="imap_folder" value="{{ ef.imap_folder }}"></label>
+          <label style="flex:1">Leer cada (segundos) <input type="number" name="imap_poll_s" value="{{ ef.imap_poll_s }}" min="15" max="3600"></label>
+        </div>
+        <div class="d-meta" style="gap:.6rem">
+          <button class="u-btn" type="submit" name="probar" value="1">Guardar y probar conexión</button>
+          <button class="u-b" type="submit">Solo guardar</button>
+        </div>
+      </form>
+      {% if ef.imap_password %}
+      <form method="post" action="/canales/correo/borrar-clave" class="inline" onsubmit="return confirm('¿Borrar la contraseña guardada? La lectura de correo se apaga.');">
+        <input type="hidden" name="csrf" value="{{ csrf }}"><button class="u-b danger" type="submit">Borrar contraseña guardada</button></form>
+      {% endif %}
+      <p class="muted small" style="margin-top:.8rem">
+        Estado: {% if ef.imap_configurado %}<span class="l-pill ok"><i></i>Configurado: lee {{ ef.imap_user }} @ {{ ef.imap_host }}</span>{% else %}<span class="l-pill off">Sin configurar</span>{% endif %}<br>
+        Gmail y Microsoft 365 piden una <b>contraseña de aplicación</b> (con 2FA activo) o IMAP habilitado. La contraseña se guarda cifrada y no se vuelve a mostrar.
+        Para que la consola <b>conteste</b> al cliente (confirmación del caso) hace falta además el SMTP del servidor:
+        {% if smtp_ok %}<span class="l-pill ok">configurado</span>{% else %}<span class="l-pill warn">no configurado (ITIER_SMTP_* en el .env)</span>{% endif %}
+      </p>
+    </section>
+
+    <section class="u-card">
+      <h2>💬 WhatsApp de soporte</h2>
+      <p class="u-lead">Vinculá el número de soporte escaneando el QR, igual que WhatsApp Web.</p>
+      <div id="wa" style="text-align:center;padding:.6rem 0">
+        <div id="wa-estado" class="l-pill off">Consultando…</div>
+        <div id="wa-qr" style="margin:1rem auto;max-width:260px" hidden>
+          <img id="wa-img" alt="Código QR de WhatsApp" style="width:100%;border:1px solid var(--line,#ddd);border-radius:12px;background:#fff">
+          <p class="muted small">En el celular: WhatsApp → Ajustes → Dispositivos vinculados → Vincular un dispositivo.</p>
+        </div>
+        <p id="wa-detalle" class="muted small"></p>
+      </div>
+      <p class="small">Webhook: {% if wa_hook_ok %}<span class="l-pill ok"><i></i>listo</span> <code>{{ hook_url }}</code>{% else %}<span class="l-pill bad">falta ITIER_WA_HOOK_TOKEN en el .env</span>{% endif %}</p>
+      <form method="post" action="/canales/whatsapp" class="form">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <label>URL de la API de OpenWA
+          <input type="text" name="wa_api_url" value="{{ ef.wa_api_url or '' }}" placeholder="http://openwa:8080"></label>
+        <label>API key de OpenWA
+          <input type="password" name="wa_api_key" autocomplete="new-password"
+                 placeholder="{{ '•••••••• (guardada: dejá vacío para conservarla)' if ef.wa_api_key else 'La misma que ITIER_WA_API_KEY' }}"></label>
+        <label>Número de soporte (solo para mostrarlo)
+          <input type="text" name="wa_numero" value="{{ ef.wa_numero or '' }}" placeholder="5491155551234"></label>
+        <button class="u-b" type="submit">Guardar</button>
+      </form>
+      <p class="muted small" style="margin-top:.8rem"><b>⚠ API no oficial:</b> WhatsApp puede bloquear el número. Usá uno dedicado, no el personal.</p>
+    </section>
+  </div>
+
+  <script>
+  (function () {
+    var rot = {conectado: ["ok", "✅ Vinculado y recibiendo mensajes"], esperando_qr: ["warn", "📱 Esperando que escanees el QR"],
+               sin_conexion: ["bad", "Sin conexión con OpenWA"], no_configurado: ["off", "Sin configurar"]};
+    function ver() {
+      fetch("/canales/whatsapp/estado", {credentials: "same-origin"}).then(function (r) { return r.json(); }).then(function (d) {
+        var e = rot[d.estado] || ["off", d.estado];
+        var el = document.getElementById("wa-estado"); el.className = "l-pill " + e[0]; el.textContent = e[1];
+        var box = document.getElementById("wa-qr");
+        if (d.qr) { document.getElementById("wa-img").src = d.qr; box.hidden = false; } else { box.hidden = true; }
+        document.getElementById("wa-detalle").textContent = d.detalle || "";
+      }).catch(function () {});
+    }
+    ver(); setInterval(ver, 6000);
+  })();
+  </script>
+{% endblock %}

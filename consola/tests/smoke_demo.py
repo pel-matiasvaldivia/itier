@@ -677,6 +677,54 @@ check("tickets: la lista muestra la vía", "💬 WhatsApp" in c.get("/tickets").
 r = c.post(f"/tickets/{t1}/tomar", data={"csrf": csrf_de(tkt.text)})
 check("ticket: «tomar caso» responde (con o sin cuenta GLPI vinculada)", r.status_code == 200 and r.url.path == f"/tickets/{t1}")
 
+# Pantalla de configuración de canales (administrador)
+pg = c.get("/canales")
+check("canales: el administrador ve la configuración de correo y WhatsApp", pg.status_code == 200 and "Correo de soporte" in pg.text and "WhatsApp de soporte" in pg.text)
+check("canales: WhatsApp informa estado y QR (demo)", c.get("/canales/whatsapp/estado").json()["estado"] == "esperando_qr" and c.get("/canales/whatsapp/estado").json()["qr"].startswith("data:image"))
+r = c.post("/canales/correo", data={"soporte_email": "soporte@pymesenlinea.com.ar", "imap_host": "imap.ejemplo.com", "imap_port": "993",
+          "imap_user": "soporte@pymesenlinea.com.ar", "imap_password": "S3cr3to-imap!", "imap_folder": "INBOX", "imap_tls": "ssl",
+          "imap_poll_s": "45", "csrf": csrf_de(pg.text)})
+check("canales: se guarda la cuenta IMAP", "Configuración del correo guardada" in r.text and "imap.ejemplo.com" in r.text)
+check("canales: la contraseña no se vuelve a mostrar", "S3cr3to-imap!" not in r.text and "guardada: dejá vacío" in r.text)
+_raw = _conn.execute("SELECT valor, secreto FROM ajustes WHERE clave='imap_password'").fetchone()
+check("canales: la contraseña queda cifrada en la base", _raw["secreto"] == 1 and "S3cr3to-imap!" not in _raw["valor"])
+from itier_console.services import ajustes as _aj  # noqa: E402
+_ef = _aj.efectiva(_conn, app.state.cfg)
+check("canales: la config guardada pisa al entorno", _ef.imap_configurado and _ef.imap_host == "imap.ejemplo.com" and _ef.imap_poll_s == 45 and _ef.imap_password == "S3cr3to-imap!")
+r = c.post("/canales/correo", data={"soporte_email": "soporte@pymesenlinea.com.ar", "imap_host": "imap.otro.com", "imap_port": "993",
+          "imap_user": "soporte@pymesenlinea.com.ar", "imap_password": "", "imap_folder": "INBOX", "imap_tls": "ssl",
+          "imap_poll_s": "60", "csrf": csrf_de(c.get("/canales").text)})
+check("canales: contraseña vacía conserva la guardada", _aj.efectiva(_conn, app.state.cfg).imap_password == "S3cr3to-imap!" and _aj.efectiva(_conn, app.state.cfg).imap_host == "imap.otro.com")
+r = c.post("/canales/correo", data={"soporte_email": "no-es-correo", "imap_host": "x", "imap_port": "993", "imap_user": "u", "imap_tls": "ssl",
+          "imap_poll_s": "60", "csrf": csrf_de(c.get("/canales").text)})
+check("canales: valida la casilla de soporte", "no es un correo válido" in r.text)
+check("canales: la auditoría registra el cambio sin la clave", "canal.correo_configurado" in c.get("/auditoria").text and "S3cr3to-imap!" not in c.get("/auditoria").text)
+# probar_imap con servidor simulado
+import imaplib as _imaplib  # noqa: E402
+class _I:
+    def __init__(s, *a, **k): pass
+    def login(s, u, p):
+        if p != "S3cr3to-imap!": raise _imaplib.IMAP4.error("AUTHENTICATIONFAILED")
+    def select(s, f, readonly=False): return "OK", [b"3"]
+    def search(s, *a): return "OK", [b"1 2"]
+    def logout(s): pass
+_real_ssl = _imaplib.IMAP4_SSL; _imaplib.IMAP4_SSL = _I
+try:
+    check("canales: probar conexión OK informa los sin leer", "2 correo(s) sin leer" in _cn.probar_imap(_aj.efectiva(_conn, app.state.cfg)))
+    _mala = _aj.efectiva(_conn, app.state.cfg).__class__(**{**_aj.efectiva(_conn, app.state.cfg).__dict__, "imap_password": "otra"})
+    try:
+        _cn.probar_imap(_mala); _ok = False
+    except Exception as _e:  # noqa: BLE001
+        _ok = "rechazó" in str(getattr(_e, "mensaje", _e))
+    check("canales: probar conexión con clave mala da un error claro", _ok)
+finally:
+    _imaplib.IMAP4_SSL = _real_ssl
+r = c.post("/canales/whatsapp", data={"wa_api_url": "http://openwa:8080", "wa_api_key": "k-wa-123", "wa_numero": "5491155550000", "csrf": csrf_de(c.get("/canales").text)})
+check("canales: se guarda la config de WhatsApp (clave oculta)", "5491155550000" in r.text and "k-wa-123" not in r.text)
+check("canales: URL inválida rechazada", "debe empezar con http" in c.post("/canales/whatsapp", data={"wa_api_url": "ftp://x", "wa_numero": "", "csrf": csrf_de(c.get("/canales").text)}).text)
+check("RBAC: PM y técnico no entran a Canales", tp.get("/canales").url.path != "/canales" and tj.get("/canales/whatsapp/estado").url.path != "/canales/whatsapp/estado")
+check("RBAC: el menú del administrador muestra Canales", 'href="/canales"' in c.get("/").text)
+
 # RBAC: la Bandeja es de PM/admin
 check("RBAC: el técnico no entra a la Bandeja", tj.get("/bandeja").url.path != "/bandeja")
 check("RBAC: el PM sí", tp.get("/bandeja").url.path == "/bandeja")
