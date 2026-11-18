@@ -12,9 +12,9 @@
       <div class="tile-s"><a href="/portal/tickets">Ver mis tickets →</a></div>
     </div>
     <div class="tile">
-      <div class="tile-k">Equipos monitoreados</div>
+      <div class="tile-k">Equipos en línea</div>
       <div class="tile-v big">{% if hosts_total is not none %}{{ hosts_ok }}/{{ hosts_total }}{% else %}—{% endif %}</div>
-      <div class="tile-s">{% if hosts_total is not none %}disponibles · <a href="/portal/equipos">ver estado →</a>{% else %}<a href="/portal/equipos">ver equipos →</a>{% endif %}</div>
+      <div class="tile-s">{% if hosts_total is not none %}en línea · <a href="/portal/equipos">ver estado →</a>{% else %}<a href="/portal/equipos">ver equipos →</a>{% endif %}</div>
     </div>
   </section>
 

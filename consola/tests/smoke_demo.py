@@ -350,7 +350,11 @@ if r.url.path == "/cambiar-clave":
                                         "repetir": "clave-nueva-portal", "csrf": csrf_de(r.text)})
 check("cliente: entra al portal", r.url.path == "/portal", r.url.path)
 check("cliente: ve su panel de tickets", pc.get("/portal/tickets").status_code == 200)
-check("cliente: ve sus equipos", pc.get("/portal/equipos").status_code == 200)
+rq = pc.get("/portal/equipos")
+check("cliente: ve sus equipos (GLPI + Mesh, ya no solo Zabbix)", rq.status_code == 200 and "PC-VENTAS-01" in rq.text and "En línea" in rq.text, rq.text[-400:])
+# (el fixture de Zabbix en demo devuelve los mismos hosts a todos; el aislamiento real es por grupo y se prueba con GLPI)
+check("cliente: no ve equipos de otras entidades de GLPI", "SRV-FILE01" not in rq.text and "PC-RECEPCION" not in rq.text and "SRV-APP" not in rq.text)
+check("cliente: el inicio cuenta los equipos en línea", "Equipos en línea" in pc.get("/portal").text)
 check("cliente: /clientes (operador) lo manda al portal", pc.get("/clientes").url.path == "/portal")
 
 # El cliente abre un ticket desde el portal (entidad forzada a la suya).

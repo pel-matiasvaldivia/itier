@@ -4,36 +4,43 @@
   <div class="page-head"><h1>Mis equipos</h1></div>
 
   <div class="card">
-    <h2>Sonda de monitoreo</h2>
-    {% if proxy %}
-      <p>{% if proxy.visto %}<span class="dot ok"></span>Conectada{% else %}<span class="dot warn"></span>Aún no reportó{% endif %}</p>
-    {% else %}
-      <p class="muted">Todavía no hay una sonda activa. La estamos preparando.</p>
-    {% endif %}
-  </div>
-
-  <div class="card">
-    <h2>Equipos monitoreados</h2>
-    {% if error %}<div class="note note-bad">No pudimos leer el estado ahora mismo. Reintentá en un momento.</div>{% endif %}
-    {% if hosts %}
+    <h2>Equipos de {{ cli.nombre }}</h2>
+    {% if notas %}<div class="note note-bad">No pudimos leer ahora mismo: {{ notas | join(', ') }}. Es posible que falten datos; reintentá en un momento.</div>{% endif %}
+    {% if equipos %}
+    {% set hay_zbx = equipos | selectattr('zbx') | list | length > 0 %}
     <table class="tabla">
-      <thead><tr><th>Equipo</th><th>Nombre</th><th>Estado</th></tr></thead>
+      <thead><tr><th>Equipo</th><th>Estado</th><th>Inventario</th>{% if hay_zbx %}<th>Monitoreo</th>{% endif %}</tr></thead>
       <tbody>
-        {% for h in hosts %}
+        {% for e in equipos %}
         <tr>
-          <td><code>{{ h.host }}</code></td>
-          <td>{{ h.name }}</td>
+          <td><strong>{{ e.nombre }}</strong></td>
           <td>
-            {% if h.available == '1' %}<span class="dot ok"></span>Disponible
-            {% elif h.available == '2' %}<span class="dot bad"></span>Con problemas
-            {% else %}<span class="dot warn"></span>Sin datos{% endif %}
+            {% if e.en_linea %}<span class="dot ok"></span>En línea
+            {% elif e.en_mesh %}<span class="dot warn"></span>Sin conexión ahora
+            {% else %}<span class="dot warn"></span>Registrado{% endif %}
           </td>
+          <td>{% if e.en_glpi %}<span class="dot ok"></span>Inventariado{% else %}<span class="muted">Pendiente</span>{% endif %}</td>
+          {% if hay_zbx %}
+          <td>
+            {% if e.zbx == '1' %}<span class="dot ok"></span>Disponible
+            {% elif e.zbx == '2' %}<span class="dot bad"></span>Con problemas
+            {% elif e.zbx == '0' %}<span class="dot warn"></span>Sin datos
+            {% else %}<span class="muted">—</span>{% endif %}
+          </td>
+          {% endif %}
         </tr>
         {% endfor %}
       </tbody>
     </table>
-    {% elif not error %}
-    <p class="muted">Cuando tu sonda empiece a descubrir equipos, aparecen acá.</p>
+    {% elif not notas %}
+    <p class="muted">Todavía no hay equipos. Cuando instales el agente de soporte en una computadora, aparece acá.</p>
     {% endif %}
   </div>
+
+  {% if proxy %}
+  <div class="card">
+    <h2>Sonda de monitoreo</h2>
+    <p>{% if proxy.visto %}<span class="dot ok"></span>Conectada{% else %}<span class="dot warn"></span>Aún no reportó{% endif %}</p>
+  </div>
+  {% endif %}
 {% endblock %}

@@ -16,7 +16,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from .. import audit, security
 from ..adapters import AdapterError
 from ..deps import flash, get_db, render, require_cliente
-from ..services import agents, onboarding
+from ..services import agents, equipos as equipos_svc, onboarding
 from ..services import tickets as tickets_svc
 
 router = APIRouter(prefix="/portal")
@@ -45,19 +45,17 @@ def inicio(request: Request, user: dict = Depends(require_cliente), conn: sqlite
     entity = _entity(cli)
 
     abiertos = None
-    hosts_total = hosts_ok = None
+    hosts_total = hosts_ok = None   # equipos (todas las fuentes) y cuántos están en línea
     try:
         if entity is not None:
             tickets = tickets_svc.listar(cfg, entity_id=entity, limit=100)
             abiertos = sum(1 for t in tickets if int(t.get("status", 0) or 0) in (1, 2, 3, 4))
     except AdapterError:
         pass
-    try:
-        datos = agents.panel(cfg, cli)
-        hosts_total = len(datos["hosts"])
-        hosts_ok = sum(1 for h in datos["hosts"] if str(h.get("available")) == "1")
-    except AdapterError:
-        pass
+    datos = equipos_svc.listar(cfg, cli)
+    if len(datos["notas"]) < 3:   # al menos una fuente respondió
+        hosts_total = len(datos["equipos"])
+        hosts_ok = sum(1 for e in datos["equipos"] if e["en_linea"] or e["zbx"] == "1")
 
     return render(request, "portal_inicio.html", cli=cli,
                   abiertos=abiertos, hosts_total=hosts_total, hosts_ok=hosts_ok)
@@ -145,9 +143,6 @@ def equipos(request: Request, user: dict = Depends(require_cliente), conn: sqlit
     cli = _cliente(conn, user)
     if not cli:
         return render(request, "portal_sin_cliente.html")
-    datos, error = {"proxy": None, "hosts": []}, None
-    try:
-        datos = agents.panel(request.app.state.cfg, cli)
-    except AdapterError as e:
-        error = e.detalle
-    return render(request, "portal_equipos.html", cli=cli, proxy=datos["proxy"], hosts=datos["hosts"], error=error)
+    datos = equipos_svc.listar(request.app.state.cfg, cli)
+    return render(request, "portal_equipos.html", cli=cli, proxy=datos["proxy"], equipos=datos["equipos"],
+                  notas=datos["notas"])
