@@ -156,6 +156,8 @@ services:
       MESH_NEW_ACCOUNTS: ${MESH_NEW_ACCOUNTS:-false}
       # Redes de las que confía en el X-Forwarded-* (el túnel llega por Docker/loopback).
       MESH_TLS_OFFLOAD: ${MESH_TLS_OFFLOAD:-172.16.0.0/12,127.0.0.1}
+      # Orígenes que pueden embeber Mesh en un iframe: la consola (conexión remota dentro del panel).
+      MESH_FRAME_ORIGINS: ${MESH_FRAME_ORIGINS:-${ITIER_CONSOLE_PUBLIC_URL:-}}
       TZ: ${TZ:-America/Argentina/Buenos_Aires}
     volumes:
       - mesh_data:/opt/meshcentral/meshcentral-data
@@ -262,6 +264,7 @@ services:
       # Grupo de usuarios de Mesh (técnicos de soporte) con acceso a TODOS los equipos de
       # todos los clientes: la consola le comparte cada grupo de cliente que crea.
       ITIER_MESH_SUPPORT_GROUP: ${ITIER_MESH_SUPPORT_GROUP:-SOPORTE}
+      ITIER_ALERTA_DISCO_PCT: ${ITIER_ALERTA_DISCO_PCT:-90}
       ITIER_SMTP_HOST: ${ITIER_SMTP_HOST:-}
       ITIER_SMTP_PORT: ${ITIER_SMTP_PORT:-587}
       ITIER_SMTP_USER: ${ITIER_SMTP_USER:-}

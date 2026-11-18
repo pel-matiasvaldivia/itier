@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+{% block titulo %}Equipos · Consola de iTier{% endblock %}
+{% block contenido %}
+  <div class="page-head">
+    <h1>Equipos</h1>
+    <div class="acciones"><a class="btn" href="/equipos?actualizar=1{% if filtro_cliente %}&cliente={{ filtro_cliente }}{% endif %}{% if solo_alertas %}&alertas=1{% endif %}">Actualizar</a></div>
+  </div>
+
+  <section class="tiles">
+    <div class="tile"><div class="tile-k">Con alertas</div>
+      <div class="tile-v big">{{ n_alertas }}</div>
+      <div class="tile-s"><a href="/equipos?alertas=1{% if filtro_cliente %}&cliente={{ filtro_cliente }}{% endif %}">ver solo estos →</a></div></div>
+    <div class="tile"><div class="tile-k">En línea</div>
+      <div class="tile-v big">{{ n_linea }}</div>
+      <div class="tile-s">de {{ filas | length }} mostrados</div></div>
+    <div class="tile"><div class="tile-k">Umbral de disco</div>
+      <div class="tile-v big">{{ umbral }} %</div>
+      <div class="tile-s">ITIER_ALERTA_DISCO_PCT</div></div>
+  </section>
+
+  <div class="card">
+    <form method="get" action="/equipos" class="form row">
+      <label>Cliente
+        <select name="cliente" onchange="this.form.submit()">
+          <option value="">Todos</option>
+          {% for c in clientes %}<option value="{{ c.slug }}" {% if c.slug == filtro_cliente %}selected{% endif %}>{{ c.nombre }}</option>{% endfor %}
+        </select>
+      </label>
+      <label><input type="checkbox" name="alertas" value="1" {% if solo_alertas %}checked{% endif %} onchange="this.form.submit()"> Solo con alertas</label>
+      <noscript><button class="btn" type="submit">Filtrar</button></noscript>
+    </form>
+    {% if notas %}<div class="note note-bad small">Sin datos de algunas fuentes — {{ notas | join(' · ') }}.</div>{% endif %}
+
+    {% if filas %}
+    <table class="tabla">
+      <thead><tr><th>Cliente</th><th>Equipo</th><th>Conexión</th><th>Discos</th><th>Antivirus</th><th>Alertas</th><th></th></tr></thead>
+      <tbody>
+        {% for e in filas %}
+        <tr>
+          <td>{{ e.cliente }}</td>
+          <td><strong>{{ e.nombre }}</strong></td>
+          <td>{% if e.en_linea %}<span class="dot ok"></span>En línea
+              {% elif e.en_mesh %}<span class="dot warn"></span>Sin conexión
+              {% else %}<span class="muted">sin agente de soporte</span>{% endif %}</td>
+          <td>
+            {% for d in e.discos %}
+              <div class="small"><span class="dot {{ 'bad' if d.alerta else 'ok' }}"></span><code>{{ d.nombre }}</code> {{ d.pct }} %
+                <span class="muted">({{ d.libre_gb }} GB libres)</span></div>
+            {% else %}<span class="muted">sin datos</span>{% endfor %}
+          </td>
+          <td>
+            {% if e.av_estado == 'on' %}<span class="dot ok"></span>ON
+            {% elif e.av_estado == 'off' %}<span class="dot bad"></span><strong>OFF</strong>
+            {% elif e.av_estado == 'ninguno' %}<span class="dot warn"></span>Ninguno
+            {% else %}<span class="muted">sin datos</span>{% endif %}
+          </td>
+          <td>
+            {% for nivel, texto in e.alertas %}
+              <div class="small"><span class="dot {{ 'bad' if nivel == 'alta' else 'warn' }}"></span>{{ texto }}</div>
+            {% else %}<span class="muted">—</span>{% endfor %}
+          </td>
+          <td class="acciones">
+            {% if e.nodeid and mesh_ok and e.en_linea %}
+              <a class="btn btn-sm btn-primary" href="/equipos/{{ e.slug }}/{{ e.nodeid | urlencode }}/remoto?n={{ e.nombre | urlencode }}">Conectar</a>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    <p class="muted small">Discos y antivirus salen del último inventario del GLPI Agent (normalmente una vez al día); la
+      conexión sale de MeshCentral en vivo.</p>
+    {% else %}
+      <p class="muted">{% if solo_alertas %}Sin alertas activas. 🎉{% else %}Todavía no hay equipos.{% endif %}</p>
+    {% endif %}
+  </div>
+{% endblock %}

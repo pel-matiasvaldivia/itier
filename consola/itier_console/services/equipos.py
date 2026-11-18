@@ -11,10 +11,49 @@ from __future__ import annotations
 from ..adapters import glpi as glpi_mod, mesh as mesh_mod, zabbix as zbx_mod
 
 
-def listar(cfg, cli: dict) -> dict:
+def evaluar(salud: dict | None, umbral: int, en_linea: bool | None = None) -> dict:
+    """Discos, antivirus y alertas de UN equipo a partir de lo inventariado.
+
+    Alertas: [(nivel, texto)] con nivel «alta» · «media» · «baja». Reglas:
+      - disco con uso >= umbral %  (alta si >= 95 %, media si no)
+      - antivirus: ninguno detectado (media) · todos apagados (alta) · activo pero desactualizado (baja)
+      - sin conexión ahora (baja)
+    """
+    discos, alertas = [], []
+    antivirus = (salud or {}).get("antivirus") or []
+    for d in (salud or {}).get("discos") or []:
+        total, libre = int(d.get("total_mb") or 0), int(d.get("libre_mb") or 0)
+        if total <= 0:
+            continue
+        pct = round(100 * (total - libre) / total)
+        discos.append({"nombre": d["nombre"], "pct": pct, "total_gb": round(total / 1024, 1),
+                       "libre_gb": round(libre / 1024, 1), "alerta": pct >= umbral})
+        if pct >= umbral:
+            alertas.append(("alta" if pct >= 95 else "media", f"Disco {d['nombre']} al {pct} % ({round(libre / 1024, 1)} GB libres)"))
+    if not (salud or {}).get("inventariado"):
+        av_estado = "sin_datos"
+    elif not antivirus:
+        av_estado = "ninguno"
+        alertas.append(("media", "No se detectó antivirus"))
+    elif not any(a["activo"] for a in antivirus):
+        av_estado = "off"
+        alertas.append(("alta", f"Antivirus APAGADO ({antivirus[0]['nombre']})"))
+    else:
+        av_estado = "on"
+        if not all(a["actualizado"] for a in antivirus if a["activo"]):
+            alertas.append(("baja", "Antivirus desactualizado"))
+    if en_linea is False:
+        alertas.append(("baja", "Sin conexión ahora"))
+    orden = {"alta": 0, "media": 1, "baja": 2}
+    alertas.sort(key=lambda a: orden[a[0]])
+    return {"discos": discos, "antivirus": antivirus, "av_estado": av_estado, "alertas": alertas}
+
+
+def listar(cfg, cli: dict, salud: bool = False) -> dict:
     """{'equipos': [...], 'proxy': {...}|None, 'notas': [...]} con los equipos ordenados por nombre.
 
-    Cada equipo: nombre, en_glpi, en_mesh, en_linea, zbx ('1' disponible · '2' con problemas · '0' sin datos · None)."""
+    Cada equipo: nombre, en_glpi, en_mesh, en_linea, zbx ('1' disponible · '2' con problemas · '0' sin datos · None).
+    Con `salud=True` suma además ci_id, nodeid, url_remoto, discos, antivirus, av_estado y alertas."""
     por_nombre: dict[str, dict] = {}
     notas: list[str] = []
     proxy = None
@@ -23,12 +62,17 @@ def listar(cfg, cli: dict) -> dict:
         n = (nombre or "").strip().upper()
         return por_nombre.setdefault(n, {"nombre": n, "en_glpi": False, "en_mesh": False, "en_linea": False, "zbx": None})
 
+    estado_ci: dict[str, dict] = {}
     if cli.get("glpi_entity_id"):
         try:
             with glpi_mod.cliente(cfg) as g:
-                for ci in g.listar_cis(cli["glpi_entity_id"]):
+                cis = g.listar_cis(cli["glpi_entity_id"])
+                for ci in cis:
                     if ci.get("name"):
-                        equipo(ci["name"])["en_glpi"] = True
+                        x = equipo(ci["name"])
+                        x["en_glpi"], x["ci_id"] = True, str(ci.get("id"))
+                if salud:
+                    estado_ci = g.salud_cis([str(ci.get("id")) for ci in cis])
         except Exception:  # noqa: BLE001
             notas.append("inventario")
     if cfg.mesh_enabled and cli.get("mesh_id"):
@@ -38,6 +82,7 @@ def listar(cfg, cli: dict) -> dict:
                     if e["nombre"]:
                         x = equipo(e["nombre"])
                         x["en_mesh"], x["en_linea"] = True, bool(e["conectado"])
+                        x["nodeid"] = e.get("nodeid") or ""
         except Exception:  # noqa: BLE001
             notas.append("conexión")
     if cli.get("zbx_hostgroup_id"):
@@ -48,4 +93,9 @@ def listar(cfg, cli: dict) -> dict:
                     equipo(h.get("host") or h.get("name") or "")["zbx"] = str(h.get("available") or "0")
         except Exception:  # noqa: BLE001
             notas.append("monitoreo")
+    if salud:
+        for x in por_nombre.values():
+            x.update(evaluar(estado_ci.get(x.get("ci_id") or ""), cfg.alerta_disco_pct,
+                             x["en_linea"] if x["en_mesh"] else None))
+            x["url_remoto"] = mesh_mod.url_remoto(cfg, x["nodeid"]) if x.get("nodeid") and cfg.mesh_url else ""
     return {"equipos": sorted(por_nombre.values(), key=lambda e: e["nombre"]), "proxy": proxy, "notas": notas}

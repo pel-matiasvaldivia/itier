@@ -78,6 +78,17 @@ _DEMO_CIS = [
 ]
 
 
+# Salud inventariada por id de Computer (demo): discos en MB y antivirus.
+_DEMO_SALUD = {
+    "501": {"discos": [{"nombre": "C:", "total_mb": 500000, "libre_mb": 30000},
+                       {"nombre": "D:", "total_mb": 1000000, "libre_mb": 600000}],
+            "antivirus": [{"nombre": "Windows Defender", "activo": True, "actualizado": True}]},
+    "502": {"discos": [{"nombre": "C:", "total_mb": 250000, "libre_mb": 20000}],
+            "antivirus": [{"nombre": "Windows Defender", "activo": False, "actualizado": False}]},
+    "503": {"discos": [{"nombre": "C:", "total_mb": 250000, "libre_mb": 120000}], "antivirus": []},
+}
+
+
 class GLPIClient:
     def __init__(self, cfg):
         self.cfg = cfg
@@ -300,6 +311,55 @@ class GLPIClient:
         return [{"itemtype": "Computer", "id": str(c.get("id")), "name": c.get("name"),
                  "criticidad": nombres.get(str(c.get("businesscriticities_id")), "")}
                 for c in comps]
+
+    def salud_cis(self, ids: list[str]) -> dict[str, dict]:
+        """Discos y antivirus que el GLPI Agent inventarió, por id de Computer.
+
+        Dos consultas en bloque (no una por equipo): /Item_Disk y /ItemAntivirus (en GLPI < 10.0.x
+        el antivirus era /ComputerAntivirus, con `computers_id`). tamaños de disco en MB.
+        ⚠ Es lo del último inventario del agente (suele ser diario), no tiempo real."""
+        quiere = {str(i) for i in ids}
+        salida: dict[str, dict] = {i: {"discos": [], "antivirus": [], "inventariado": False} for i in quiere}
+        if self.demo:
+            for i in quiere:
+                d = _DEMO_SALUD.get(i)
+                if d:
+                    salida[i] = {**d, "inventariado": True}
+            return salida
+        if not quiere:
+            return salida
+
+        def listar(clase: str) -> list[dict]:
+            try:
+                r = self._get(f"/{clase}", params={"range": "0-4999"})
+            except AdapterError as e:
+                if "RANGE_EXCEED_TOTAL" in str(e):
+                    return []
+                raise
+            return [x for x in r if isinstance(x, dict)] if isinstance(r, list) else []
+
+        for d in listar("Item_Disk"):
+            i = str(d.get("items_id"))
+            if i in quiere and (d.get("itemtype") or "Computer") == "Computer":
+                salida[i]["inventariado"] = True
+                salida[i]["discos"].append({
+                    "nombre": d.get("mountpoint") or d.get("name") or d.get("device") or "?",
+                    "total_mb": int(d.get("totalsize") or 0), "libre_mb": int(d.get("freesize") or 0)})
+        av: list[dict] = []
+        for clase in ("ItemAntivirus", "ComputerAntivirus"):
+            try:
+                av = listar(clase)
+                break
+            except AdapterError:
+                continue
+        for a in av:
+            i = str(a.get("items_id") if a.get("items_id") is not None else a.get("computers_id"))
+            if i in quiere:
+                salida[i]["inventariado"] = True
+                salida[i]["antivirus"].append({
+                    "nombre": a.get("name") or "Antivirus", "activo": bool(int(a.get("is_active") or 0)),
+                    "actualizado": bool(int(a.get("is_uptodate") or 0))})
+        return salida
 
     def _criticidad_id(self, nombre: str) -> int:
         """Id del valor de business criticity en GLPI (lo crea si no existe)."""

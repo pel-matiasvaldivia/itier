@@ -92,6 +92,7 @@ class Config:
     mesh_url: str | None = None          # https://itier-mesh.<dominio> (MeshCentral, soporte remoto)
     mesh_user: str | None = None
     mesh_password: str | None = None
+    alerta_disco_pct: int = 90             # alerta cuando un disco supera este % de uso
     mesh_support_group: str = "SOPORTE"    # grupo de usuarios de Mesh (técnicos) con acceso a todos los clientes
 
     @classmethod
@@ -162,6 +163,7 @@ class Config:
             mesh_url=(os.environ.get("ITIER_MESH_URL") or "").rstrip("/") or ("https://itier-mesh.demo.example" if demo else None),
             mesh_user=os.environ.get("ITIER_MESH_USER") or None,
             mesh_password=os.environ.get("ITIER_MESH_PASSWORD") or None,
+            alerta_disco_pct=int(os.environ.get("ITIER_ALERTA_DISCO_PCT", "90")),
             mesh_support_group=(os.environ.get("ITIER_MESH_SUPPORT_GROUP", "SOPORTE") or "").strip(),
             cloudflared_win_url=os.environ.get("ITIER_CLOUDFLARED_WIN_URL") or (
                 "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-windows-amd64.exe"),

@@ -287,6 +287,19 @@ Por eso los técnicos se manejan con un **grupo de usuarios** (`SOPORTE`):
    Desde ese momento ve los equipos de todos los clientes, presentes y futuros. Para quitarle el acceso, sacalo del grupo.
 4. Para los clientes que ya existían: «Reintentar aprovisionamiento» en su ficha vuelve a compartirlos con `SOPORTE`.
 
+### Panel de equipos, alertas y conexión remota embebida
+
+La consola tiene **Equipos** (menú): todos los equipos de todos los clientes con su conexión, **discos** (alerta desde
+`ITIER_ALERTA_DISCO_PCT`, 90 % por defecto, por cada unidad), **antivirus ON/OFF/ninguno** y un botón **Conectar** que abre
+el control remoto de MeshCentral dentro del panel (iframe).
+
+- Discos y antivirus salen del **último inventario del GLPI Agent** (normalmente diario), no son en tiempo real; la
+  conexión sale de Mesh en vivo. Hace falta que GLPI tenga los datos (`Item_Disk` e `ItemAntivirus` en la API REST).
+- Para embeber, Mesh necesita permiso de la consola: el entrypoint lo escribe en `allowedFramingOrigins` desde
+  `MESH_FRAME_ORIGINS` (por defecto `ITIER_CONSOLE_PUBLIC_URL`). Después del primer despliegue: `docker compose up -d meshcentral`.
+- La primera vez cada técnico inicia sesión en Mesh dentro del recuadro; como consola y Mesh comparten dominio
+  (`*.pymesenlinea.com.ar`) la sesión queda guardada. Cada técnico ve solo lo que el grupo `SOPORTE` le asigna.
+
 > El instalador baja el agente de `/meshagents?id=4&meshid=…&installflags=2` sin login (mientras no actives
 > `lockAgentDownload` en MeshCentral). El enlace lleva el id del grupo del cliente, que no es un secreto fuerte: solo
 > permite instalar un agente en ese grupo. Para revocarlo, borrá el grupo.

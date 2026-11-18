@@ -260,6 +260,46 @@ check("instaladores: muestra el equipo en línea en Mesh", "en línea" in pagM a
 check("instaladores: Zabbix queda en «Avanzado»", "<details" in pagM and "Avanzado" in pagM)
 check("el cliente quedó con su grupo de Mesh", "Grupo del cliente: creado" in pagM)
 
+# Panel de equipos del técnico: alertas de disco/antivirus y conexión remota embebida
+from itier_console.services import equipos as _eq_svc  # noqa: E402
+
+_ev = _eq_svc.evaluar({"inventariado": True,
+                       "discos": [{"nombre": "C:", "total_mb": 100000, "libre_mb": 6000},
+                                  {"nombre": "D:", "total_mb": 100000, "libre_mb": 50000}],
+                       "antivirus": [{"nombre": "Defender", "activo": False, "actualizado": False}]}, 90, True)
+check("alertas: disco C: al 94 % (media) y D: sin alerta",
+      [d["pct"] for d in _ev["discos"]] == [94, 50] and ("media", "Disco C: al 94 % (5.9 GB libres)") in _ev["alertas"], _ev)
+check("alertas: antivirus apagado = alta y ordenada primero", _ev["av_estado"] == "off" and _ev["alertas"][0][0] == "alta")
+check("alertas: disco >= 95 % es alta", _eq_svc.evaluar({"inventariado": True, "discos": [{"nombre": "C:", "total_mb": 100, "libre_mb": 4}], "antivirus": [{"nombre": "A", "activo": True, "actualizado": True}]}, 90)["alertas"][0][0] == "alta")
+check("alertas: sin antivirus detectado", _eq_svc.evaluar({"inventariado": True, "discos": [], "antivirus": []}, 90)["av_estado"] == "ninguno")
+check("alertas: sin inventario no inventa alertas de antivirus", _eq_svc.evaluar(None, 90)["alertas"] == [])
+check("alertas: sin conexión es baja", _eq_svc.evaluar(None, 90, False)["alertas"] == [("baja", "Sin conexión ahora")])
+
+_orig_listar = _eq_svc.listar
+_eq_svc.listar = lambda cfg, cli, salud=False: {"proxy": None, "notas": [], "equipos": [
+    {"nombre": "PC-VENTAS-01", "en_glpi": True, "en_mesh": True, "en_linea": True, "zbx": None, "nodeid": "NODO-DEMO@abc$123",
+     "url_remoto": "x", "discos": _ev["discos"], "antivirus": _ev["antivirus"], "av_estado": "off", "alertas": _ev["alertas"]},
+    {"nombre": "PC-OK", "en_glpi": True, "en_mesh": True, "en_linea": True, "zbx": None, "nodeid": "NODO-OK@abc$123",
+     "url_remoto": "x", "discos": [], "antivirus": [], "av_estado": "on", "alertas": []}]}
+import itier_console.routes.equipos as _r_eq  # noqa: E402
+_r_eq._CACHE.clear()
+pe = c.get("/equipos")
+check("equipos: el técnico ve la lista con discos, antivirus OFF y alertas",
+      pe.status_code == 200 and "PC-VENTAS-01" in pe.text and "Antivirus APAGADO" in pe.text and "<strong>OFF</strong>" in pe.text
+      and "Disco C: al 94 %" in pe.text, pe.text[-300:])
+check("equipos: botón Conectar lleva al control remoto embebido", "/remoto?n=PC-VENTAS-01" in pe.text and "Conectar" in pe.text)
+check("equipos: filtro «solo con alertas» oculta los equipos sanos",
+      "PC-OK" not in c.get("/equipos?alertas=1").text and "PC-VENTAS-01" in c.get("/equipos?alertas=1").text)
+rr = c.get("/equipos/prueba-srl/NODO-DEMO%40abc%24123/remoto?n=PC-VENTAS-01")
+check("remoto: embebe MeshCentral en un iframe dentro del panel",
+      rr.status_code == 200 and "<iframe" in rr.text and "gotonode=NODO-DEMO@abc$123" in rr.text.replace("&amp;", "&")
+      and "viewmode=11" in rr.text, rr.text[-300:])
+check("remoto: nodo con caracteres raros se rechaza", "<iframe" not in c.get("/equipos/prueba-srl/a%22%3E%3Cscript/remoto").text)
+check("remoto: exige sesión de operador", pub.get("/equipos", follow_redirects=False).status_code == 303
+      and pub.get("/equipos/prueba-srl/NODO-DEMO%40abc/remoto", follow_redirects=False).status_code == 303)
+check("auditoría registra la conexión remota", "equipo.remoto.abierto" in c.get("/auditoria").text)
+_eq_svc.listar = _orig_listar
+
 check("descargas exigen sesión", pub.get(INST + "/appliance.sh", follow_redirects=False).status_code == 303)
 aud = c.get("/auditoria").text
 check("auditoría registra el enrolamiento", "enrolamiento.instalador.descargado" in aud and "enrolamiento.appliance.reporte" in aud)
@@ -356,6 +396,7 @@ check("cliente: ve sus equipos (GLPI + Mesh, ya no solo Zabbix)", rq.status_code
 check("cliente: no ve equipos de otras entidades de GLPI", "SRV-FILE01" not in rq.text and "PC-RECEPCION" not in rq.text and "SRV-APP" not in rq.text)
 check("cliente: el inicio cuenta los equipos en línea", "Equipos en línea" in pc.get("/portal").text)
 check("cliente: /clientes (operador) lo manda al portal", pc.get("/clientes").url.path == "/portal")
+check("cliente: /equipos del operador lo manda al portal", pc.get("/equipos").url.path == "/portal")
 
 # El cliente abre un ticket desde el portal (entidad forzada a la suya).
 html = pc.get("/portal/tickets/nuevo").text

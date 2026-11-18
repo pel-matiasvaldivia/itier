@@ -31,7 +31,7 @@ _ESPERA_S = 15.0
 DERECHOS_SOPORTE = 4 | 8 | 16 | 32 | 64 | 128
 
 # Demo: un equipo ya conectado en cualquier grupo.
-_DEMO_EQUIPOS = [{"nombre": "PC-VENTAS-01", "conectado": True}]
+_DEMO_EQUIPOS = [{"nombre": "PC-VENTAS-01", "conectado": True, "nodeid": "DEMONODO01@x"}]
 
 
 def id_corto(meshid: str) -> str:
@@ -154,7 +154,7 @@ class MeshClient:
                     ok=lambda m: m.get("failed", 0) == 0 and m.get("success", 0) >= 1)
 
     def equipos(self, mesh_id: str) -> list[dict]:
-        """Equipos del grupo: [{nombre, conectado}]."""
+        """Equipos del grupo: [{nombre, conectado, nodeid}] (nodeid corto, para el enlace remoto)."""
         if self._cfg.demo:
             return list(_DEMO_EQUIPOS)
         r = self._pedir({"action": "nodes"}, "nodes")
@@ -163,7 +163,8 @@ class MeshClient:
             if id_corto(clave) != mesh_id:
                 continue
             for n in nodos:
-                salida.append({"nombre": str(n.get("name", "")).upper(), "conectado": bool(int(n.get("conn", 0)) & 1)})
+                salida.append({"nombre": str(n.get("name", "")).upper(), "conectado": bool(int(n.get("conn", 0)) & 1),
+                               "nodeid": id_corto(n.get("_id", ""))})
         return salida
 
 
@@ -174,3 +175,16 @@ def cliente(cfg) -> MeshClient:
 def url_agente_windows(cfg, mesh_id: str) -> str:
     """Enlace de descarga del agente Windows x64 (instalación en segundo plano)."""
     return f"{cfg.mesh_url}/meshagents?id=4&meshid={quote(mesh_id, safe='@$')}&installflags=2"
+
+
+_RE_NODO = r"^[A-Za-z0-9@$_+\-]{8,120}$"
+
+
+def nodo_valido(nodeid: str) -> bool:
+    import re
+    return bool(re.match(_RE_NODO, nodeid or ""))
+
+
+def url_remoto(cfg, nodeid: str) -> str:
+    """Enlace a la vista de escritorio remoto del equipo (viewmode=11) en MeshCentral."""
+    return f"{cfg.mesh_url}/?viewmode=11&gotonode={quote(nodeid, safe='@$')}"

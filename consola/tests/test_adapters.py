@@ -90,6 +90,14 @@ def handler(request: httpx.Request) -> httpx.Response:
         if request.method == "POST":
             return httpx.Response(201, json={"id": 90})
         return httpx.Response(200, json=[{"id": "5", "name": "Crítica"}, {"id": "6", "name": "Alta"}])
+    if p.endswith("/Item_Disk") and request.method == "GET":
+        return httpx.Response(200, json=[
+            {"id": 1, "items_id": 501, "itemtype": "Computer", "mountpoint": "C:", "totalsize": 100000, "freesize": 8000},
+            {"id": 2, "items_id": 501, "itemtype": "Computer", "mountpoint": "D:", "totalsize": 500000, "freesize": 400000},
+            {"id": 3, "items_id": 999, "itemtype": "Computer", "mountpoint": "C:", "totalsize": 1, "freesize": 1}])
+    if p.endswith("/ItemAntivirus") and request.method == "GET":
+        return httpx.Response(200, json=[
+            {"id": 1, "items_id": 501, "itemtype": "Computer", "name": "Defender", "is_active": 0, "is_uptodate": 1}])
     if "/Computer/" in p and request.method == "PUT":
         return httpx.Response(200, json={"id": 501})
     if p.endswith("/Computer") and request.method == "GET":
@@ -203,6 +211,12 @@ with glpi_mod.cliente(cfg) as g:
     check("glpi.listar_cis resuelve el nombre de criticidad actual", cis[0]["criticidad"] == "Crítica", cis[0].get("criticidad"))
     r = g.fijar_criticidad("Computer", "501", "critica")
     check("glpi.fijar_criticidad devuelve el nombre GLPI", r.get("criticidad") == "Crítica", str(r))
+with glpi_mod.cliente(cfg) as g:
+    sal = g.salud_cis(["501", "601"])
+check("glpi.salud_cis: discos de ese equipo (y no los de otros) en MB", [d["nombre"] for d in sal["501"]["discos"]] == ["C:", "D:"]
+      and sal["501"]["discos"][0]["libre_mb"] == 8000, str(sal))
+check("glpi.salud_cis: antivirus apagado detectado", sal["501"]["antivirus"] == [{"nombre": "Defender", "activo": False, "actualizado": True}], str(sal))
+check("glpi.salud_cis: equipo sin inventario queda marcado", sal["601"]["inventariado"] is False and sal["501"]["inventariado"] is True)
 put = next((x for x in captured if x["path"].endswith("/Computer/501") and x["method"] == "PUT"), None)
 check("glpi.fijar_criticidad hace PUT con businesscriticities_id",
       put and "businesscriticities_id" in put["body"]["input"], str(put["body"]) if put else "—")
@@ -294,7 +308,7 @@ def _mesh_servidor(ws):
         elif m["action"] == "nodes":
             ws.send(json.dumps({"action": "userinfo"}))  # ruido que debe ignorarse
             ws.send(json.dumps({"action": "nodes", "responseid": m["responseid"], "nodes": {
-                "mesh//NUEVO@$id": [{"name": "pc-1", "conn": 1}, {"name": "pc-2", "conn": 0}]}}))
+                "mesh//NUEVO@$id": [{"_id": "node//NODO1@x", "name": "pc-1", "conn": 1}, {"_id": "node//NODO2@x", "name": "pc-2", "conn": 0}]}}))
 
 
 _srv = serve(_mesh_servidor, "127.0.0.1", 0)
@@ -309,7 +323,11 @@ check("mesh: autentica con x-meshauth (usuario,clave en base64)",
       _mesh_visto["auth"] == base64.b64encode(b"itier").decode() + "," + base64.b64encode(b"clave").decode())
 check("mesh: crea el grupo si no existe y devuelve el id corto", mid == "NUEVO@$id" and "createmesh" in _mesh_visto["acciones"])
 check("mesh: lista equipos con su estado (ignora mensajes ajenos)",
-      eq == [{"nombre": "PC-1", "conectado": True}, {"nombre": "PC-2", "conectado": False}], eq)
+      eq == [{"nombre": "PC-1", "conectado": True, "nodeid": "NODO1@x"},
+             {"nombre": "PC-2", "conectado": False, "nodeid": "NODO2@x"}], eq)
+check("mesh: enlace remoto (viewmode 11, gotonode con id corto)",
+      mesh_mod.url_remoto(cfg_mesh, "NODO1@xxxxx").endswith("/?viewmode=11&gotonode=NODO1@xxxxx") and mesh_mod.nodo_valido("NODO1@xxxxx")
+      and not mesh_mod.nodo_valido('a"><script>'))
 with mesh_mod.cliente(cfg_mesh) as mc2:
     antes = _mesh_visto["acciones"].count("createmesh")
     check("mesh: si el grupo existe no lo crea de nuevo", mc2.asegurar_grupo("itier-x") == "NUEVO@$id"

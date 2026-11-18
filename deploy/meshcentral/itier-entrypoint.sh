@@ -22,6 +22,20 @@ if ! [[ "$TLS" =~ ^[0-9A-Fa-f.:/,]+$ ]]; then
 fi
 TLS_JSON="[\"${TLS//,/\",\"}\"]"
 
+# Orígenes que pueden EMBEBER MeshCentral en un iframe (la consola de iTier): lista separada por
+# comas o espacios, solo https://host[:puerto]. Vacío = no se permite embeber (X-Frame-Options).
+FRAME_JSON=""
+FRAME_RAW="${MESH_FRAME_ORIGINS:-}"
+for o in ${FRAME_RAW//,/ }; do
+  if ! [[ "$o" =~ ^https://[A-Za-z0-9.-]+(:[0-9]+)?$ ]]; then
+    echo "[iTier] ERROR: MESH_FRAME_ORIGINS inválido ('$o')" >&2
+    exit 1
+  fi
+  FRAME_JSON+="${FRAME_JSON:+, }\"$o\""
+done
+FRAME_LINE=""
+[ -n "$FRAME_JSON" ] && FRAME_LINE="\"allowedFramingOrigins\": [$FRAME_JSON],"
+
 mkdir -p "$(dirname "$CONFIG_FILE")"
 cat > "$CONFIG_FILE" <<JSON
 {
@@ -37,6 +51,7 @@ cat > "$CONFIG_FILE" <<JSON
     "SelfUpdate": false,
     "AllowFraming": false,
     "WebRTC": false,
+    $FRAME_LINE
     "plugins": { "enabled": false }
   },
   "domains": {
@@ -49,7 +64,7 @@ cat > "$CONFIG_FILE" <<JSON
   }
 }
 JSON
-echo "[iTier] config escrita: host=$HOST puerto=4430 (público 443, TLS lo termina Cloudflare) cuentasNuevas=$NUEVAS"
+echo "[iTier] config escrita: host=$HOST puerto=4430 (público 443, TLS lo termina Cloudflare) cuentasNuevas=$NUEVAS embeber=${FRAME_JSON:-no}"
 
 export DYNAMIC_CONFIG=false   # el entrypoint oficial deja esta config tal cual
 exec /bin/bash /opt/meshcentral/entrypoint.sh "$@"
