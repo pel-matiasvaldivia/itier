@@ -237,6 +237,11 @@ def nodo_valido(nodeid: str) -> bool:
     return bool(re.match(_RE_NODO, nodeid or ""))
 
 
+# Bits del parámetro `hide` de MeshCentral: 1 barra superior (logo) · 2 pestañas · 4 pie · 8 títulos de pestaña ·
+# 16 menú lateral · 32 botón «volver». Con todos ocultos queda solo la pantalla remota y sus controles.
+HIDE_SOLO_PANTALLA = 1 | 2 | 4 | 8 | 16 | 32
+
+
 def url_remoto(cfg, nodeid: str) -> str:
-    """Enlace a la vista de escritorio remoto del equipo (viewmode=11) en MeshCentral."""
-    return f"{cfg.mesh_url}/?viewmode=11&gotonode={quote(nodeid, safe='@$')}"
+    """Enlace al escritorio remoto del equipo (viewmode=11) en MeshCentral, sin su marco: solo la pantalla remota."""
+    return f"{cfg.mesh_url}/?viewmode=11&gotonode={quote(nodeid, safe='@$')}&hide={HIDE_SOLO_PANTALLA}"

@@ -1,31 +1,39 @@
 {% extends "base.html" %}
 {% block titulo %}Ticket #{{ t.id }} · Consola de iTier{% endblock %}
 {% block contenido %}
-  <div class="page-head">
-    <h1>Ticket #{{ t.id }}</h1>
-    <a class="btn" href="/tickets">← Volver</a>
+  {% set s = t.status|int %}{% set p = t.priority|int %}
+  <div class="l-head">
+    <div>
+      <p class="u-sub" style="margin:0 0 .2rem"><a href="/tickets">← Tickets</a> · <span class="l-id">#{{ t.id }}</span></p>
+      <h1>{{ t.name }}</h1>
+    </div>
+    <div class="acciones"><a class="u-b" href="/tickets" style="text-decoration:none">← Volver</a></div>
   </div>
 
-  <div class="card">
-    <h2>{{ t.name }}</h2>
-    <p>
-      <span class="badge">{{ t.estado_label }}</span>
-      <span class="badge">Prioridad: {{ t.prioridad_label }}</span>
-      <span class="badge">Técnico: {{ t.tecnico or 'sin asignar' }}</span>
-      {% if t.date %}<span class="muted">· {{ t.date }}</span>{% endif %}
-    </p>
-    {% if t.content %}<div class="ticket-body">{{ t.content }}</div>{% endif %}
-  </div>
+  <div class="d-cols">
+    <section class="u-card">
+      <h2>📝 Descripción</h2>
+      <div class="d-meta">
+        <span class="l-pill {{ 'info' if s == 1 else ('warn' if s in (2, 3) else ('off' if s == 4 else ('ok' if s == 5 else 'dark'))) }}"><i></i>{{ t.estado_label }}</span>
+        <span class="l-pill {{ 'bad' if p >= 5 else ('warn' if p == 4 else ('info' if p == 3 else 'off')) }}">Prioridad: {{ t.prioridad_label }}</span>
+        <span class="l-pill off">👤 Técnico: {{ t.tecnico or 'sin asignar' }}</span>
+        {% if cliente %}<span class="l-pill off">🏢 {{ cliente.nombre }}</span>{% endif %}
+        {% if t.date %}<span class="l-pill off">🕒 {{ t.date }}</span>{% endif %}
+      </div>
+      {% if t.content %}<div class="d-body">{{ t.content }}</div>{% else %}<p class="muted">Sin descripción.</p>{% endif %}
+    </section>
 
-  <div class="card narrow">
-    <h2>Asignar</h2>
-    <form method="post" action="/tickets/{{ t.id }}/asignar" class="form row">
-      <input type="hidden" name="csrf" value="{{ csrf }}">
-      <label>ID de técnico (GLPI users_id)
-        <input type="number" name="users_id" min="1" required>
-      </label>
-      <button class="btn btn-primary" type="submit">Asignar</button>
-    </form>
-    <p class="muted small">En una próxima iteración se reemplaza el ID por un selector de técnicos leído de GLPI.</p>
+    <section class="u-card">
+      <h2>👤 Asignar</h2>
+      <p class="u-lead">Elegí quién toma el ticket.</p>
+      <form method="post" action="/tickets/{{ t.id }}/asignar" class="form">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <label>ID de técnico (GLPI users_id)
+          <input type="number" name="users_id" min="1" required>
+        </label>
+        <button class="u-btn" type="submit">Asignar</button>
+      </form>
+      <p class="muted small" style="margin-top:.8rem">El ID del técnico es el de su usuario en GLPI (visible en Administración → Usuarios).</p>
+    </section>
   </div>
 {% endblock %}

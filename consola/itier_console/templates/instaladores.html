@@ -1,22 +1,29 @@
 {% extends "base.html" %}
 {% block titulo %}Instaladores · {{ cli.nombre }} · Consola de iTier{% endblock %}
 {% block contenido %}
-  <div class="page-head">
-    <h1>Instaladores — {{ cli.nombre }}</h1>
-    <div class="acciones"><a class="btn" href="/clientes/{{ cli.slug }}">← Volver al cliente</a></div>
+  <div class="l-head">
+    <div>
+      <p class="u-sub" style="margin:0 0 .2rem"><a href="/clientes/{{ cli.slug }}">← {{ cli.nombre }}</a></p>
+      <h1>Instaladores — {{ cli.nombre }}</h1>
+      <p class="u-sub">Dejá los equipos del cliente conectados: un solo instalador para Windows con inventario y soporte remoto.</p>
+    </div>
+    <div class="acciones"><a class="u-b" href="/clientes/{{ cli.slug }}" style="text-decoration:none">← Volver al cliente</a></div>
   </div>
 
-  <div class="card">
-    <h2>Servidor GLPI que usan los agentes</h2>
+  <div class="d-grid" style="grid-template-columns:repeat(auto-fit,minmax(340px,1fr))">
+  <div class="d-int" style="gap:.5rem">
+    <div class="k">Servidor GLPI que usan los agentes</div>
     <p>{% if glpi_url %}<code>{{ glpi_url }}</code> <span class="muted small">(ITIER_PUBLIC_GLPI_URL; los instaladores apuntan acá, así que tiene que resolver desde internet)</span>
     {% else %}<span class="dot bad"></span>No está configurada <code>ITIER_PUBLIC_GLPI_URL</code>.{% endif %}</p>
   </div>
 
-  <div class="card">
-    <h2>Soporte remoto (MeshCentral)</h2>
+  <div class="d-int" style="gap:.5rem">
+    <div class="k">Soporte remoto (MeshCentral)</div>
     {% if mesh_ok %}<p><span class="dot ok"></span>Configurado: <code>{{ mesh_url }}</code>. Cada cliente tiene su grupo de equipos, compartido con el grupo de usuarios <code>{{ mesh_soporte or 'SOPORTE' }}</code> (los técnicos); desde ahí toman el control remoto.
       {% if mesh_grupo %}Grupo del cliente: creado.{% else %}<span class="dot warn"></span>Este cliente aún no tiene grupo.{% endif %}</p>
     {% else %}<p><span class="dot bad"></span>Sin configurar (<code>ITIER_MESH_URL</code>, <code>ITIER_MESH_USER</code>, <code>ITIER_MESH_PASSWORD</code>). Ver <code>deploy/vps/README.md</code>.</p>{% endif %}
+  </div>
+
   </div>
 
   <div class="card">
@@ -30,7 +37,7 @@
     {% elif not mesh_grupo %}<div class="note note-bad small">Este cliente todavía no tiene su grupo en MeshCentral:
       usá «Reintentar aprovisionamiento» en la ficha del cliente.</div>{% endif %}
 
-    <h3>Enviar al cliente</h3>
+    <h3><span class="d-step">1</span>Enviar al cliente</h3>
     <p class="muted small">Se manda un <strong>enlace</strong> (los correos bloquean ejecutables adjuntos). El cliente
       descarga un instalador de doble clic: acepta el aviso de Windows una vez y el resto es automático.</p>
     {% if enlace_equipos %}
@@ -49,7 +56,7 @@
       <button class="btn btn-primary" type="submit">{% if smtp %}Generar y enviar{% else %}Generar enlace{% endif %}</button>
     </form>
 
-    <h3>Descargar</h3>
+    <h3><span class="d-step">2</span>Descargar</h3>
     <div class="acciones">
       <a class="btn" href="/clientes/{{ cli.slug }}/instaladores/windows.cmd">Instalador de doble clic (.cmd)</a>
       <a class="btn" href="/clientes/{{ cli.slug }}/instaladores/windows.ps1">Script para GPO / RMM (.ps1)</a>
@@ -59,7 +66,7 @@
       SYSTEM, sin UAC). El <code>.cmd</code> es para que lo ejecute una persona: pide permisos de administrador una vez.
       {% if cli.enrolado_ip %}Además se instala Zabbix Agent apuntando a <code>{{ cli.enrolado_ip }}</code> (monitoreo avanzado).{% endif %}
     </p>
-    <h3>Equipos instalados</h3>
+    <h3><span class="d-step">3</span>Equipos instalados</h3>
     {% if equipos %}
     <table class="tabla">
       <thead><tr><th>Equipo</th><th>Instalación</th><th>Inventario (GLPI)</th><th>Soporte remoto (Mesh)</th>{% if hay_zbx %}<th>Monitoreo (Zabbix)</th>{% endif %}<th>Último reporte</th></tr></thead>

@@ -85,14 +85,16 @@ def nuevo_post(
 
 
 @router.get("/tickets/{ticket_id}", response_class=HTMLResponse)
-def detalle(request: Request, ticket_id: int, user: dict = Depends(require_permiso("tickets"))):
+def detalle(request: Request, ticket_id: int, user: dict = Depends(require_permiso("tickets")),
+            conn: sqlite3.Connection = Depends(get_db)):
     cfg = request.app.state.cfg
     try:
         t = svc.ver(cfg, ticket_id)
     except AdapterError as e:
         flash(request, f"No se pudo leer el ticket: {e.detalle}", "error")
         return RedirectResponse("/tickets", status_code=303)
-    return render(request, "tickets_detalle.html", t=t)
+    cliente = next((c for c in _clientes_con_entidad(conn) if str(c["glpi_entity_id"]) == str(t.get("entities_id"))), None)
+    return render(request, "tickets_detalle.html", t=t, cliente=cliente)
 
 
 @router.post("/tickets/{ticket_id}/asignar")

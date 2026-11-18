@@ -1,26 +1,25 @@
 {% extends "base.html" %}
 {% block titulo %}{{ cli.nombre }} · Consola de iTier{% endblock %}
 {% block contenido %}
-  <div class="page-head">
-    <h1>{{ cli.nombre }}</h1>
-    <div class="acciones">
-      <a class="btn btn-primary" href="/clientes/{{ cli.slug }}/instaladores">Instaladores →</a>
-      <a class="btn" href="/clientes/{{ cli.slug }}/criticidad">Criticidad (CMDB) →</a>
-      <a class="btn" href="/clientes/{{ cli.slug }}/descubrimiento">Descubrimiento de red →</a>
-      <a class="btn" href="/clientes/{{ cli.slug }}/agentes">Agentes de Zabbix →</a>
+  <div class="d-hero">
+    <span class="l-logo">{{ (cli.nombre.split()[0][:1] ~ (cli.nombre.split()[1][:1] if cli.nombre.split()|length > 1 else cli.nombre[1:2]))|upper }}</span>
+    <div>
+      <h1>{{ cli.nombre }}</h1>
+      <small>{{ cli.slug }}</small>
     </div>
+    {% if cli.estado == 'activo' %}<span class="l-pill ok"><i></i>Activo</span>
+    {% elif cli.estado == 'error' %}<span class="l-pill bad"><i></i>Con error</span>
+    {% else %}<span class="l-pill warn"><i></i>{{ cli.estado|capitalize }}</span>{% endif %}
+    <div class="acciones"><a class="u-b" href="/clientes" style="text-decoration:none">← Clientes</a></div>
   </div>
 
-  <div class="card">
-    <table class="kv">
-      <tr><th>Tenant</th><td><code>{{ cli.slug }}</code></td></tr>
-      <tr><th>Estado</th><td><span class="badge badge-{{ cli.estado }}">{{ cli.estado }}</span></td></tr>
-      <tr><th>Entidad GLPI</th><td>{{ cli.glpi_entity_id or '—' }}</td></tr>
-      <tr><th>Grupo Zabbix</th><td>{{ cli.zbx_hostgroup_id or '—' }}</td></tr>
-      <tr><th>Proxy Zabbix</th><td><code>{{ cli.zbx_proxy_name }}</code> (id {{ cli.zbx_proxy_id or '—' }})</td></tr>
-      <tr><th>Alta</th><td>{{ cli.created_at }} · por {{ cli.created_by }}</td></tr>
-      {% if cli.notas %}<tr><th>Notas</th><td>{{ cli.notas }}</td></tr>{% endif %}
-    </table>
+  <div class="d-tabs">
+    {% if puede('equipos') %}<a class="pri" href="/equipos?cliente={{ cli.slug }}">🖥 Equipos y alertas</a>{% endif %}
+    {% if puede('instaladores') %}<a href="/clientes/{{ cli.slug }}/instaladores">📦 Instaladores</a>{% endif %}
+    {% if puede('curacion') %}<a href="/clientes/{{ cli.slug }}/criticidad">🎯 Criticidad (CMDB)</a>{% endif %}
+    {% if puede('descubrimiento') %}<a href="/clientes/{{ cli.slug }}/descubrimiento">📡 Descubrimiento de red</a>{% endif %}
+    {% if puede('agentes') %}<a href="/clientes/{{ cli.slug }}/agentes">📈 Agentes de Zabbix</a>{% endif %}
+    {% if puede('tickets') %}<a href="/tickets?cliente={{ cli.slug }}">🎫 Tickets</a>{% endif %}
   </div>
 
   {% if cli.estado != 'activo' %}
@@ -30,97 +29,124 @@
   </div>
   {% endif %}
 
-  <div class="card">
-    <h2>Acciones</h2>
-    <div class="acciones">
-      <form method="post" action="/clientes/{{ cli.slug }}/reintentar" class="inline">
-        <input type="hidden" name="csrf" value="{{ csrf }}">
-        <button class="btn btn-primary" type="submit">Reintentar aprovisionamiento</button>
-      </form>
-      <form method="post" action="/clientes/{{ cli.slug }}/eliminar" class="inline"
-            onsubmit="return confirm('¿Eliminar el registro local de {{ cli.nombre }}? No borra la entidad/grupo/proxy en GLPI/Zabbix.');">
-        <input type="hidden" name="csrf" value="{{ csrf }}">
-        <button class="btn" type="submit">Eliminar registro</button>
-      </form>
-    </div>
-    <p class="muted small">«Reintentar» crea solo lo que falte (reusa la PSK). «Eliminar» quita
-      únicamente el registro de la consola; lo que haya quedado en GLPI/Zabbix se borra allí.</p>
+  <div class="d-grid">
+    <div class="d-int"><div class="k">GLPI <span class="l-pill {{ 'ok' if cli.glpi_entity_id else 'off' }}"><i></i>{{ 'Entidad' if cli.glpi_entity_id else 'Falta' }}</span></div>
+      <b>{{ ('#' ~ cli.glpi_entity_id) if cli.glpi_entity_id else '—' }}</b><small>Tickets e inventario</small></div>
+    <div class="d-int"><div class="k">Zabbix <span class="l-pill {{ 'ok' if cli.zbx_hostgroup_id else 'off' }}"><i></i>{{ 'Grupo' if cli.zbx_hostgroup_id else 'Falta' }}</span></div>
+      <b>{{ ('#' ~ cli.zbx_hostgroup_id) if cli.zbx_hostgroup_id else '—' }}</b><small>Proxy <code>{{ cli.zbx_proxy_name or '—' }}</code> (id {{ cli.zbx_proxy_id or '—' }})</small></div>
+    <div class="d-int"><div class="k">MeshCentral <span class="l-pill {{ 'ok' if cli.mesh_id else 'off' }}"><i></i>{{ 'Grupo' if cli.mesh_id else 'Falta' }}</span></div>
+      <b>{{ 'Grupo creado' if cli.mesh_id else '—' }}</b><small>Soporte remoto de sus equipos</small></div>
+    <div class="d-int"><div class="k">Alta <span class="l-pill off">{{ cli.created_by }}</span></div>
+      <b style="font-size:.98rem">{{ cli.created_at }}</b>{% if cli.notas %}<small title="{{ cli.notas }}">{{ cli.notas }}</small>{% else %}<small>Sin notas</small>{% endif %}</div>
   </div>
 
-  <div class="card">
-    <h2>Usuarios del portal</h2>
-    <p class="muted">Accesos para que el cliente entre a <code>/portal</code> (ve solo su empresa: sus tickets y equipos).</p>
-    {% if usuarios %}
-    <table class="tabla">
-      <thead><tr><th>Usuario</th><th>2FA</th><th>Último ingreso</th><th></th></tr></thead>
-      <tbody>
-        {% for u in usuarios %}
-        <tr>
-          <td>{{ u.username }}</td>
-          <td>{% if u.totp_confirmed %}<span class="dot ok"></span>activo{% else %}<span class="dot warn"></span>pendiente{% endif %}</td>
-          <td class="muted">{{ u.last_login or '—' }}</td>
-          <td class="acciones">
-            <form method="post" action="/clientes/{{ cli.slug }}/portal-usuarios/{{ u.id }}/eliminar" class="inline"
-                  onsubmit="return confirm('¿Eliminar el acceso de {{ u.username }}?');">
-              <input type="hidden" name="csrf" value="{{ csrf }}">
-              <button class="btn btn-sm" type="submit">Eliminar</button>
-            </form>
-          </td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-    {% else %}
-    <p class="muted">Todavía no hay usuarios de portal para este cliente.</p>
-    {% endif %}
+  <div class="d-cols">
+    <div>
+      <section class="u-card">
+        <h2>👥 Usuarios del portal</h2>
+        <p class="u-lead">Accesos para que el cliente entre a <code>/portal</code> (ve solo su empresa: sus tickets y equipos).</p>
+        {% if usuarios %}
+        <table class="tabla">
+          <thead><tr><th>Usuario</th><th>2FA</th><th>Último ingreso</th><th></th></tr></thead>
+          <tbody>
+            {% for u in usuarios %}
+            <tr>
+              <td><strong>{{ u.username }}</strong></td>
+              <td>{% if u.totp_confirmed %}<span class="l-pill ok"><i></i>activo</span>{% else %}<span class="l-pill warn"><i></i>pendiente</span>{% endif %}</td>
+              <td class="muted">{{ u.last_login or '—' }}</td>
+              <td class="acciones">
+                {% if puede('clientes.editar') %}
+                <form method="post" action="/clientes/{{ cli.slug }}/portal-usuarios/{{ u.id }}/eliminar" class="inline"
+                      onsubmit="return confirm('¿Eliminar el acceso de {{ u.username }}?');">
+                  <input type="hidden" name="csrf" value="{{ csrf }}">
+                  <button class="u-b danger" type="submit">Eliminar</button>
+                </form>
+                {% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        {% else %}
+        <p class="muted">Todavía no hay usuarios de portal para este cliente.</p>
+        {% endif %}
 
-    <form method="post" action="/clientes/{{ cli.slug }}/portal-usuarios" class="form row" style="margin-top:1rem">
-      <input type="hidden" name="csrf" value="{{ csrf }}">
-      <label>Usuario
-        <input type="text" name="username" placeholder="contacto@cliente" required>
-      </label>
-      <label>Contraseña temporal <span class="muted small">(mín. 10)</span>
-        <input type="text" name="password" required>
-      </label>
-      <button class="btn btn-primary" type="submit">Crear acceso</button>
-    </form>
-    <p class="muted small">El cliente cambia la clave y enrola su 2FA en el primer ingreso.</p>
-  </div>
+        {% if puede('clientes.editar') %}
+        <form method="post" action="/clientes/{{ cli.slug }}/portal-usuarios" class="form row" style="margin-top:1.1rem">
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          <label>Usuario
+            <input type="text" name="username" placeholder="contacto@cliente" required>
+          </label>
+          <label>Contraseña temporal <span class="muted small">(mín. 10)</span>
+            <input type="text" name="password" required>
+          </label>
+          <button class="u-btn" type="submit">Crear acceso</button>
+        </form>
+        <p class="muted small">El cliente cambia la clave y enrola su 2FA en el primer ingreso.</p>
+        {% endif %}
+      </section>
 
-  <div class="card">
-    <h2>Despliegue en el cliente</h2>
-    <p>
-      {% if cli.enrolado_at and cli.enrolado_estado == 'ok' %}<span class="dot ok"></span>Appliance instalado
-        (<code>{{ cli.enrolado_host }}</code>, {{ cli.enrolado_ip or 'IP —' }}) · {{ cli.enrolado_at }}.
-      {% elif cli.enrolado_at %}<span class="dot warn"></span>La última instalación reportó un error ({{ cli.enrolado_at }}).
-      {% else %}<span class="dot warn"></span>Appliance todavía sin instalar.{% endif %}
-    </p>
-    <p class="muted">Los instaladores ya vienen con todos los valores de este cliente: un comando para el
-      appliance y un instalador para los equipos Windows.</p>
-    <div class="acciones"><a class="btn btn-primary" href="/clientes/{{ cli.slug }}/instaladores">Ir a instaladores →</a></div>
+      <section class="u-card">
+        <h2>🚀 Despliegue en el cliente</h2>
+        <p>
+          {% if cli.enrolado_at and cli.enrolado_estado == 'ok' %}<span class="l-pill ok"><i></i>Appliance instalado</span>
+            <code>{{ cli.enrolado_host }}</code>, {{ cli.enrolado_ip or 'IP —' }} · {{ cli.enrolado_at }}.
+          {% elif cli.enrolado_at %}<span class="l-pill warn"><i></i>Error en la última instalación</span> {{ cli.enrolado_at }}.
+          {% else %}<span class="l-pill off"><i></i>Appliance sin instalar</span>{% endif %}
+        </p>
+        <p class="muted">Los instaladores ya vienen con todos los valores de este cliente: un instalador para los equipos Windows (GLPI + soporte remoto)
+          y, si contrata monitoreo avanzado, un comando para el appliance.</p>
+        {% if puede('instaladores') %}<div class="acciones"><a class="u-btn" href="/clientes/{{ cli.slug }}/instaladores" style="text-decoration:none">Ir a instaladores →</a></div>
 
-    <details style="margin-top:1rem">
-      <summary class="muted small">Configuración manual (avanzado)</summary>
-    <p class="muted">Pegá esto en <code>deploy/cliente/.env</code> del appliance del cliente y levantá el stack. Los nombres calzan con <code>deploy/cliente/docker-compose.yml</code>.</p>
+        <details style="margin-top:1.1rem">
+          <summary class="muted small">Configuración manual del appliance (avanzado)</summary>
+        <p class="muted">Pegá esto en <code>deploy/cliente/.env</code> del appliance del cliente y levantá el stack. Los nombres calzan con <code>deploy/cliente/docker-compose.yml</code>.</p>
 
-    <div class="bundle-head">
-      <span class="bundle-t">.env</span>
-      <button class="btn btn-sm" type="button" data-copy="#bundle-env">Copiar</button>
+        <div class="bundle-head">
+          <span class="bundle-t">.env</span>
+          <button class="u-b" type="button" data-copy="#bundle-env">Copiar</button>
+        </div>
+        <pre class="codeblock" id="bundle-env">{{ bundle }}</pre>
+
+        <div class="bundle-head">
+          <span class="bundle-t">PSK — guardá su contenido en el archivo <code>proxy.psk</code> (ruta <code>ZBX_TLSPSKFILE</code>)</span>
+          <button class="u-b" type="button" data-copy="#bundle-psk">Copiar</button>
+        </div>
+        <pre class="codeblock" id="bundle-psk">{{ cli.psk_key }}</pre>
+
+        <div class="note small">
+          <strong>Secreto.</strong> La PSK da acceso de proxy al servidor Zabbix. Compartila por un canal seguro
+          y nunca la publiques. En el appliance:
+          <code>mkdir -p enc &amp;&amp; printf '%s' '&lt;PSK&gt;' &gt; enc/proxy.psk &amp;&amp; chmod 600 enc/proxy.psk</code>
+          y montá <code>enc/proxy.psk</code> en <code>/var/lib/zabbix/enc/proxy.psk</code>.
+        </div>
+        </details>
+        {% endif %}
+      </section>
     </div>
-    <pre class="codeblock" id="bundle-env">{{ bundle }}</pre>
 
-    <div class="bundle-head">
-      <span class="bundle-t">PSK — guardá su contenido en el archivo <code>proxy.psk</code> (ruta <code>ZBX_TLSPSKFILE</code>)</span>
-      <button class="btn btn-sm" type="button" data-copy="#bundle-psk">Copiar</button>
+    <div>
+      {% if puede('clientes.editar') %}
+      <section class="u-card">
+        <h2>⚙️ Acciones</h2>
+        <form method="post" action="/clientes/{{ cli.slug }}/reintentar" class="inline">
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          <button class="u-btn" type="submit" style="width:100%">Reintentar aprovisionamiento</button>
+        </form>
+        <p class="muted small" style="margin-top:.7rem">Crea solo lo que falte en GLPI, Zabbix y MeshCentral (reusa la PSK). Es seguro repetirlo.</p>
+      </section>
+      {% endif %}
+      {% if puede('clientes.eliminar') %}
+      <section class="u-card d-danger">
+        <h2>🗑 Zona de riesgo</h2>
+        <form method="post" action="/clientes/{{ cli.slug }}/eliminar" class="inline"
+              onsubmit="return confirm('¿Eliminar el registro local de {{ cli.nombre }}? No borra la entidad/grupo/proxy en GLPI/Zabbix.');">
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          <button class="u-b danger" type="submit" style="width:100%;padding:.6rem">Eliminar registro</button>
+        </form>
+        <p class="muted small" style="margin-top:.7rem">Quita únicamente el registro de la consola; lo que haya quedado en GLPI, Zabbix o MeshCentral se borra allí.</p>
+      </section>
+      {% endif %}
     </div>
-    <pre class="codeblock" id="bundle-psk">{{ cli.psk_key }}</pre>
-
-    <div class="note small">
-      <strong>Secreto.</strong> La PSK da acceso de proxy al servidor Zabbix. Compartila por un canal seguro
-      y nunca la publiques. En el appliance:
-      <code>mkdir -p enc &amp;&amp; printf '%s' '&lt;PSK&gt;' &gt; enc/proxy.psk &amp;&amp; chmod 600 enc/proxy.psk</code>
-      y montá <code>enc/proxy.psk</code> en <code>/var/lib/zabbix/enc/proxy.psk</code>.
-    </div>
-  </details>
   </div>
 {% endblock %}
