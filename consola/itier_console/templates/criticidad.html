@@ -1,9 +1,13 @@
 {% extends "base.html" %}
 {% block titulo %}Criticidad · {{ cli.nombre }}{% endblock %}
 {% block contenido %}
-  <div class="page-head">
-    <h1>Criticidad (CMDB) · {{ cli.nombre }}</h1>
-    <a class="btn" href="/clientes/{{ cli.slug }}">← Volver al cliente</a>
+  <div class="l-head">
+    <div>
+      <p class="u-sub" style="margin:0 0 .2rem"><a href="/clientes/{{ cli.slug }}">← {{ cli.nombre }}</a></p>
+      <h1>Criticidad (CMDB) · {{ cli.nombre }}</h1>
+      <p class="u-sub">Qué tan crítico es cada elemento: ordena prioridades y fija el techo de autonomía del agente.</p>
+    </div>
+    <div class="acciones"><a class="u-b" href="/clientes/{{ cli.slug }}" style="text-decoration:none">← Volver al cliente</a></div>
   </div>
 
   <div class="note">

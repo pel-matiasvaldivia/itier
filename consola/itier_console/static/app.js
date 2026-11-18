@@ -26,3 +26,24 @@ document.addEventListener("click", function (ev) {
     sel.removeAllRanges();
   }
 });
+
+// Feedback inmediato al navegar: barra de progreso arriba + cursor de espera. Las pantallas consultan
+// GLPI/Zabbix/Mesh y pueden tardar un poco; sin esto parece que el clic no hizo nada.
+(function () {
+  var barra = document.createElement("div");
+  barra.id = "nav-bar";
+  document.addEventListener("DOMContentLoaded", function () { document.body.appendChild(barra); });
+  function iniciar() { barra.className = "on"; document.documentElement.classList.add("cargando"); }
+  function terminar() { barra.className = ""; document.documentElement.classList.remove("cargando"); }
+  document.addEventListener("click", function (ev) {
+    if (ev.defaultPrevented || ev.button !== 0 || ev.metaKey || ev.ctrlKey || ev.shiftKey || ev.altKey) return;
+    var a = ev.target.closest("a[href]");
+    if (!a || a.target === "_blank" || a.hasAttribute("download") || a.hasAttribute("data-copy")) return;
+    var h = a.getAttribute("href") || "";
+    if (h.charAt(0) === "#" || /^(mailto:|tel:|javascript:)/.test(h)) return;
+    if (a.origin && a.origin !== location.origin) return;
+    iniciar();
+  });
+  document.addEventListener("submit", function (ev) { if (!ev.defaultPrevented) iniciar(); });
+  window.addEventListener("pageshow", terminar);   // al volver con «atrás» no debe quedar colgada
+})();

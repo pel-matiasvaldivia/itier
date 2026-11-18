@@ -1,10 +1,11 @@
 {% extends "base.html" %}
 {% block titulo %}Nuevo cliente · Consola de iTier{% endblock %}
 {% block contenido %}
-  <div class="page-head"><h1>Dar de alta un cliente</h1></div>
-  <div class="card narrow">
+  <div class="l-head"><div><p class="u-sub" style="margin:0 0 .2rem"><a href="/clientes">← Clientes</a></p><h1>Dar de alta un cliente</h1></div></div>
+  <div class="u-card" style="max-width:640px">
+    <h2>🏢 Nuevo cliente</h2>
     <p class="muted">Esto crea, en un paso: la <strong>entidad en GLPI</strong>, el <strong>grupo de hosts</strong> y el <strong>proxy con PSK</strong> en Zabbix, y deja listos los <strong>instaladores preconfigurados</strong> (appliance y equipos Windows) de ese cliente.</p>
-    <form method="post" action="/clientes/nuevo" class="form">
+    <form method="post" action="/clientes/nuevo" class="form" style="max-width:none;margin-top:1rem">
       <input type="hidden" name="csrf" value="{{ csrf }}">
       <label>Nombre del cliente
         <input type="text" name="nombre" placeholder="Ferretería San Martín" autofocus required>
@@ -12,7 +13,7 @@
       <label>Notas <span class="muted small">(opcional)</span>
         <textarea name="notas" rows="3" placeholder="Contacto, dirección, observaciones…"></textarea>
       </label>
-      <button class="btn btn-primary" type="submit">Crear cliente</button>
+      <button class="u-btn" type="submit">Crear cliente</button>
     </form>
   </div>
   {% if demo %}<p class="muted small">Modo demo: no se tocan GLPI/Zabbix reales; los identificadores son de ejemplo.</p>{% endif %}

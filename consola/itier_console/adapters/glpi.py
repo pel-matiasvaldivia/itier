@@ -19,6 +19,7 @@ from typing import Any
 
 import httpx
 
+from .. import perf
 from . import AdapterError
 
 # ── Fixtures de demo ────────────────────────────────────────────────────────
@@ -91,6 +92,12 @@ _DEMO_SALUD = {
 
 _DEMO_USUARIOS: dict[str, dict] = {}
 
+# Sesión de API y lecturas pesadas COMPARTIDAS entre requests: abrir y cerrar una sesión de GLPI (PHP) por
+# cada pantalla y bajar toda la lista de equipos por cada cliente era buena parte de la lentitud.
+_SESIONES = perf.Cache()      # (base, token de usuario) → session_token
+_LECTURAS = perf.Cache()      # (base, ruta, params) → respuesta JSON
+_SESION_TTL_S = 600
+
 
 class GLPIClient:
     def __init__(self, cfg):
@@ -107,7 +114,15 @@ class GLPIClient:
     def __exit__(self, *_exc) -> None:
         self.close()
 
+    def _cacheando(self) -> bool:
+        return (not self.demo) and getattr(self.cfg, "adapter_cache_s", 0) > 0
+
+    def _clave_sesion(self) -> tuple:
+        return (self._base, self.cfg.glpi_user_token or self.cfg.glpi_app_token)
+
     def close(self) -> None:
+        if self._cacheando():   # la sesión queda abierta para el próximo request
+            self._session_token = None
         if self._session_token and self._http is not None:
             try:
                 self._http.get(
@@ -137,11 +152,19 @@ class GLPIClient:
     def _asegurar_sesion(self) -> None:
         if self._session_token:
             return
+        if self._cacheando():
+            tok = _SESIONES.fresco(self._clave_sesion(), _SESION_TTL_S)
+            if tok:
+                self._session_token = tok
+                self._de_cache = True
+                return
+        self._de_cache = False
         headers = {"App-Token": self.cfg.glpi_app_token or ""}
         if self.cfg.glpi_user_token:
             headers["Authorization"] = f"user_token {self.cfg.glpi_user_token}"
         try:
-            r = self._client().get(f"{self._base}/initSession", headers=headers)
+            with perf.medir("glpi"):
+                r = self._client().get(f"{self._base}/initSession", headers=headers)
         except httpx.HTTPError as e:
             raise AdapterError("GLPI", f"no se pudo conectar a initSession: {e}") from e
         if r.status_code != 200:
@@ -149,34 +172,45 @@ class GLPIClient:
         self._session_token = r.json().get("session_token")
         if not self._session_token:
             raise AdapterError("GLPI", "initSession no devolvió session_token")
+        if self._cacheando():
+            _SESIONES.poner(self._clave_sesion(), self._session_token)
+
+    def _req(self, metodo: str, ruta: str, *, params=None, cuerpo=None, ok=(200,), reintento=True):
+        """Una llamada a la API. Si la sesión venía del caché y GLPI la dio por vencida, abre otra y repite una vez."""
+        self._asegurar_sesion()
+        with perf.medir("glpi"):
+            r = self._client().request(metodo, f"{self._base}{ruta}", headers=self._headers_sesion(),
+                                       params=params, json=cuerpo)
+        if reintento and getattr(self, "_de_cache", False) and (
+                r.status_code == 401 or "ERROR_SESSION_TOKEN" in r.text[:200]):
+            _SESIONES.quitar(self._clave_sesion())
+            self._session_token = None
+            return self._req(metodo, ruta, params=params, cuerpo=cuerpo, ok=ok, reintento=False)
+        if r.status_code not in ok:
+            raise AdapterError("GLPI", f"{metodo} {ruta} → {r.status_code}: {r.text[:200]}")
+        if metodo != "GET":
+            _LECTURAS.vaciar()   # una escritura invalida lo leído
+        return r
 
     def _get(self, ruta: str, params: dict | None = None) -> Any:
-        self._asegurar_sesion()
-        r = self._client().get(f"{self._base}{ruta}", headers=self._headers_sesion(), params=params)
-        if r.status_code not in (200, 206):
-            raise AdapterError("GLPI", f"GET {ruta} → {r.status_code}: {r.text[:200]}")
-        return r.json()
+        return self._req("GET", ruta, params=params, ok=(200, 206)).json()
+
+    def _get_cacheado(self, ruta: str, params: dict | None = None) -> Any:
+        """Lecturas pesadas y repetidas (lista de equipos, discos…): se reusan unos segundos entre pantallas y clientes."""
+        if not self._cacheando():
+            return self._get(ruta, params)
+        clave = (self._base, ruta, tuple(sorted((params or {}).items())))
+        return _LECTURAS.get(clave, self.cfg.adapter_cache_s, lambda: self._get(ruta, params))
 
     def _post(self, ruta: str, cuerpo: dict) -> Any:
-        self._asegurar_sesion()
-        r = self._client().post(f"{self._base}{ruta}", headers=self._headers_sesion(), json=cuerpo)
-        if r.status_code not in (200, 201):
-            raise AdapterError("GLPI", f"POST {ruta} → {r.status_code}: {r.text[:200]}")
-        return r.json()
+        return self._req("POST", ruta, cuerpo=cuerpo, ok=(200, 201)).json()
 
     def _delete(self, ruta: str, params: dict | None = None) -> Any:
-        self._asegurar_sesion()
-        r = self._client().delete(f"{self._base}{ruta}", headers=self._headers_sesion(), params=params)
-        if r.status_code not in (200, 204):
-            raise AdapterError("GLPI", f"DELETE {ruta} → {r.status_code}: {r.text[:200]}")
+        r = self._req("DELETE", ruta, params=params, ok=(200, 204))
         return r.json() if r.content else {}
 
     def _put(self, ruta: str, cuerpo: dict) -> Any:
-        self._asegurar_sesion()
-        r = self._client().put(f"{self._base}{ruta}", headers=self._headers_sesion(), json=cuerpo)
-        if r.status_code not in (200, 201):
-            raise AdapterError("GLPI", f"PUT {ruta} → {r.status_code}: {r.text[:200]}")
-        return r.json()
+        return self._req("PUT", ruta, cuerpo=cuerpo, ok=(200, 201)).json()
 
     # -- salud ---------------------------------------------------------------
 
@@ -303,7 +337,7 @@ class GLPIClient:
         if entity_id in (None, ""):
             return []
         try:
-            comps = self._get("/Computer", params={"range": "0-500"})
+            comps = self._get_cacheado("/Computer", params={"range": "0-500"})
         except AdapterError as e:
             if "RANGE_EXCEED_TOTAL" in str(e):
                 return []
@@ -313,7 +347,7 @@ class GLPIClient:
         comps = [c for c in comps if str(c.get("entities_id")) == str(entity_id)]
         nombres: dict[str, str] = {}  # id de business criticity → nombre (valor actual)
         try:
-            for x in self._get(f"/{IT_BUSINESSCRIT}", params={"range": "0-200"}) or []:
+            for x in self._get_cacheado(f"/{IT_BUSINESSCRIT}", params={"range": "0-200"}) or []:
                 if isinstance(x, dict):
                     nombres[str(x.get("id"))] = x.get("name") or ""
         except AdapterError:
@@ -411,7 +445,7 @@ class GLPIClient:
 
         def listar(clase: str) -> list[dict]:
             try:
-                r = self._get(f"/{clase}", params={"range": "0-4999"})
+                r = self._get_cacheado(f"/{clase}", params={"range": "0-4999"})
             except AdapterError as e:
                 if "RANGE_EXCEED_TOTAL" in str(e):
                     return []

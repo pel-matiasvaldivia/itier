@@ -23,6 +23,7 @@ from typing import Any
 
 import httpx
 
+from .. import perf
 from . import AdapterError
 
 # ── Fixtures de demo ────────────────────────────────────────────────────────
@@ -48,6 +49,10 @@ ESTADO_HOST = {"0": "Monitoreado", "1": "Sin monitorear"}
 
 
 _DEMO_USUARIOS: dict[str, dict] = {}
+
+# Token de la API reusado entre requests (user.login por cada pantalla era lento y llenaba el registro de Zabbix).
+_TOKENS = perf.Cache()
+_TOKEN_TTL_S = 900
 
 
 class ZabbixClient:
@@ -75,10 +80,22 @@ class ZabbixClient:
             self._http = httpx.Client(timeout=self.cfg.http_timeout_s)
         return self._http
 
+    def _cacheando(self) -> bool:
+        return (not self.demo) and not self.cfg.zbx_token and getattr(self.cfg, "adapter_cache_s", 0) > 0
+
     def _login(self) -> str:
         if self._token:
             return self._token
+        clave = (self._endpoint, self.cfg.zbx_user)
+        if self._cacheando():
+            tok = _TOKENS.fresco(clave, _TOKEN_TTL_S)
+            if tok:
+                self._token, self._de_cache = tok, True
+                return tok
+        self._de_cache = False
         self._token = self._rpc("user.login", {"username": self.cfg.zbx_user, "password": self.cfg.zbx_password}, auth=False)
+        if self._cacheando():
+            _TOKENS.poner(clave, self._token)
         return self._token
 
     def _rpc(self, metodo: str, params: Any, auth: bool = True) -> Any:
@@ -88,7 +105,8 @@ class ZabbixClient:
             headers["Authorization"] = f"Bearer {self._login()}"
         cuerpo = {"jsonrpc": "2.0", "method": metodo, "params": params, "id": self._id}
         try:
-            r = self._client().post(self._endpoint, headers=headers, json=cuerpo)
+            with perf.medir("zabbix"):
+                r = self._client().post(self._endpoint, headers=headers, json=cuerpo)
         except httpx.HTTPError as e:
             raise AdapterError("Zabbix", f"no se pudo conectar ({metodo}): {e}") from e
         if r.status_code != 200:
@@ -96,7 +114,13 @@ class ZabbixClient:
         data = r.json()
         if "error" in data:
             err = data["error"]
-            raise AdapterError("Zabbix", f"{metodo}: {err.get('message')} {err.get('data')}")
+            texto = f"{err.get('message')} {err.get('data')}"
+            if auth and getattr(self, "_de_cache", False) and ("re-login" in texto or "Session terminated" in texto
+                                                               or "Not authorized" in texto or "Not authorised" in texto):
+                _TOKENS.quitar((self._endpoint, self.cfg.zbx_user))   # token vencido: se vuelve a loguear una vez
+                self._token, self._de_cache = None, False
+                return self._rpc(metodo, params, auth=auth)
+            raise AdapterError("Zabbix", f"{metodo}: {texto}")
         return data["result"]
 
     # -- salud ---------------------------------------------------------------

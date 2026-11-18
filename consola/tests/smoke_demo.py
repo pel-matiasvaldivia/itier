@@ -554,6 +554,17 @@ r = c.post(f"/usuarios/{uid_jp}/eliminar", data={"csrf": csrf_de(c.get("/usuario
 check("usuarios: eliminar", "Usuario eliminado" in r.text and "<strong>jperez</strong>" not in c.get("/usuarios").text)
 check("usuarios: CSRF inválido no crea", "zzz" not in c.post("/usuarios", data={"username": "zzz", "email": "z@z.com", "rol": "tecnico", "csrf": "mal"}).text)
 
+# Rendimiento: estáticos cacheables con huella, Server-Timing y barra de progreso
+_pg = c.get("/equipos")
+_m = re.search(r'/static/app\.css\?v=([0-9a-f]+)', _pg.text)
+check("rendimiento: las páginas apuntan a estáticos con huella (?v=)", bool(_m) and "/static/app.js?v=" in _pg.text)
+_css = c.get(f"/static/app.css?v={_m.group(1)}") if _m else None
+check("rendimiento: el CSS versionado se guarda un año (inmutable)", _css is not None and "immutable" in _css.headers.get("cache-control", "")
+      and "max-age=31536000" in _css.headers.get("cache-control", ""))
+check("rendimiento: sin versión se revalida", c.get("/static/app.css").headers.get("cache-control") == "no-cache")
+check("rendimiento: cada pantalla informa Server-Timing", "app;dur=" in _pg.headers.get("server-timing", ""), _pg.headers.get("server-timing"))
+check("rendimiento: hay barra de progreso de navegación", "nav-bar" in c.get(f"/static/app.js?v={_m.group(1)}").text)
+
 # 10) Logout
 c.post("/logout", data={"csrf": csrf_de(c.get("/").text)})
 check("logout: / vuelve a /login", c.get("/").url.path == "/login")

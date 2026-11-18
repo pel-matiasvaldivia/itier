@@ -194,3 +194,17 @@ consola/
 `ITIER_MESH_URL`, `ITIER_MESH_USER`, `ITIER_MESH_PASSWORD` (cuenta de servicio **sin 2FA**). Al dar de alta o reprovisionar un
 cliente se crea su grupo `itier-<slug>` y el instalador de Windows instala el Mesh Agent de ese grupo (ADR-0011).
 Alta del servidor: `deploy/vps/README.md` → «Soporte remoto: MeshCentral».
+
+
+## Rendimiento y diagnóstico de lentitud
+
+Cada pantalla consulta GLPI, Zabbix y MeshCentral. Para que no se sienta lenta:
+- **Sesión y lecturas reutilizadas** (`ITIER_ADAPTER_CACHE_S`, 60 s por defecto): una sola sesión de GLPI y un solo token de Zabbix para
+  todas las pantallas; la lista de equipos y los discos/antivirus se bajan una vez para todos los clientes. «Actualizar datos» en Equipos las salta.
+- **Consultas en paralelo** en Tablero y Equipos (tardan lo de la más lenta, no la suma).
+- **Estáticos con huella** (`app.css?v=…`): el navegador los guarda un año, sin revalidar en cada pantalla.
+- **Barra de progreso** al navegar, para que el clic tenga respuesta inmediata.
+
+Para saber **dónde se pierde el tiempo**: DevTools → Network → la petición de la pantalla → *Timing* → `Server-Timing`
+(`app` = total del servidor; `glpi`, `zabbix`, `mesh` = lo que tardó cada uno y cuántas llamadas). Si `app` es bajo y la petición tarda mucho,
+la demora es de red (Cloudflare/túnel). Las pantallas que superan 1 s quedan en el log como `LENTO … (glpi=…ms/n zabbix=…)`.

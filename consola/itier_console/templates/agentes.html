@@ -1,9 +1,13 @@
 {% extends "base.html" %}
 {% block titulo %}Agentes · {{ cli.nombre }}{% endblock %}
 {% block contenido %}
-  <div class="page-head">
-    <h1>Agentes · {{ cli.nombre }}</h1>
-    <a class="btn" href="/clientes/{{ cli.slug }}">← Volver al cliente</a>
+  <div class="l-head">
+    <div>
+      <p class="u-sub" style="margin:0 0 .2rem"><a href="/clientes/{{ cli.slug }}">← {{ cli.nombre }}</a></p>
+      <h1>Agentes · {{ cli.nombre }}</h1>
+      <p class="u-sub">Hosts de Zabbix del cliente y su proxy de monitoreo avanzado.</p>
+    </div>
+    <div class="acciones"><a class="u-b" href="/clientes/{{ cli.slug }}" style="text-decoration:none">← Volver al cliente</a></div>
   </div>
 
   {% if error %}<div class="note note-bad">No se pudo consultar Zabbix: {{ error }}</div>{% endif %}
@@ -36,7 +40,7 @@
             {% if h.available == '1' %}<span class="dot ok"></span>{% elif h.available == '2' %}<span class="dot bad"></span>{% else %}<span class="dot warn"></span>{% endif %}
             {{ h.disponibilidad }}
           </td>
-          <td>{% if h.vinculado %}<span class="badge badge-activo">sí</span>{% else %}<span class="badge">no</span>{% endif %}</td>
+          <td>{% if h.vinculado %}<span class="l-pill ok"><i></i>sí</span>{% else %}<span class="l-pill off">no</span>{% endif %}</td>
           <td class="acciones">
             {% if not h.vinculado %}
             <form method="post" action="/clientes/{{ cli.slug }}/agentes/vincular" class="inline">

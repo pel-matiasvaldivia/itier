@@ -24,6 +24,7 @@ os.environ.update(
     ITIER_GLPI_USER_TOKEN="USR",
     ITIER_ZBX_URL="http://zabbix-web:8080",
     ITIER_ZBX_TOKEN="TKN",
+    ITIER_ADAPTER_CACHE_S="0",   # las pruebas de protocolo ven cada llamada; el caché se prueba aparte
 )
 
 from itier_console.adapters import glpi as glpi_mod  # noqa: E402
@@ -431,6 +432,82 @@ check("mesh: baja = cuenta bloqueada (32) y fuera de SOPORTE; alta = derechos de
 check("mesh: cambio de rol y eliminación", ("edituser", 64, "jperez") in ops and ("deleteuser", None, "jperez") in ops)
 _srv.shutdown()
 
+# ── Rendimiento: sesión de GLPI y token de Zabbix reutilizados, lecturas cacheadas, reintento si vencen ────
+import dataclasses as _dc  # noqa: E402
+from itier_console import perf  # noqa: E402
+
+cfg_c = _dc.replace(cfg, adapter_cache_s=60)
+glpi_mod._SESIONES.vaciar(); glpi_mod._LECTURAS.vaciar()
+captured.clear()
+with glpi_mod.cliente(cfg_c) as g1:
+    g1.listar_cis(2)
+with glpi_mod.cliente(cfg_c) as g2:
+    g2.listar_cis(3)
+n_init = sum(1 for x in captured if x["path"].endswith("/initSession"))
+n_kill = sum(1 for x in captured if x["path"].endswith("/killSession"))
+n_comp = sum(1 for x in captured if x["path"].endswith("/Computer") and x["method"] == "GET")
+check("rendimiento: GLPI abre UNA sesión para varias pantallas y no la cierra", n_init == 1 and n_kill == 0, (n_init, n_kill))
+check("rendimiento: la lista de equipos se baja una sola vez para dos clientes", n_comp == 1, n_comp)
+with glpi_mod.cliente(cfg_c) as g3:
+    g3.fijar_criticidad("Computer", "501", "critica")
+captured.clear()
+with glpi_mod.cliente(cfg_c) as g4:
+    g4.listar_cis(2)
+check("rendimiento: una escritura invalida el caché de lecturas", any(x["path"].endswith("/Computer") for x in captured))
+# sesión vencida en GLPI: se vuelve a abrir y la llamada sale igual
+_vencida = {"n": 0}
+_handler_ok = handler
+def _handler_vence(request):
+    if request.url.path.endswith("/Computer") and request.method == "GET" and _vencida["n"] == 0:
+        _vencida["n"] += 1
+        return httpx.Response(401, json=["ERROR_SESSION_TOKEN_INVALID", "token inválido"])
+    return _handler_ok(request)
+glpi_mod._SESIONES.vaciar(); glpi_mod._LECTURAS.vaciar()
+with glpi_mod.cliente(cfg_c) as gx:
+    gx.listar_cis(2)           # abre sesión y la deja cacheada
+glpi_mod._LECTURAS.vaciar(); captured.clear()
+_real_h = handler
+handler = _handler_vence  # type: ignore[assignment]
+with glpi_mod.cliente(cfg_c) as gy:
+    cis_y = gy.listar_cis(2)
+handler = _real_h  # type: ignore[assignment]
+check("rendimiento: si GLPI da por vencida la sesión cacheada, reabre y reintenta una vez",
+      len(cis_y) == 1 and sum(1 for x in captured if x["path"].endswith("/initSession")) == 1, str(cis_y))
+# Zabbix con usuario/clave: un solo user.login para varias pantallas
+_logins = {"n": 0}
+_zh = handler
+def _handler_zlogin(request):
+    body = json.loads(request.content) if request.content else {}
+    if request.url.path.endswith("/api_jsonrpc.php"):
+        if body.get("method") == "user.login":
+            _logins["n"] += 1
+            return httpx.Response(200, json={"jsonrpc": "2.0", "result": "TOK-%d" % _logins["n"], "id": body.get("id")})
+        if body.get("method") == "hostgroup.get":
+            if request.headers.get("authorization") == "Bearer TOK-1" and _logins.get("vence"):
+                _logins["vence"] = False
+                return httpx.Response(200, json={"jsonrpc": "2.0", "error": {"message": "Session terminated, re-login, please.", "data": ""}, "id": body.get("id")})
+            return httpx.Response(200, json={"jsonrpc": "2.0", "result": [], "id": body.get("id")})
+    return _zh(request)
+handler = _handler_zlogin  # type: ignore[assignment]
+cfg_z = _dc.replace(cfg_c, zbx_token=None, zbx_user="u", zbx_password="p")
+zbx_mod._TOKENS.vaciar()
+for _ in range(3):
+    with zbx_mod.cliente(cfg_z) as zz:
+        zz._rpc("hostgroup.get", {})
+check("rendimiento: Zabbix hace un solo user.login para varias pantallas", _logins["n"] == 1, _logins["n"])
+_logins["vence"] = True
+with zbx_mod.cliente(cfg_z) as zz:
+    zz._rpc("hostgroup.get", {})
+check("rendimiento: si el token de Zabbix venció, se vuelve a loguear y repite", _logins["n"] == 2, _logins["n"])
+handler = _zh  # type: ignore[assignment]
+# utilidades de medición
+_antes = perf.iniciar()
+with perf.medir("glpi"):
+    pass
+check("rendimiento: Server-Timing nombra el total y cada sistema", perf.server_timing(0.25, _antes).startswith("app;dur=250")
+      and 'glpi;dur=' in perf.server_timing(0.25, _antes))
+_res = perf.paralelo([lambda: 1, lambda: (_ for _ in ()).throw(ValueError("x")), lambda: 3])
+check("rendimiento: paralelo conserva el orden y captura los errores", [r[0] for r in _res] == [True, False, True] and _res[0][1] == 1 and _res[2][1] == 3)
 httpx.Client = _real_Client  # type: ignore[assignment]
 print("\nRESULTADO:", "TODO OK" if not fails else f"{len(fails)} FALLAS: {fails}")
 sys.exit(1 if fails else 0)

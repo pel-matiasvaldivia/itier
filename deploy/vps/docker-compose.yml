@@ -265,6 +265,8 @@ services:
       # todos los clientes: la consola le comparte cada grupo de cliente que crea.
       ITIER_MESH_SUPPORT_GROUP: ${ITIER_MESH_SUPPORT_GROUP:-SOPORTE}
       ITIER_ALERTA_DISCO_PCT: ${ITIER_ALERTA_DISCO_PCT:-90}
+      # Segundos que se reusan la sesión de GLPI, el token de Zabbix y las lecturas pesadas (0 = sin caché).
+      ITIER_ADAPTER_CACHE_S: ${ITIER_ADAPTER_CACHE_S:-60}
       # Grupo de usuarios de Zabbix al que pertenecen los técnicos y PM (la consola le da acceso a cada cliente).
       ITIER_ZBX_SOPORTE_GROUP: ${ITIER_ZBX_SOPORTE_GROUP:-iTier Soporte}
       # URL pública de la web de Zabbix: solo para mostrarla en el correo de bienvenida a los usuarios.

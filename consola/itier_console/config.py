@@ -61,6 +61,7 @@ class Config:
     zbx_server_host: str | None
 
     http_timeout_s: float
+    adapter_cache_s: int = 60              # segundos que se reusan sesiones y lecturas de GLPI/Zabbix (0 = sin caché)
 
     # -- Enrolamiento automatizado (instaladores por cliente) ----------------
     # URL pública de la consola (la que alcanza el appliance del cliente), para
@@ -139,6 +140,7 @@ class Config:
             zbx_password=os.environ.get("ITIER_ZBX_PASSWORD") or None,
             zbx_server_host=os.environ.get("ITIER_ZBX_SERVER_HOST") or None,
             http_timeout_s=float(os.environ.get("ITIER_CONSOLE_HTTP_TIMEOUT", "6")),
+            adapter_cache_s=int(os.environ.get("ITIER_ADAPTER_CACHE_S", "60")),
             console_public_url=(os.environ.get("ITIER_CONSOLE_PUBLIC_URL") or "").rstrip("/") or None,
             enroll_ttl_h=int(os.environ.get("ITIER_ENROLL_TTL_H", "24")),
             enroll_max_usos=int(os.environ.get("ITIER_ENROLL_MAX_USOS", "3")),

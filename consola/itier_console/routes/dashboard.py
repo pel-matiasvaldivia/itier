@@ -7,6 +7,7 @@ import sqlite3
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import HTMLResponse
 
+from .. import perf
 from ..adapters import AdapterError
 from ..adapters import glpi as glpi_mod
 from ..adapters import zabbix as zbx_mod
@@ -21,10 +22,23 @@ router = APIRouter()
 def dashboard(request: Request, user: dict = Depends(require_permiso("tablero")), conn: sqlite3.Connection = Depends(get_db)):
     cfg = request.app.state.cfg
 
-    with glpi_mod.cliente(cfg) as g:
-        salud_glpi = g.health()
-    with zbx_mod.cliente(cfg) as z:
-        salud_zbx = z.health()
+    def _glpi():
+        with glpi_mod.cliente(cfg) as g:
+            return g.health()
+
+    def _zbx():
+        with zbx_mod.cliente(cfg) as z:
+            return z.health()
+
+    def _tickets():
+        return tickets_svc.recientes(cfg, limit=10) if cfg.glpi_configurado else []
+
+    # Las tres consultas son independientes: en paralelo el tablero tarda lo de la más lenta, no la suma.
+    (ok_g, salud_glpi), (ok_z, salud_zbx), (ok_t, res_tickets) = perf.paralelo([_glpi, _zbx, _tickets])
+    if not ok_g:
+        salud_glpi = {"ok": False, "detalle": str(getattr(salud_glpi, "detalle", salud_glpi))[:120]}
+    if not ok_z:
+        salud_zbx = {"ok": False, "detalle": str(getattr(salud_zbx, "detalle", salud_zbx))[:120]}
 
     clientes = onboarding.listar_clientes(conn)
     filas = conn.execute("SELECT estado, COUNT(*) AS n FROM clients GROUP BY estado").fetchall()
@@ -36,12 +50,14 @@ def dashboard(request: Request, user: dict = Depends(require_permiso("tablero"))
     ent_a_cliente = {str(c["glpi_entity_id"]): c["nombre"] for c in clientes if c.get("glpi_entity_id")}
     tickets, error_tickets = [], None
     if cfg.glpi_configurado:
-        try:
-            tickets = tickets_svc.recientes(cfg, limit=10)
+        if ok_t:
+            tickets = res_tickets
             for t in tickets:
                 t["cliente"] = ent_a_cliente.get(str(t.get("entities_id")), "—")
-        except AdapterError as e:
-            error_tickets = e.detalle
+        elif isinstance(res_tickets, AdapterError):
+            error_tickets = res_tickets.detalle
+        else:
+            raise res_tickets
 
     return render(
         request, "dashboard.html",

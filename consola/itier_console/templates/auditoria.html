@@ -1,30 +1,52 @@
 {% extends "base.html" %}
 {% block titulo %}Auditoría · Consola de iTier{% endblock %}
 {% block contenido %}
-  <div class="page-head"><h1>Auditoría</h1></div>
-
-  <div class="note {{ 'note-ok' if cadena_ok else 'note-bad' }}">
-    Cadena de hash: <strong>{{ 'íntegra' if cadena_ok else 'ALTERADA' }}</strong> · {{ cadena_motivo }}
+  <div class="l-head">
+    <div>
+      <h1>Auditoría</h1>
+      <p class="u-sub">Bitácora append-only encadenada por hash: cada entrada sella la anterior, así una edición del pasado rompe la cadena y se detecta (OWASP ASI10).</p>
+    </div>
   </div>
 
-  <div class="card">
-    <p class="muted">Bitácora append-only encadenada por hash: cada entrada sella la anterior, así una edición del pasado rompe la cadena y se detecta (OWASP ASI10).</p>
+  <div class="note {{ 'note-ok' if cadena_ok else 'note-bad' }}" style="display:flex;align-items:center;gap:.7rem">
+    <span style="font-size:1.4rem">{{ '🔒' if cadena_ok else '⚠️' }}</span>
+    <span>Cadena de hash: <strong>{{ 'íntegra' if cadena_ok else 'ALTERADA' }}</strong> · {{ cadena_motivo }}</span>
+  </div>
+
+  <div class="l-wrap">
+    <div class="l-bar-top">
+      <h2 style="margin:0">Eventos</h2>
+      <input class="u-search" type="search" id="l-buscar" placeholder="Buscar por actor, acción o detalle…" aria-label="Buscar en la auditoría">
+    </div>
     {% if entradas %}
-    <table class="tabla">
+    <table class="l-table" id="l-lista">
       <thead><tr><th>Fecha (UTC)</th><th>Actor</th><th>Acción</th><th>Detalle</th></tr></thead>
       <tbody>
         {% for e in entradas %}
-        <tr>
-          <td class="muted nowrap">{{ e.ts }}</td>
-          <td>{{ e.actor }}</td>
-          <td><code>{{ e.tipo }}</code></td>
+        <tr data-q="{{ (e.actor ~ ' ' ~ e.tipo ~ ' ' ~ (e.payload | tojson))|lower }}">
+          <td class="muted small nowrap">{{ e.ts }}</td>
+          <td><strong>{{ e.actor }}</strong></td>
+          <td><span class="l-pill {{ 'bad' if ('eliminad' in e.tipo or 'baja' in e.tipo or 'fall' in e.tipo) else ('warn' if ('clave' in e.tipo or 'rol' in e.tipo or 'remoto' in e.tipo or 'login' in e.tipo) else 'info') }}">{{ e.tipo }}</span></td>
           <td class="detalle">{{ e.payload | tojson }}</td>
         </tr>
         {% endfor %}
+        <tr id="l-vacio" hidden><td colspan="4" class="l-empty">Ningún evento coincide con la búsqueda.</td></tr>
       </tbody>
     </table>
     {% else %}
-    <p class="muted">Sin eventos registrados aún.</p>
+    <div class="l-empty"><b>🧾</b>Sin eventos registrados aún.</div>
     {% endif %}
   </div>
+  <script>
+    (function () {
+      var q = document.getElementById('l-buscar'); if (!q) return;
+      q.addEventListener('input', function () {
+        var t = q.value.trim().toLowerCase(), n = 0;
+        document.querySelectorAll('#l-lista tbody tr[data-q]').forEach(function (r) {
+          var ok = !t || (r.getAttribute('data-q') || '').indexOf(t) >= 0; r.hidden = !ok; if (ok) n++;
+        });
+        var v = document.getElementById('l-vacio'); if (v) v.hidden = n > 0;
+      });
+    })();
+  </script>
 {% endblock %}

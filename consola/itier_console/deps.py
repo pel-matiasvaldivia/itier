@@ -21,6 +21,21 @@ BASE = Path(__file__).resolve().parent
 templates = Jinja2Templates(directory=str(BASE / "templates"))
 
 
+def _version_estatico(nombre: str, _cache: dict = {}) -> str:  # noqa: B006 — caché intencional de módulo
+    """Huella del contenido de un archivo estático: la URL cambia solo si el archivo cambia, así el navegador
+    lo guarda un año (sin revalidar en cada pantalla) y igual toma los cambios al desplegar."""
+    if nombre not in _cache:
+        import hashlib
+        try:
+            _cache[nombre] = hashlib.sha1((BASE / "static" / nombre).read_bytes()).hexdigest()[:10]
+        except OSError:
+            _cache[nombre] = "0"
+    return _cache[nombre]
+
+
+templates.env.globals["static_v"] = _version_estatico
+
+
 class AuthRequired(Exception):
     """Se lanza cuando una ruta protegida no tiene sesión válida."""
 

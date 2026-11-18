@@ -22,6 +22,7 @@ import json
 import time
 from urllib.parse import quote
 
+from .. import perf
 from . import AdapterError
 
 _ESPERA_S = 15.0
@@ -56,8 +57,9 @@ class MeshClient:
         cred = (base64.b64encode(self._cfg.mesh_user.encode()).decode() + ","
                 + base64.b64encode(self._cfg.mesh_password.encode()).decode())
         try:
-            self._ws = connect(url, additional_headers={"x-meshauth": cred}, open_timeout=_ESPERA_S,
-                               max_size=8 * 1024 * 1024)
+            with perf.medir("mesh"):
+                self._ws = connect(url, additional_headers={"x-meshauth": cred}, open_timeout=_ESPERA_S,
+                                   max_size=8 * 1024 * 1024)
         except Exception as e:  # noqa: BLE001 — cualquier falla de red/handshake
             raise AdapterError("mesh", f"no se pudo conectar a {self._cfg.mesh_url}: {e}") from e
         return self
@@ -75,6 +77,10 @@ class MeshClient:
         Por defecto un `result` de texto distinto de "ok" es un error; `ok(msg)` permite
         otro criterio (addmeshuser responde result vacío + success/failed)."""
         accion = {**accion, "responseid": responseid}
+        with perf.medir("mesh"):
+            return self._pedir_medido(accion, esperar, responseid, ok)
+
+    def _pedir_medido(self, accion: dict, esperar: str, responseid: str, ok) -> dict:
         self._ws.send(json.dumps(accion))
         limite = time.monotonic() + _ESPERA_S
         while time.monotonic() < limite:

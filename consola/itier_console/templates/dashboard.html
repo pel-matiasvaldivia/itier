@@ -1,35 +1,31 @@
 {% extends "base.html" %}
 {% block titulo %}Tablero · Consola de iTier{% endblock %}
+{% macro estado_pill(t) -%}
+  {%- set s = t.status|int -%}
+  <span class="l-pill {{ 'info' if s == 1 else ('warn' if s in (2, 3) else ('off' if s == 4 else ('ok' if s == 5 else 'dark'))) }}"><i></i>{{ t.estado_label }}</span>
+{%- endmacro %}
+{% macro prio_pill(t) -%}
+  {%- set p = t.priority|int -%}
+  <span class="l-pill {{ 'bad' if p >= 5 else ('warn' if p == 4 else ('info' if p == 3 else 'off')) }}">{{ t.prioridad_label }}</span>
+{%- endmacro %}
 {% block contenido %}
-  <div class="page-head">
-    <h1>Tablero</h1>
-    {% if puede('clientes.editar') %}<a class="btn btn-primary" href="/clientes/nuevo">+ Nuevo cliente</a>{% endif %}
+  <div class="l-head">
+    <div>
+      <h1>Tablero</h1>
+      <p class="u-sub">Hola, {{ user.user }}. Así está la plataforma ahora.</p>
+    </div>
+    {% if puede('clientes.editar') %}<a class="u-btn" href="/clientes/nuevo" style="text-decoration:none">+ Nuevo cliente</a>{% endif %}
   </div>
 
-  <section class="tiles">
-    <div class="tile">
-      <div class="tile-k">GLPI</div>
-      <div class="tile-v">
-        {% if salud_glpi.ok %}<span class="dot ok"></span>Operativo{% else %}<span class="dot bad"></span>Sin conexión{% endif %}
-      </div>
-      <div class="tile-s">{{ salud_glpi.version or salud_glpi.detalle }}</div>
-    </div>
-    <div class="tile">
-      <div class="tile-k">Zabbix</div>
-      <div class="tile-v">
-        {% if salud_zbx.ok %}<span class="dot ok"></span>Operativo{% else %}<span class="dot bad"></span>Sin conexión{% endif %}
-      </div>
-      <div class="tile-s">{{ salud_zbx.version or salud_zbx.detalle }}</div>
-    </div>
-    <div class="tile">
-      <div class="tile-k">Clientes</div>
-      <div class="tile-v big">{{ n_clientes }}</div>
-      <div class="tile-s">
-        {% for estado, n in por_estado.items() %}<span class="badge badge-{{ estado }}">{{ n }} {{ estado }}</span> {% endfor %}
-        {% if not por_estado %}aún no hay clientes{% endif %}
-      </div>
-    </div>
-  </section>
+  <div class="d-grid">
+    <div class="d-int"><div class="k">GLPI <span class="l-pill {{ 'ok' if salud_glpi.ok else 'bad' }}"><i></i>{{ 'Operativo' if salud_glpi.ok else 'Sin conexión' }}</span></div>
+      <b>Tickets e inventario</b><small>{{ salud_glpi.version or salud_glpi.detalle }}</small></div>
+    <div class="d-int"><div class="k">Zabbix <span class="l-pill {{ 'ok' if salud_zbx.ok else 'bad' }}"><i></i>{{ 'Operativo' if salud_zbx.ok else 'Sin conexión' }}</span></div>
+      <b>Monitoreo avanzado</b><small>{{ salud_zbx.version or salud_zbx.detalle }}</small></div>
+    <div class="d-int"><div class="k">Clientes <a href="/clientes">ver todos →</a></div>
+      <b style="font-size:1.8rem">{{ n_clientes }}</b>
+      <small>{% for estado, n in por_estado.items() %}<span class="l-pill {{ 'ok' if estado == 'activo' else ('bad' if estado == 'error' else 'warn') }}">{{ n }} {{ estado }}</span> {% endfor %}{% if not por_estado %}aún no hay clientes{% endif %}</small></div>
+  </div>
 
   {% if not glpi_conf or not zbx_conf %}
   <div class="note">
@@ -40,43 +36,40 @@
   </div>
   {% endif %}
 
-  <section class="card">
-    <div class="page-head" style="margin-bottom:.75rem">
-      <h2 style="margin:0">Tickets recientes</h2>
-      <a class="btn btn-sm" href="/tickets">Ver todos →</a>
+  <div class="l-wrap">
+    <div class="l-bar-top">
+      <div><h2 style="margin:0">🎫 Tickets recientes</h2></div>
+      <a class="u-b" href="/tickets" style="text-decoration:none">Ver todos →</a>
     </div>
-    {% if error_tickets %}<div class="note note-bad">No se pudo leer GLPI: {{ error_tickets }}</div>{% endif %}
+    {% if error_tickets %}<div class="u-err" style="margin:1rem 1.1rem 0">No se pudo leer GLPI: {{ error_tickets }}</div>{% endif %}
     {% if tickets %}
-    <table class="tabla">
-      <thead>
-        <tr><th>#</th><th>Cliente</th><th>Asunto</th><th>Estado</th><th>Prioridad</th><th>Técnico</th><th>Fecha</th></tr>
-      </thead>
+    <table class="l-table">
+      <thead><tr><th>#</th><th>Cliente</th><th>Asunto</th><th>Estado</th><th>Prioridad</th><th>Técnico</th><th>Fecha</th></tr></thead>
       <tbody>
         {% for t in tickets %}
         <tr>
-          <td><a href="/tickets/{{ t.id }}">{{ t.id }}</a></td>
+          <td class="tight"><a class="l-id" href="/tickets/{{ t.id }}">#{{ t.id }}</a></td>
           <td>{{ t.cliente }}</td>
-          <td><a href="/tickets/{{ t.id }}">{{ t.name }}</a></td>
-          <td><span class="badge">{{ t.estado_label }}</span></td>
-          <td>{{ t.prioridad_label }}</td>
+          <td><a class="l-link" href="/tickets/{{ t.id }}">{{ t.name }}</a></td>
+          <td>{{ estado_pill(t) }}</td>
+          <td>{{ prio_pill(t) }}</td>
           <td>{{ t.tecnico or '—' }}</td>
-          <td class="muted nowrap">{{ t.date or '—' }}</td>
+          <td class="muted small nowrap">{{ t.date or '—' }}</td>
         </tr>
         {% endfor %}
       </tbody>
     </table>
     {% elif not error_tickets %}
-    <p class="muted">No hay tickets todavía. Cuando se creen (desde la consola o en GLPI), aparecen acá.</p>
+    <div class="l-empty"><b>🎫</b>No hay tickets todavía. Cuando se creen (desde la consola o en GLPI), aparecen acá.</div>
     {% endif %}
-  </section>
+  </div>
 
-  <section class="card">
-    <h2>Accesos rápidos</h2>
-    <div class="quick">
-      {% if puede('clientes.editar') %}<a href="/clientes/nuevo">Dar de alta un cliente →</a>{% endif %}
-      <a href="/clientes">Ver clientes y bundles →</a>
-      <a href="/tickets/nuevo">Crear un ticket →</a>
-      {% if puede('auditoria') %}<a href="/auditoria">Revisar auditoría →</a>{% endif %}
-    </div>
-  </section>
+  <div class="d-tabs">
+    {% if puede('equipos') %}<a class="pri" href="/equipos?alertas=1">⚠ Equipos con alertas</a>{% endif %}
+    {% if puede('clientes.editar') %}<a href="/clientes/nuevo">➕ Dar de alta un cliente</a>{% endif %}
+    <a href="/clientes">🏢 Ver clientes</a>
+    <a href="/tickets/nuevo">🎫 Crear un ticket</a>
+    {% if puede('auditoria') %}<a href="/auditoria">🧾 Revisar auditoría</a>{% endif %}
+    <a href="/manual">📘 Manual de operaciones</a>
+  </div>
 {% endblock %}

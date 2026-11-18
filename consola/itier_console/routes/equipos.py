@@ -16,8 +16,8 @@ import time
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 
-from .. import audit
-from ..adapters import mesh as mesh_mod
+from .. import audit, perf
+from ..adapters import glpi as glpi_mod, mesh as mesh_mod
 from ..deps import flash, get_db, render, require_permiso
 from ..services import equipos as equipos_svc, onboarding
 
@@ -42,13 +42,19 @@ def _datos(cfg, cli: dict, forzar: bool) -> dict:
 def lista(request: Request, cliente: str = "", alertas: str = "", actualizar: str = "",
           user: dict = Depends(require_permiso("equipos")), conn: sqlite3.Connection = Depends(get_db)):
     cfg = request.app.state.cfg
+    if actualizar:   # «Actualizar datos»: también se salta el caché de lecturas de GLPI
+        glpi_mod._LECTURAS.vaciar()
     clientes = [c for c in onboarding.listar_clientes(conn) if c.get("estado") == "activo"]
     todos = [{"slug": c["slug"], "nombre": c["nombre"]} for c in clientes]
     if cliente:
         clientes = [c for c in clientes if c["slug"] == cliente]
     filas, notas = [], []
-    for c in clientes:
-        d = _datos(cfg, c, bool(actualizar))
+    # Cada cliente consulta GLPI, Mesh y Zabbix por separado: en paralelo la pantalla tarda lo del más lento.
+    resultados = perf.paralelo([(lambda c=c: _datos(cfg, c, bool(actualizar))) for c in clientes])
+    for c, (ok, d) in zip(clientes, resultados):
+        if not ok:
+            notas.append(f"{c['nombre']}: {getattr(d, 'detalle', d)}"[:160])
+            continue
         for e in d["equipos"]:
             filas.append({**e, "cliente": c["nombre"], "slug": c["slug"]})
         if d["notas"]:

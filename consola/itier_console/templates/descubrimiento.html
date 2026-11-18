@@ -1,9 +1,13 @@
 {% extends "base.html" %}
 {% block titulo %}Descubrimiento · {{ cli.nombre }}{% endblock %}
 {% block contenido %}
-  <div class="page-head">
-    <h1>Descubrimiento de red · {{ cli.nombre }}</h1>
-    <a class="btn" href="/clientes/{{ cli.slug }}">← Volver al cliente</a>
+  <div class="l-head">
+    <div>
+      <p class="u-sub" style="margin:0 0 .2rem"><a href="/clientes/{{ cli.slug }}">← {{ cli.nombre }}</a></p>
+      <h1>Descubrimiento de red · {{ cli.nombre }}</h1>
+      <p class="u-sub">Rangos de IP y credenciales SNMP para encontrar los dispositivos de la red del cliente.</p>
+    </div>
+    <div class="acciones"><a class="u-b" href="/clientes/{{ cli.slug }}" style="text-decoration:none">← Volver al cliente</a></div>
   </div>
 
   <div class="note">
@@ -32,9 +36,9 @@
           <td><code>{{ r.ip_start }} – {{ r.ip_end }}</code></td>
           <td>v{{ r.snmp_version }}</td>
           <td>
-            {% if r.estado == 'aplicado' %}<span class="badge badge-activo">aplicado</span>
-            {% elif r.estado == 'error' %}<span class="badge badge-error">error</span>
-            {% else %}<span class="badge badge-provisionando">pendiente</span>{% endif %}
+            {% if r.estado == 'aplicado' %}<span class="l-pill ok"><i></i>aplicado</span>
+            {% elif r.estado == 'error' %}<span class="l-pill bad"><i></i>error</span>
+            {% else %}<span class="l-pill warn"><i></i>pendiente</span>{% endif %}
             {% if r.estado == 'error' and r.detalle %}<div class="muted small">{{ r.detalle }}</div>{% endif %}
           </td>
           <td class="acciones">

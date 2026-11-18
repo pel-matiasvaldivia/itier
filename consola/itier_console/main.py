@@ -12,13 +12,14 @@ from __future__ import annotations
 
 import logging
 import os
+import time
 
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.sessions import SessionMiddleware
 
-from . import security
+from . import perf, security
 from .config import Config
 from .db import connect, init_db
 from .deps import AccesoConsola, AccesoPortal, AuthRequired, CambioClaveRequerido, PermisoDenegado, BASE, flash
@@ -80,7 +81,29 @@ def create_app() -> FastAPI:
         max_age=cfg.session_max_age,
     )
 
-    app.mount("/static", StaticFiles(directory=str(BASE / "static")), name="static")
+    class EstaticosCacheados(StaticFiles):
+        """Con `?v=<huella>` el archivo es inmutable (1 año); sin versión, se revalida."""
+        async def get_response(self, path, scope):
+            resp = await super().get_response(path, scope)
+            if resp.status_code in (200, 304):
+                versionado = b"v=" in (scope.get("query_string") or b"")
+                resp.headers["Cache-Control"] = "public, max-age=31536000, immutable" if versionado else "no-cache"
+            return resp
+
+    app.mount("/static", EstaticosCacheados(directory=str(BASE / "static")), name="static")
+
+    @app.middleware("http")
+    async def _tiempos(request: Request, call_next):
+        """Cuánto tarda cada request y cuánto de eso es GLPI/Zabbix/Mesh → cabecera Server-Timing y log si es lento."""
+        acum = perf.iniciar()
+        t0 = time.perf_counter()
+        resp = await call_next(request)
+        total = time.perf_counter() - t0
+        if not request.url.path.startswith("/static") and request.url.path != "/healthz":
+            resp.headers["Server-Timing"] = perf.server_timing(total, acum)
+            if total > 1.0:
+                log.warning("LENTO %s %s %.0f ms (%s)", request.method, request.url.path, total * 1000, perf.resumen(acum))
+        return resp
 
     @app.exception_handler(AuthRequired)
     async def _auth_required(request: Request, _exc: AuthRequired):
