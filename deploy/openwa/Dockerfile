@@ -9,10 +9,12 @@ FROM openwa/wa-automate:latest
 ARG WA_VERSION=5.10.0
 
 USER root
-# `ps` lo usa la librería para limpiar procesos de Chrome (sin él se cae con «spawn ps ENOENT»).
-RUN apt-get update \
- && apt-get install -y --no-install-recommends procps curl ca-certificates \
- && rm -rf /var/lib/apt/lists/* \
+# Sin apt: la base es Debian bullseye (archivada) y sus repositorios ya no responden.
+# La librería usa `ps` para limpiar procesos de Chrome (sin él: «spawn ps ENOENT»): si la
+# base no lo trae, se agrega un sustituto mínimo que lee /proc.
+COPY ps-shim.sh /tmp/ps-shim.sh
+RUN command -v ps >/dev/null 2>&1 || install -m 0755 /tmp/ps-shim.sh /usr/local/bin/ps; \
+    rm -f /tmp/ps-shim.sh \
  && mkdir -p /opt/itier-openwa /sessions \
  && chown -R owauser:owauser /opt/itier-openwa /sessions
 
@@ -34,5 +36,5 @@ ENV WA_EXECUTABLE_PATH=/usr/bin/google-chrome \
 USER owauser
 EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=5 \
-  CMD curl -fsS http://127.0.0.1:8080/health >/dev/null || exit 1
+  CMD node -e "fetch('http://127.0.0.1:8080/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
 ENTRYPOINT ["/usr/bin/dumb-init", "--", "/usr/local/bin/itier-entrypoint.sh"]
