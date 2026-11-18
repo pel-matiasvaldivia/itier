@@ -303,6 +303,7 @@ cfg_mesh = dataclasses.replace(cfg, mesh_url=f"http://127.0.0.1:{_srv.socket.get
                                mesh_user="itier", mesh_password="clave", mesh_support_group="SOPORTE")
 with mesh_mod.cliente(cfg_mesh) as mc:
     mid = mc.asegurar_grupo("itier-x")
+    mc.compartir_con_soporte(mid)
     eq = mc.equipos(mid)
 check("mesh: autentica con x-meshauth (usuario,clave en base64)",
       _mesh_visto["auth"] == base64.b64encode(b"itier").decode() + "," + base64.b64encode(b"clave").decode())
@@ -313,6 +314,7 @@ with mesh_mod.cliente(cfg_mesh) as mc2:
     antes = _mesh_visto["acciones"].count("createmesh")
     check("mesh: si el grupo existe no lo crea de nuevo", mc2.asegurar_grupo("itier-x") == "NUEVO@$id"
           and _mesh_visto["acciones"].count("createmesh") == antes)
+    mc2.compartir_con_soporte("NUEVO@$id")
 check("mesh: URL del agente Windows x64, en segundo plano",
       mesh_mod.url_agente_windows(cfg_mesh, "NUEVO@$id").endswith("/meshagents?id=4&meshid=NUEVO@$id&installflags=2"))
 check("mesh: crea el grupo de usuarios SOPORTE si no existe y comparte el grupo del cliente con él",
@@ -325,7 +327,7 @@ check("mesh: re-compartir es idempotente y reutiliza el grupo de usuarios", len(
 _mesh_denegar = True
 try:
     with mesh_mod.cliente(cfg_mesh) as mc3:
-        mc3.asegurar_grupo("itier-x")
+        mc3.compartir_con_soporte(mc3.asegurar_grupo("itier-x"))
     check("mesh: un rechazo al compartir se informa", False)
 except AdapterError as e:
     check("mesh: un rechazo al compartir se informa", "Permission denied" in str(e), str(e))

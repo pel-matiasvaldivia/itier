@@ -83,7 +83,7 @@ class MeshClient:
             except TimeoutError:
                 break
             except Exception as e:  # noqa: BLE001
-                raise AdapterError("mesh", f"conexión interrumpida: {e}") from e
+                raise AdapterError("mesh", f"conexión interrumpida durante «{accion.get('action')}»: {e}") from e
             if msg.get("action") == esperar and msg.get("responseid", responseid) == responseid:
                 if ok is not None:
                     if not ok(msg):
@@ -108,7 +108,6 @@ class MeshClient:
             completo = self._buscar(nombre)
         if not completo:
             raise AdapterError("mesh", f"se creó el grupo «{nombre}» pero no aparece en la lista")
-        self._compartir(completo)
         return id_corto(completo)
 
     def _buscar(self, nombre: str) -> str | None:
@@ -136,13 +135,16 @@ class MeshClient:
                                "«Administrar grupos de usuarios».") from e
         return r.get("ugrpid") or buscar() or ""
 
-    def _compartir(self, meshid: str) -> None:
+    def compartir_con_soporte(self, mesh_id: str) -> None:
         """Da acceso al grupo del cliente al grupo de usuarios de soporte (los técnicos son
         miembros de ese grupo). Idempotente. Los grupos de dispositivos solo los ven su dueño
         (la cuenta de servicio) y quienes tengan acceso."""
         nombre = self._cfg.mesh_support_group
-        if not nombre:
+        if self._cfg.demo or not nombre:
             return
+        meshid = next((g["_id"] for g in self._grupos() if id_corto(g["_id"]) == mesh_id), None)
+        if not meshid:
+            raise AdapterError("mesh", f"no se encontró el grupo de equipos {mesh_id} para compartirlo")
         if not hasattr(self, "_ugrp"):
             self._ugrp = self._grupo_usuarios(nombre)
         if not self._ugrp:

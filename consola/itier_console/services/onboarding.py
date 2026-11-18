@@ -122,7 +122,13 @@ def autoasignar(conn: sqlite3.Connection, cfg, actor: str, cid: int) -> None:
         try:
             with mesh_mod.cliente(cfg) as m:
                 mesh_id = m.asegurar_grupo(marca)
-            conn.execute("UPDATE clients SET mesh_id=? WHERE id=?", (mesh_id, cid))
+                # El grupo ya existe: se guarda ANTES de compartirlo, así un fallo al compartir
+                # no impide que el instalador lleve el Mesh Agent.
+                conn.execute("UPDATE clients SET mesh_id=? WHERE id=?", (mesh_id, cid))
+                try:
+                    m.compartir_con_soporte(mesh_id)
+                except AdapterError as e:
+                    errores.append(f"MeshCentral (compartir con {cfg.mesh_support_group}): {e.detalle}")
         except AdapterError as e:
             errores.append(f"MeshCentral (grupo): {e.detalle}")
     if not rule_id:
