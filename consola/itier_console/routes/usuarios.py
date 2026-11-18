@@ -17,7 +17,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 
 from .. import security
 from ..deps import flash, get_db, render, require_permiso
-from ..services import ServiceError, rbac, usuarios as svc
+from ..services import ServiceError, correo, rbac, usuarios as svc
 
 router = APIRouter()
 
@@ -39,17 +39,17 @@ def lista(request: Request, user: dict = Depends(require_permiso("usuarios")), c
     nueva = request.session.pop("_clave_usuario", None)   # se muestra UNA sola vez
     return render(request, "usuarios.html", usuarios=svc.listar(conn), roles=rbac.ROLES, nueva=nueva, yo=user["uid"],
                   cfg_glpi=request.app.state.cfg.glpi_configurado, cfg_zbx=request.app.state.cfg.zbx_configurado,
-                  cfg_mesh=request.app.state.cfg.mesh_enabled)
+                  cfg_mesh=request.app.state.cfg.mesh_enabled, smtp=correo.configurado(request.app.state.cfg))
 
 
 @router.post("/usuarios")
 def alta(request: Request, username: str = Form(""), email: str = Form(""), nombre: str = Form(""),
-         rol: str = Form("tecnico"), csrf: str = Form(""), user: dict = Depends(require_permiso("usuarios")),
+         rol: str = Form("tecnico"), enviar: str = Form(""), csrf: str = Form(""), user: dict = Depends(require_permiso("usuarios")),
          conn: sqlite3.Connection = Depends(get_db)):
     if not _csrf(request, csrf):
         return RedirectResponse("/usuarios", status_code=303)
     try:
-        _uid, clave, estados = svc.crear(conn, request.app.state.cfg, user["user"], username, email, nombre, rol)
+        _uid, clave, estados = svc.crear(conn, request.app.state.cfg, user["user"], username, email, nombre, rol, enviar=bool(enviar))
     except ServiceError as e:
         flash(request, e.mensaje, "error")
         return RedirectResponse("/usuarios", status_code=303)

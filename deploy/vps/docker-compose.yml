@@ -267,6 +267,8 @@ services:
       ITIER_ALERTA_DISCO_PCT: ${ITIER_ALERTA_DISCO_PCT:-90}
       # Grupo de usuarios de Zabbix al que pertenecen los técnicos y PM (la consola le da acceso a cada cliente).
       ITIER_ZBX_SOPORTE_GROUP: ${ITIER_ZBX_SOPORTE_GROUP:-iTier Soporte}
+      # URL pública de la web de Zabbix: solo para mostrarla en el correo de bienvenida a los usuarios.
+      ITIER_ZBX_PUBLIC_URL: ${ITIER_ZBX_PUBLIC_URL:-}
       ITIER_SMTP_HOST: ${ITIER_SMTP_HOST:-}
       ITIER_SMTP_PORT: ${ITIER_SMTP_PORT:-587}
       ITIER_SMTP_USER: ${ITIER_SMTP_USER:-}

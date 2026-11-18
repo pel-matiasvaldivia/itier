@@ -94,6 +94,7 @@ class Config:
     mesh_password: str | None = None
     alerta_disco_pct: int = 90             # alerta cuando un disco supera este % de uso
     zbx_soporte_grupo: str = "iTier Soporte"  # grupo de usuarios de Zabbix con acceso a los hosts de los clientes
+    zbx_public_url: str | None = None      # URL pública de la web de Zabbix (solo para mostrarla en el correo de bienvenida)
     mesh_support_group: str = "SOPORTE"    # grupo de usuarios de Mesh (técnicos) con acceso a todos los clientes
 
     @classmethod
@@ -166,6 +167,7 @@ class Config:
             mesh_password=os.environ.get("ITIER_MESH_PASSWORD") or None,
             alerta_disco_pct=int(os.environ.get("ITIER_ALERTA_DISCO_PCT", "90")),
             zbx_soporte_grupo=(os.environ.get("ITIER_ZBX_SOPORTE_GROUP", "iTier Soporte") or "iTier Soporte").strip(),
+            zbx_public_url=(os.environ.get("ITIER_ZBX_PUBLIC_URL") or "").rstrip("/") or None,
             mesh_support_group=(os.environ.get("ITIER_MESH_SUPPORT_GROUP", "SOPORTE") or "").strip(),
             cloudflared_win_url=os.environ.get("ITIER_CLOUDFLARED_WIN_URL") or (
                 "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-windows-amd64.exe"),

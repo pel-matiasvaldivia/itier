@@ -47,12 +47,14 @@ def texto_instalacion(nombre_cliente: str, url: str, dias: int) -> tuple[str, st
     return asunto, cuerpo
 
 
-def enviar(cfg, destinatario: str, asunto: str, cuerpo: str) -> None:
+def enviar(cfg, destinatario: str, asunto: str, cuerpo: str, html: str | None = None) -> None:
     if not configurado(cfg):
         raise ServiceError("El envío de correo no está configurado (ITIER_SMTP_HOST / ITIER_SMTP_FROM).")
     msg = EmailMessage()
     msg["From"], msg["To"], msg["Subject"] = cfg.smtp_from, destinatario, asunto
     msg.set_content(cuerpo)
+    if html:
+        msg.add_alternative(html, subtype="html")
     try:
         if cfg.smtp_tls == "ssl":
             smtp = smtplib.SMTP_SSL(cfg.smtp_host, cfg.smtp_port, timeout=20, context=ssl.create_default_context())

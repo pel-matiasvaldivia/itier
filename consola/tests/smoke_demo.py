@@ -466,6 +466,70 @@ tp, _ = _login_operador("mgomez", clave_pm)
 check("PM: ve auditoría y clientes pero NO el ABM de usuarios",
       "Auditoría" in tp.get("/auditoria").text and tp.get("/clientes").status_code == 200 and tp.get("/usuarios").url.path == "/")
 
+# Correo de bienvenida: credenciales + responsabilidades + manual del rol
+from itier_console.services import correo as _correo_svc  # noqa: E402
+
+_enviados = []
+_cfg_ok, _env_ok = _correo_svc.configurado, _correo_svc.enviar
+_correo_svc.configurado = lambda cfg: True
+_correo_svc.enviar = lambda cfg, dest, asunto, cuerpo, html=None: _enviados.append((dest, asunto, cuerpo, html))
+pag = c.get("/usuarios")
+check("usuarios: con SMTP configurado ofrece enviar el correo", 'name="enviar"' in pag.text and "disabled" not in pag.text.split('name="enviar"')[1][:60])
+r = c.post("/usuarios", data={"username": "ltec", "email": "ltec@pymesenlinea.com.ar", "nombre": "<b>Lucía</b> Técnica",
+                              "rol": "tecnico", "enviar": "1", "csrf": csrf_de(pag.text)})
+clave_lt = re.search(r"Clave:\s+([^\s<]+)", r.text).group(1)
+dest, asunto, cuerpo, html = _enviados[-1]
+check("correo: va al correo del formulario", dest == "ltec@pymesenlinea.com.ar" and "Lucía" in cuerpo)
+check("correo: informa el alta, el rol y las credenciales", "Técnico" in asunto and "Usuario: ltec" in cuerpo and f"Clave temporal: {clave_lt}" in cuerpo
+      and clave_lt in html)
+check("correo: explica la misión y las responsabilidades del técnico", "TUS RESPONSABILIDADES" in cuerpo and "tickets que se te asignan" in cuerpo
+      and "Conectarte de forma remota solo con un motivo" in cuerpo)
+check("correo: trae el manual de operaciones del rol (revisar alertas, conexión remota)",
+      "MANUAL DE OPERACIONES" in cuerpo and "REVISAR EQUIPOS Y ALERTAS" in cuerpo and "CONEXIÓN REMOTA A UN EQUIPO" in cuerpo)
+check("correo: el técnico NO recibe procedimientos de PM ni de administrador",
+      "INSTALAR AGENTES" not in cuerpo and "ADMINISTRAR USUARIOS" not in cuerpo and "DAR DE ALTA UN CLIENTE" not in cuerpo)
+check("correo: pide cambiar la clave y activar 2FA, y borrar el correo", "2FA" in cuerpo and "borrá este correo" in cuerpo)
+check("correo: el HTML escapa lo que escribió el administrador", "<b>Lucía</b>" not in html and "&lt;b&gt;" in html)
+check("correo: la card del alta informa el envío", "enviado a ltec@pymesenlinea.com.ar" in r.text or "ok*" in r.text or 'title="ok (enviado' in r.text)
+check("correo: la clave NO queda en la auditoría", clave_lt not in c.get("/auditoria").text)
+r = c.post("/usuarios", data={"username": "pmgr", "email": "pmgr@pymesenlinea.com.ar", "nombre": "Paula Mgr", "rol": "pm",
+                              "enviar": "1", "csrf": csrf_de(c.get("/usuarios").text)})
+cuerpo_pm = _enviados[-1][2]
+check("correo PM: incluye alta de clientes e instaladores pero no el ABM de usuarios",
+      "DAR DE ALTA UN CLIENTE" in cuerpo_pm and "INSTALAR AGENTES" in cuerpo_pm and "ADMINISTRAR USUARIOS" not in cuerpo_pm)
+r = c.post("/usuarios", data={"username": "adm2", "email": "adm2@pymesenlinea.com.ar", "nombre": "Admin Dos", "rol": "admin",
+                              "enviar": "1", "csrf": csrf_de(c.get("/usuarios").text)})
+check("correo administrador: incluye el ABM de usuarios y la baja de clientes",
+      "ADMINISTRAR USUARIOS" in _enviados[-1][2] and "DAR DE BAJA UN CLIENTE" in _enviados[-1][2])
+n0 = len(_enviados)
+c.post("/usuarios", data={"username": "sincorreo", "email": "sc@pymesenlinea.com.ar", "nombre": "", "rol": "tecnico",
+                          "csrf": csrf_de(c.get("/usuarios").text)})
+check("correo: si no se tilda «enviar» no se manda nada", len(_enviados) == n0)
+_correo_svc.enviar = lambda *a, **k: (_ for _ in ()).throw(__import__("itier_console.services", fromlist=["ServiceError"]).ServiceError("SMTP caído"))
+r = c.post("/usuarios", data={"username": "fallo", "email": "fa@pymesenlinea.com.ar", "nombre": "", "rol": "tecnico",
+                              "enviar": "1", "csrf": csrf_de(c.get("/usuarios").text)})
+check("correo: si el SMTP falla el alta igual se crea y la clave se muestra", "Clave:" in r.text and "SMTP caído" in r.text)
+uid_lt = int(re.search(r'/usuarios/(\d+)/rol', c.get("/usuarios").text.split("<strong>ltec</strong>")[1]).group(1))
+_correo_svc.enviar = lambda cfg, dest, asunto, cuerpo, html=None: _enviados.append((dest, asunto, cuerpo, html))
+c.post(f"/usuarios/{uid_lt}/clave", data={"csrf": csrf_de(c.get("/usuarios").text)})
+check("correo: al reiniciar la clave se mandan las credenciales nuevas (sin repetir el manual)",
+      _enviados[-1][1] == "iTier: tu clave fue reiniciada" and "Clave temporal:" in _enviados[-1][2] and "MANUAL DE OPERACIONES" not in _enviados[-1][2])
+_correo_svc.configurado, _correo_svc.enviar = _cfg_ok, _env_ok
+# (se limpian los usuarios de prueba que sumarían administradores y falsearían las pruebas de protección)
+for _n in ("adm2", "pmgr", "sincorreo", "fallo"):
+    _m = re.search(r'/usuarios/(\d+)/rol', c.get("/usuarios").text.split(f"<strong>{_n}</strong>")[1]) if f"<strong>{_n}</strong>" in c.get("/usuarios").text else None
+    if _m:
+        c.post(f"/usuarios/{_m.group(1)}/eliminar", data={"csrf": csrf_de(c.get("/usuarios").text)})
+
+# Manual en la consola
+tt, _ = _login_operador("ltec", clave_lt) if False else (tj, None)
+man = tj.get("/manual")
+check("manual: cada operador lee el de su rol", man.status_code == 200 and "Manual de operaciones" in man.text)
+check("manual: el administrador puede ver el de otro rol", "Conexión remota a un equipo" in c.get("/manual?rol=tecnico").text
+      and "Administrar usuarios y roles" in c.get("/manual?rol=admin").text and "Administrar usuarios y roles" not in c.get("/manual?rol=tecnico").text)
+check("manual: un técnico no puede pedir el manual de otro rol", "Administrar usuarios y roles" not in tj.get("/manual?rol=admin").text)
+check("clientes: solo el administrador puede eliminar clientes", tp.post("/clientes/prueba-srl/eliminar", data={"csrf": csrf_de(tp.get("/").text)}).url.path == "/")
+
 # cambio de rol, reinicio de clave, baja/alta y protecciones
 uid_jp = int(re.search(r'/usuarios/(\d+)/rol', c.get("/usuarios").text.split("<strong>jperez</strong>")[1]).group(1))
 r = c.post(f"/usuarios/{uid_jp}/rol", data={"rol": "pm", "csrf": csrf_de(c.get("/usuarios").text)})

@@ -3,7 +3,7 @@
 {% macro estado(v) -%}
   {% if v is none or v == '' %}<span class="muted">—</span>
   {% elif v.startswith('ok') %}<span class="dot ok" title="{{ v }}"></span>{{ 'ok' if v == 'ok' else 'ok*' }}
-  {% elif v == 'no configurado' %}<span class="muted">no config.</span>
+  {% elif v == 'no configurado' or v == 'no solicitado' %}<span class="muted">{{ 'no config.' if v == 'no configurado' else 'no enviado' }}</span>
   {% else %}<span class="dot bad" title="{{ v }}"></span><span class="small">{{ v[:70] }}</span>{% endif %}
 {%- endmacro %}
 {% block contenido %}
@@ -19,9 +19,10 @@ Clave:   {{ nueva.clave }}</pre>
     <div class="note small"><strong>Copiala ahora:</strong> no se vuelve a mostrar ni se guarda. Entregásela por un canal seguro.
       En el primer ingreso la consola y MeshCentral piden cambiarla; GLPI y Zabbix la conservan hasta que la cambie el usuario.</div>
     <table class="tabla">
-      <thead><tr><th>Consola</th><th>GLPI</th><th>Zabbix</th><th>MeshCentral</th></tr></thead>
+      <thead><tr><th>Consola</th><th>GLPI</th><th>Zabbix</th><th>MeshCentral</th><th>Correo</th></tr></thead>
       <tbody><tr><td><span class="dot ok"></span>ok</td><td>{{ estado(nueva.estados.glpi) }}</td>
-        <td>{{ estado(nueva.estados.zbx) }}</td><td>{{ estado(nueva.estados.mesh) }}</td></tr></tbody>
+        <td>{{ estado(nueva.estados.zbx) }}</td><td>{{ estado(nueva.estados.mesh) }}</td>
+        <td>{{ estado(nueva.estados.correo) }}</td></tr></tbody>
     </table>
   </div>
   {% endif %}
@@ -40,6 +41,9 @@ Clave:   {{ nueva.clave }}</pre>
           {% for k, v in roles.items() %}<option value="{{ k }}" {{ 'selected' if k == 'tecnico' }}>{{ v }}</option>{% endfor %}
         </select>
       </label>
+      <label class="small"><input type="checkbox" name="enviar" value="1" {{ 'checked' if smtp else 'disabled' }}>
+        Enviar por correo las credenciales, las responsabilidades del rol y el manual de operaciones
+        {% if not smtp %}<span class="muted">(SMTP sin configurar: <code>ITIER_SMTP_HOST</code>)</span>{% endif %}</label>
       <button class="btn btn-primary" type="submit">Crear en todos los sistemas</button>
     </form>
     <details class="small"><summary>¿Qué puede hacer cada rol?</summary>

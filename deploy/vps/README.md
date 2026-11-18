@@ -308,6 +308,14 @@ Qué hace cada acción: **Reiniciar clave** pone una clave nueva en los tres (en
 Mesh (cuenta bloqueada + fuera de SOPORTE); la baja y los cambios de rol rigen **al instante**, aunque tenga la sesión abierta.
 **Eliminar** borra la cuenta en los cuatro. Cada sistema es independiente: si uno falla, el estado queda a la vista por sistema en la lista.
 
+**Correo de bienvenida y manual.** Al dar de alta un usuario, con «Enviar por correo» tildado (requiere `ITIER_SMTP_HOST` y `ITIER_SMTP_FROM`)
+el usuario recibe en el correo del formulario: sus accesos a cada sistema, el usuario y la clave temporal, su misión y responsabilidades según el
+rol, las funciones que tiene en la consola y el **manual de operaciones de su perfil** (el técnico no recibe procedimientos de PM ni de
+administrador). «Reiniciar clave» manda solo las credenciales nuevas. Si el SMTP falla, el alta igual se hace y la clave se muestra en pantalla.
+El mismo manual está en la consola, menú **Manual** (el administrador puede ver el de cualquier rol). Se edita en
+`consola/itier_console/services/manual.py`. ⚠ El correo lleva la clave inicial en claro: por eso es temporal, el correo le pide al usuario
+cambiarla y borrarlo, y conviene un SMTP con TLS (`ITIER_SMTP_TLS=starttls|ssl`).
+
 > ⚠ La clave solo es la misma **al principio**: la consola y Mesh piden cambiarla en el primer ingreso y cada sistema la maneja después por su cuenta.
 > Cada usuario debería activar 2FA en las cuatro. Para un único inicio de sesión real habría que pasar a SSO (OIDC/SAML).
 

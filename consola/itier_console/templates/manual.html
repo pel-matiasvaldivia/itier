@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block titulo %}Manual de operaciones · Consola de iTier{% endblock %}
+{% block contenido %}
+  <div class="page-head">
+    <h1>Manual de operaciones — {{ m.rol_nombre }}</h1>
+    {% if es_admin %}
+    <div class="acciones">
+      <form method="get" action="/manual" class="inline">
+        <select name="rol" onchange="this.form.submit()">
+          {% for k, v in roles.items() %}<option value="{{ k }}" {{ 'selected' if k == elegido }}>{{ v }}</option>{% endfor %}
+        </select>
+      </form>
+    </div>
+    {% endif %}
+  </div>
+
+  <div class="card">
+    <h2>Tu misión</h2>
+    <p>{{ m.mision }}</p>
+    <h2>Tus responsabilidades</h2>
+    <ul>{% for r in m.responsabilidades %}<li>{{ r }}</li>{% endfor %}</ul>
+  </div>
+
+  <div class="card">
+    <h2>Qué podés hacer en la consola</h2>
+    <table class="tabla">
+      <tbody>{% for menu, que in m.funciones %}<tr><td><strong>{{ menu }}</strong></td><td>{{ que }}</td></tr>{% endfor %}</tbody>
+    </table>
+  </div>
+
+  <div class="card">
+    <h2>Procedimientos</h2>
+    {% for titulo, pasos in m.procedimientos %}
+      <h3>{{ titulo }}</h3>
+      <ol>{% for p in pasos %}<li>{{ p }}</li>{% endfor %}</ol>
+    {% endfor %}
+  </div>
+
+  <div class="card">
+    <h2>Reglas de oro</h2>
+    <ul>{% for r in m.reglas %}<li>{{ r }}</li>{% endfor %}</ul>
+    <p><strong>Escalamiento:</strong> {{ m.escalamiento }}</p>
+  </div>
+{% endblock %}

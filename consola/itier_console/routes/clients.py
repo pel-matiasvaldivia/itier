@@ -152,7 +152,7 @@ def eliminar(
     request: Request,
     slug: str,
     csrf: str = Form(""),
-    user: dict = Depends(require_permiso("clientes.editar")),
+    user: dict = Depends(require_permiso("clientes.eliminar")),
     conn: sqlite3.Connection = Depends(get_db),
 ):
     cli = onboarding.obtener_cliente_por_slug(conn, slug)

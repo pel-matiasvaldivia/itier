@@ -17,7 +17,7 @@ import sqlite3
 
 from .. import audit, security
 from ..adapters import AdapterError, glpi as glpi_mod, mesh as mesh_mod, zabbix as zbx_mod
-from . import ServiceError, correo, rbac
+from . import ServiceError, bienvenida, correo, rbac
 
 _RE_USUARIO = re.compile(r"^[a-z0-9][a-z0-9._-]{2,31}$")
 _MINUS, _MAYUS, _DIG, _SIM = "abcdefghjkmnpqrstuvwxyz", "ABCDEFGHJKLMNPQRSTUVWXYZ", "23456789", "-_!+"
@@ -101,8 +101,22 @@ def _aprovisionar(conn, cfg, u: dict, clave: str) -> dict[str, str]:
     return estados
 
 
-def crear(conn: sqlite3.Connection, cfg, actor: str, username: str, email: str, nombre: str, rol: str) -> tuple[int, str, dict]:
-    """Alta en consola + GLPI + Zabbix + Mesh. → (uid, clave en claro —mostrar UNA vez—, estados)."""
+def _correo(cfg, u: dict, clave: str, motivo: str) -> str:
+    """Manda las credenciales (y, en el alta, responsabilidades y manual del rol) al correo del usuario."""
+    if not correo.configurado(cfg):
+        return "no configurado"
+    try:
+        asunto, texto, html = bienvenida.armar(cfg, u["username"], u.get("nombre") or "", u["rol"], clave, motivo)
+        correo.enviar(cfg, u["email"], asunto, texto, html)
+    except ServiceError as e:
+        return f"error: {e.mensaje}"[:300]
+    return f"ok (enviado a {u['email']})"
+
+
+def crear(conn: sqlite3.Connection, cfg, actor: str, username: str, email: str, nombre: str, rol: str,
+          enviar: bool = False) -> tuple[int, str, dict]:
+    """Alta en consola + GLPI + Zabbix + Mesh (+ correo de bienvenida si `enviar`).
+    → (uid, clave en claro —mostrar UNA vez—, estados)."""
     username = (username or "").strip().lower()
     email = (email or "").strip().lower()
     nombre = (nombre or "").strip()[:80]
@@ -111,7 +125,9 @@ def crear(conn: sqlite3.Connection, cfg, actor: str, username: str, email: str, 
         raise ServiceError("Ya existe un usuario con ese nombre en la consola.")
     clave = generar_clave()
     uid = security.crear_usuario(conn, username, clave, rol=rol, must_change_pw=True, email=email, nombre=nombre)
-    estados = _aprovisionar(conn, cfg, _fila(conn, uid), clave)
+    u = _fila(conn, uid)
+    estados = _aprovisionar(conn, cfg, u, clave)
+    estados["correo"] = _correo(cfg, u, clave, "alta") if enviar else "no solicitado"
     audit.registrar(conn, actor, "usuario.creado", {"usuario": username, "rol": rol, "email": email, "sync": estados})
     return uid, clave, estados
 
@@ -130,6 +146,7 @@ def reiniciar_clave(conn: sqlite3.Connection, cfg, actor: str, uid: int) -> tupl
         except AdapterError:
             pass   # si no existía, el alta lo crea
     estados = _aprovisionar(conn, cfg, u, clave)
+    estados["correo"] = _correo(cfg, u, clave, "reinicio") if u.get("email") else "no configurado"
     audit.registrar(conn, actor, "usuario.clave_reiniciada", {"usuario": u["username"], "sync": estados})
     return clave, estados
 

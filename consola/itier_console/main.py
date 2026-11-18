@@ -30,6 +30,7 @@ from .routes import dashboard as r_dashboard
 from .routes import discovery as r_discovery
 from .routes import enrolamiento as r_enrolamiento
 from .routes import equipos as r_equipos
+from .routes import manual as r_manual
 from .routes import portal as r_portal
 from .routes import tickets as r_tickets
 from .routes import usuarios as r_usuarios
@@ -115,6 +116,7 @@ def create_app() -> FastAPI:
     app.include_router(r_enrolamiento.router)
     app.include_router(r_equipos.router)
     app.include_router(r_usuarios.router)
+    app.include_router(r_manual.router)
     app.include_router(r_curacion.router)
     app.include_router(r_tickets.router)
     app.include_router(r_audit.router)
