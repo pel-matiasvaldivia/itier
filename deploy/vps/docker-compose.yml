@@ -177,11 +177,15 @@ services:
     <<: *comun
     image: ${OPENWA_IMAGE:-openwa/wa-automate:latest}
     command: >
-      --port 8080 --api-key ${ITIER_WA_API_KEY:?definí ITIER_WA_API_KEY en el .env} --headless
+      --port 8080 --api-key ${ITIER_WA_API_KEY:?definí ITIER_WA_API_KEY en el .env}
+      --session-data-path /sessions
       --webhook http://consola:8080/hooks/whatsapp/${ITIER_WA_HOOK_TOKEN:?definí ITIER_WA_HOOK_TOKEN en el .env}
       --session-id itier-soporte
     environment:
       TZ: ${TZ:-America/Argentina/Buenos_Aires}
+      # La imagen instala la librería al arrancar y `latest` (v5) ya NO trae bin/server.js, que es lo que
+      # ejecuta el entrypoint de la imagen (falla con MODULE_NOT_FOUND). Se fija la última 4.x que sí lo trae.
+      W_A_V: ${OPENWA_LIB_VERSION:-4.76.0}
     volumes:
       - openwa_data:/sessions
     networks: [interna, publica]
