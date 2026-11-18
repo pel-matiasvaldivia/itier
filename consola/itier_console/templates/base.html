@@ -31,6 +31,7 @@
       {% if puede('tickets') %}<a href="/tickets" class="{{ 'on' if ruta.startswith('/tickets') else '' }}">Tickets</a>{% endif %}
       {% if puede('canales') %}<a href="/canales" class="{{ 'on' if ruta.startswith('/canales') else '' }}">Canales</a>{% endif %}
       {% if puede('bandeja') %}<a href="/bandeja" class="{{ 'on' if ruta.startswith('/bandeja') else '' }}">Bandeja</a>{% endif %}
+      {% if puede('reportes') %}<a href="/reportes/horas" class="{{ 'on' if ruta.startswith('/reportes') else '' }}">Horas</a>{% endif %}
       {% if puede('auditoria') %}<a href="/auditoria" class="{{ 'on' if ruta.startswith('/auditoria') else '' }}">Auditoría</a>{% endif %}
       <a href="/manual" class="{{ 'on' if ruta.startswith('/manual') else '' }}">Manual</a>
       {% if puede('usuarios') %}<a href="/usuarios" class="{{ 'on' if ruta.startswith('/usuarios') else '' }}">Usuarios</a>{% endif %}

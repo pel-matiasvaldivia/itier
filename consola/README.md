@@ -196,6 +196,12 @@ Los pedidos de soporte por correo (buzón IMAP) y WhatsApp (webhook de OpenWA, `
 (o se suma como seguimiento) y lo no reconocido queda en la **Bandeja** (`/bandeja`, PM/administrador). Alta y operación:
 `deploy/vps/README.md` → «Canales de entrada». La cuenta IMAP y el QR de WhatsApp se configuran en la pantalla **Canales** (administrador); los ajustes se guardan en la base (`ajustes`, secretos cifrados). WhatsApp vía OpenWA es una API no oficial: ver la advertencia allí.
 
+## Horas y rentabilidad por cliente
+
+Los técnicos registran el tiempo en cada ticket («Tiempo dedicado», va a las tareas de GLPI). La pantalla **Horas**
+(administrador) suma por cliente y por persona, aplica la tarifa por hora de cada uno y la parte del costo de la plataforma,
+y compara contra lo facturado (pesos → USD con la cotización del BCRA, que se trae con un botón o se carga a mano).
+
 ## Soporte remoto (MeshCentral)
 
 `ITIER_MESH_URL`, `ITIER_MESH_USER`, `ITIER_MESH_PASSWORD` (cuenta de servicio **sin 2FA**). Al dar de alta o reprovisionar un

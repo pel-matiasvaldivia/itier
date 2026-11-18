@@ -16,6 +16,7 @@ ROLES = {
     "tecnico": "Técnico",
 }
 
+# «reportes» (horas y rentabilidad) no está en ningún rol salvo admin (= todo): maneja plata.
 _TODOS = {"tablero", "tickets", "equipos", "equipos.remoto", "clientes.ver"}
 _PM = _TODOS | {"clientes.editar", "instaladores", "descubrimiento", "curacion", "agentes", "auditoria", "bandeja"}
 

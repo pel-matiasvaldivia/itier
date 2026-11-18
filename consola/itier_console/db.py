@@ -157,6 +157,12 @@ CREATE TABLE IF NOT EXISTS ajustes (
     updated_by TEXT
 );
 
+-- Costo por hora (USD) de cada persona que carga horas: para el reporte de rentabilidad.
+CREATE TABLE IF NOT EXISTS tarifas (
+    username TEXT PRIMARY KEY,
+    usd_hora REAL NOT NULL
+);
+
 -- Enlaces de instalación del appliance: token de un solo propósito, con
 -- vencimiento y usos acotados. Se guarda SOLO el hash (el token se muestra una vez).
 CREATE TABLE IF NOT EXISTS enroll_tokens (
@@ -234,6 +240,8 @@ def _migrar(conn: sqlite3.Connection) -> None:
                 "glpi_rule_id", "zbx_action_id", "autoasig_detalle", "report_key", "central_key", "mesh_id"):
         if col not in ccols:
             conn.execute(f"ALTER TABLE clients ADD COLUMN {col} TEXT")
+    if "facturacion_ars" not in ccols:
+        conn.execute("ALTER TABLE clients ADD COLUMN facturacion_ars REAL")
     ucols = {r["name"] for r in conn.execute("PRAGMA table_info(users)").fetchall()}
     for col in ("rol", "email", "nombre", "glpi_user_id", "zbx_user_id", "sync_glpi", "sync_zbx", "sync_mesh"):
         if col not in ucols:

@@ -744,6 +744,50 @@ check("canales: URL inválida rechazada", "debe empezar con http" in c.post("/ca
 check("RBAC: PM y técnico no entran a Canales", tp.get("/canales").url.path != "/canales" and tj.get("/canales/whatsapp/estado").url.path != "/canales/whatsapp/estado")
 check("RBAC: el menú del administrador muestra Canales", 'href="/canales"' in c.get("/").text)
 
+# Reporte de horas por cliente
+from itier_console.services import horas as _hs  # noqa: E402
+from datetime import datetime as _dt  # noqa: E402
+_conn.execute("UPDATE users SET glpi_user_id='77' WHERE username='admin'"); _conn.commit()
+_tk = c.get(f"/tickets/{t1}")
+check("horas: el ticket ofrece registrar tiempo", "Registrar tiempo" in _tk.text)
+r = c.post(f"/tickets/{t1}/tiempo", data={"minutos": "90", "nota": "Cambio de toner", "csrf": csrf_de(_tk.text)})
+check("horas: se registra el tiempo de un ticket", "Registraste 90 min" in r.text and "Cambio de toner" in r.text, r.text[-300:])
+c.post(f"/tickets/{t1}/tiempo", data={"minutos": "30", "nota": "", "csrf": csrf_de(c.get(f"/tickets/{t1}").text)})
+check("horas: el ticket muestra el total (2 h)", "Total: <b>2.0 h</b>" in c.get(f"/tickets/{t1}").text)
+check("horas: minutos fuera de rango rechazados", "entre 1 y 1440" in c.post(f"/tickets/{t1}/tiempo", data={"minutos": "5000", "nota": "", "csrf": csrf_de(c.get(f"/tickets/{t1}").text)}).text)
+rp = c.get("/reportes/horas")
+check("horas: la pantalla del reporte carga", rp.status_code == 200 and "Horas y rentabilidad por cliente" in rp.text and "Canal SA" in rp.text)
+check("horas: avisa que falta la cotización y la tarifa", "Falta la cotización del dólar" in rp.text and "Sin tarifa por hora" in rp.text)
+c.post("/reportes/parametros", data={"fx_ars_usd": "1.400", "costo_plataforma_usd": "60", "mes": "", "csrf": csrf_de(rp.text)})
+check("horas: la cotización «1.400» se lee como 1400 (formato argentino)", _aj.efectiva(_conn, app.state.cfg).fx_ars_usd == 1400.0)
+check("horas: números a la argentina", _hs.numero_ar("257.000,50") == 257000.5 and _hs.numero_ar("1455,5") == 1455.5 and _hs.numero_ar("$ 60") == 60.0)
+c.post("/reportes/parametros", data={"fx_ars_usd": "1400", "costo_plataforma_usd": "60", "mes": "", "csrf": csrf_de(c.get("/reportes/horas").text)})
+check("horas: se guardan cotización y costo de plataforma", _aj.efectiva(_conn, app.state.cfg).fx_ars_usd == 1400.0 and _aj.efectiva(_conn, app.state.cfg).costo_plataforma_usd == 60.0)
+c.post("/reportes/tarifas", data={"t_admin": "35", "mes": "", "csrf": csrf_de(c.get("/reportes/horas").text)})
+c.post("/reportes/facturacion", data={"f_canal-sa": "257.000", "mes": "", "csrf": csrf_de(c.get("/reportes/horas").text)})
+check("horas: la facturación 257.000 se lee como 257000", _conn.execute("SELECT facturacion_ars FROM clients WHERE slug='canal-sa'").fetchone()[0] == 257000.0)
+rp = c.get("/reportes/horas")
+_ing = 257000 / 1400
+check("horas: el reporte suma 2.0 h al cliente y muestra su facturación en USD", "2.0 h" in rp.text and f"US$ {_ing:.0f}" in rp.text, rp.text[rp.text.find("Por cliente"):][:900])
+_rep = _hs.reporte(_conn, _aj.efectiva(_conn, app.state.cfg), _dt.now().strftime("%Y-%m"))
+_fc = next(f for f in _rep["filas"] if f["slug"] == "canal-sa")
+check("horas: costo = horas × tarifa + parte de la plataforma; margen = ingreso − costo",
+      abs(_fc["costo_horas"] - 70.0) < 0.01 and abs(_fc["margen"] - (_ing - _fc["costo"])) < 0.01 and _fc["plataforma"] > 0, str(_fc))
+check("horas: otro mes no suma las horas de éste", next(f for f in _hs.reporte(_conn, _aj.efectiva(_conn, app.state.cfg), "2020-01")["filas"] if f["slug"] == "canal-sa")["horas"] == 0)
+check("horas: el costo de plataforma se mide en USD", "Costo mensual de la plataforma" in rp.text)
+_real_bcra = _hs.cotizacion_bcra
+_hs.cotizacion_bcra = lambda: (1455.5, "2026-11-18")
+r = c.post("/reportes/fx-bcra", data={"mes": "", "csrf": csrf_de(rp.text)})
+check("horas: trae la cotización del BCRA", _aj.efectiva(_conn, app.state.cfg).fx_ars_usd == 1455.5 and "BCRA 2026-11-18" in r.text, r.text[-200:])
+_hs.cotizacion_bcra = _real_bcra
+import httpx as _hx  # noqa: E402
+_g = _hx.get
+_hx.get = lambda *a, **k: type("R", (), {"raise_for_status": lambda s: None, "json": lambda s: {"status": 200, "results": {"fecha": "2026-11-17", "detalle": [{"codigoMoneda": "USD", "tipoCotizacion": 1432.25}]}}})()
+check("horas: interpreta la respuesta del BCRA", _hs.cotizacion_bcra() == (1432.25, "2026-11-17"))
+_hx.get = _g
+check("RBAC: el reporte de horas es solo del administrador", tp.get("/reportes/horas").url.path != "/reportes/horas" and tj.get("/reportes/horas").url.path != "/reportes/horas")
+check("RBAC: el menú muestra Horas al administrador", 'href="/reportes/horas"' in c.get("/").text)
+
 # RBAC: la Bandeja es de PM/admin
 check("RBAC: el técnico no entra a la Bandeja", tj.get("/bandeja").url.path != "/bandeja")
 check("RBAC: el PM sí", tp.get("/bandeja").url.path == "/bandeja")

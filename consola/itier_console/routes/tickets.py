@@ -102,7 +102,13 @@ def detalle(request: Request, ticket_id: int, user: dict = Depends(require_permi
         "AND glpi_user_id IS NOT NULL AND glpi_user_id != '' ORDER BY COALESCE(nombre, username)")]
     mi = conn.execute("SELECT glpi_user_id FROM users WHERE id = ?", (user["uid"],)).fetchone()
     origen = conn.execute("SELECT canal, remitente FROM ticket_origen WHERE ticket_id = ?", (ticket_id,)).fetchone()
-    return render(request, "tickets_detalle.html", t=t, cliente=cliente, tecnicos=tecnicos,
+    from ..services import horas as horas_svc
+    try:
+        tiempos = horas_svc.tiempo_de_ticket(cfg, ticket_id)
+    except AdapterError:
+        tiempos = []
+    return render(request, "tickets_detalle.html", t=t, cliente=cliente, tecnicos=tecnicos, tiempos=tiempos,
+                  total_min=sum(x["minutos"] for x in tiempos),
                   puedo_tomar=bool(mi and mi["glpi_user_id"]), origen=dict(origen) if origen else None)
 
 
@@ -147,4 +153,27 @@ def tomar(request: Request, ticket_id: int, csrf: str = Form(""),
         return RedirectResponse(f"/tickets/{ticket_id}", status_code=303)
     audit.registrar(conn, user["user"], "ticket.tomado", {"ticket_id": ticket_id})
     flash(request, f"Tomaste el ticket #{ticket_id}.", "ok")
+    return RedirectResponse(f"/tickets/{ticket_id}", status_code=303)
+
+
+@router.post("/tickets/{ticket_id}/tiempo")
+def registrar_tiempo(request: Request, ticket_id: int, minutos: int = Form(...), nota: str = Form(""), csrf: str = Form(""),
+                     user: dict = Depends(require_permiso("tickets")), conn: sqlite3.Connection = Depends(get_db)):
+    """El técnico carga el tiempo que le dedicó al ticket: es la base del reporte de horas por cliente."""
+    from ..services import ServiceError
+    from ..services import horas as horas_svc
+    if not security.verificar_csrf(request.session, csrf):
+        flash(request, "Sesión expirada, reintentá.", "error")
+        return RedirectResponse(f"/tickets/{ticket_id}", status_code=303)
+    r = conn.execute("SELECT glpi_user_id FROM users WHERE id = ?", (user["uid"],)).fetchone()
+    if not r or not r["glpi_user_id"]:
+        flash(request, "Tu usuario no tiene cuenta en GLPI vinculada: pedile al administrador que la sincronice.", "error")
+        return RedirectResponse(f"/tickets/{ticket_id}", status_code=303)
+    try:
+        horas_svc.registrar_tiempo(request.app.state.cfg, ticket_id, int(minutos), nota, int(r["glpi_user_id"]))
+    except (ServiceError, AdapterError, ValueError) as e:
+        flash(request, f"No se pudo registrar el tiempo: {getattr(e, 'mensaje', None) or getattr(e, 'detalle', None) or e}", "error")
+        return RedirectResponse(f"/tickets/{ticket_id}", status_code=303)
+    audit.registrar(conn, user["user"], "ticket.tiempo", {"ticket_id": ticket_id, "minutos": int(minutos)})
+    flash(request, f"Registraste {int(minutos)} min en el ticket #{ticket_id}.", "ok")
     return RedirectResponse(f"/tickets/{ticket_id}", status_code=303)

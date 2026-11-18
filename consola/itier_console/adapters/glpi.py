@@ -43,6 +43,9 @@ _DEMO_TICKETS = [
 # coherente entre requests sin tocar GLPI real.
 _DEMO_TICKETS_EXTRA: dict[int, dict] = {}
 
+# Tareas con tiempo registrado (demo): {tickets_id, actiontime (segundos), users_id_tech, date, content}.
+_DEMO_TAREAS: list[dict] = []
+
 # Técnico asignado por ticket (demo).
 _DEMO_TECNICOS: dict[int, str] = {1042: "María Técnica", 1041: "", 1038: "Juan Soporte"}
 
@@ -612,6 +615,47 @@ class GLPIClient:
                 t.setdefault("seguimientos", []).append(contenido)
             return
         self._post("/ITILFollowup", {"input": {"itemtype": "Ticket", "items_id": ticket_id, "content": contenido}})
+
+    def listar_tareas(self, limit: int = 3000) -> list[dict]:
+        """Tareas de tickets con su tiempo (`actiontime` en segundos) y quién las hizo."""
+        if self.demo:
+            return list(_DEMO_TAREAS)
+        try:
+            datos = self._get("/TicketTask", params={"range": f"0-{limit - 1}"})
+        except AdapterError as e:
+            if "ERROR_RANGE_EXCEED_TOTAL" in e.detalle:
+                return []
+            raise
+        salida = []
+        for r in datos if isinstance(datos, list) else []:
+            salida.append({"tickets_id": int(r.get("tickets_id") or 0), "actiontime": int(r.get("actiontime") or 0),
+                           "users_id_tech": int(r.get("users_id_tech") or 0),
+                           "date": str(r.get("date") or r.get("date_creation") or ""), "content": r.get("content") or ""})
+        return salida
+
+    def tareas_de_ticket(self, ticket_id: int) -> list[dict]:
+        if self.demo:
+            return [t for t in _DEMO_TAREAS if t["tickets_id"] == ticket_id]
+        try:
+            datos = self._get(f"/Ticket/{ticket_id}/TicketTask")
+        except AdapterError:
+            return []
+        return [{"tickets_id": ticket_id, "actiontime": int(r.get("actiontime") or 0),
+                 "users_id_tech": int(r.get("users_id_tech") or 0),
+                 "date": str(r.get("date") or r.get("date_creation") or ""), "content": r.get("content") or ""}
+                for r in (datos if isinstance(datos, list) else [])]
+
+    def registrar_tarea(self, ticket_id: int, segundos: int, contenido: str, users_id_tech: int) -> None:
+        """Suma una tarea con tiempo a un ticket (así se cuentan las horas por cliente)."""
+        if self.demo:
+            _DEMO_TAREAS.append({"tickets_id": ticket_id, "actiontime": segundos, "users_id_tech": users_id_tech,
+                                 "date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "content": contenido})
+            return
+        self._post("/TicketTask", {"input": {"tickets_id": ticket_id, "content": contenido or "Trabajo registrado",
+                                             "actiontime": segundos, "users_id_tech": users_id_tech, "state": 2}})
+
+    def nombre_usuario(self, uid: int) -> str:
+        return self._nombre_usuario(uid) if not self.demo else f"usuario {uid}"
 
     def _asignados(self, ticket_id: int) -> list[dict]:
         """Actores de tipo 2 (asignado) del ticket, con su id de Ticket_User y el users_id numérico."""

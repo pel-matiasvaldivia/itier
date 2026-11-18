@@ -28,6 +28,9 @@ CAMPOS = {
     "wa_api_url": ("wa_api_url", False, str),
     "wa_api_key": ("wa_api_key", True, str),
     "wa_numero": ("wa_numero", False, str),
+    "fx_ars_usd": ("fx_ars_usd", False, float),
+    "fx_fecha": ("fx_fecha", False, str),
+    "costo_plataforma_usd": ("costo_plataforma_usd", False, float),
 }
 
 

@@ -77,6 +77,10 @@ def handler(request: httpx.Request) -> httpx.Response:
         return httpx.Response(200, json=[{"id": 0, "name": "Root"}])
     if p == "/health":
         return httpx.Response(200, json=WA_ESTADO)
+    if "/TicketTask" in p:
+        if request.method == "POST":
+            return httpx.Response(201, json={"id": 5})
+        return httpx.Response(200, json=[{"id": 1, "tickets_id": 77, "actiontime": 5400, "users_id_tech": 7, "date": "2026-11-05 10:00:00", "content": "x"}])
     if "/ITILFollowup" in p:
         return httpx.Response(201, json={"id": 9})
     if "/Ticket_User" in p:
@@ -526,6 +530,16 @@ _c3 = captured[_n3:]
 check("GLPI: reasignar quita al asignado anterior y suma al nuevo",
       any(x["method"] == "DELETE" and x["path"].endswith("/Ticket_User/55") for x in _c3)
       and any(x["method"] == "POST" and x["body"]["input"]["users_id"] == 9 for x in _c3), _c3)
+# horas: tareas con tiempo
+_n4 = len(captured)
+with glpi_mod.cliente(cfg) as g:
+    g.registrar_tarea(77, 1800, "Cambio de toner", 7)
+    _tareas = g.listar_tareas()
+_p = [x for x in captured[_n4:] if x["method"] == "POST" and x["path"].endswith("/TicketTask")]
+check("GLPI: registrar_tarea crea una TicketTask con el tiempo en segundos",
+      len(_p) == 1 and _p[0]["body"]["input"]["tickets_id"] == 77 and _p[0]["body"]["input"]["actiontime"] == 1800
+      and _p[0]["body"]["input"]["users_id_tech"] == 7, _p)
+check("GLPI: listar_tareas devuelve el tiempo y quién lo hizo", _tareas == [{"tickets_id": 77, "actiontime": 5400, "users_id_tech": 7, "date": "2026-11-05 10:00:00", "content": "x"}], _tareas)
 # seguimiento de ticket (respuesta del solicitante por correo/WhatsApp)
 _n2 = len(captured)
 with glpi_mod.cliente(cfg) as g:

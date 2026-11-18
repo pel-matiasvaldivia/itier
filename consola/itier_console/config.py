@@ -109,7 +109,11 @@ class Config:
     wa_api_url: str | None = None          # API de OpenWA (para responder: confirmaciones)
     wa_api_key: str | None = None
     wa_numero: str | None = None           # número de soporte (solo para mostrarlo)
-    canal_limite_hora: int = 20            # mensajes por remitente y hora antes de frenarlo (anti-inundación)
+    canal_limite_hora: int = 20
+    # -- Reporte de horas / rentabilidad (editables en la pantalla Horas) ---------------------
+    fx_ars_usd: float | None = None        # cotización de referencia (BCRA), pesos por dólar
+    fx_fecha: str | None = None
+    costo_plataforma_usd: float = 60.0     # VPS y demás costos fijos mensuales, en USD            # mensajes por remitente y hora antes de frenarlo (anti-inundación)
     mesh_support_group: str = "SOPORTE"    # grupo de usuarios de Mesh (técnicos) con acceso a todos los clientes
 
     @classmethod
@@ -197,6 +201,8 @@ class Config:
             wa_api_key=os.environ.get("ITIER_WA_API_KEY") or None,
             wa_numero=(os.environ.get("ITIER_WA_NUMERO") or "").strip() or None,
             canal_limite_hora=int(os.environ.get("ITIER_CANAL_LIMITE_HORA", "20")),
+            fx_ars_usd=float(os.environ["ITIER_FX_ARS_USD"]) if os.environ.get("ITIER_FX_ARS_USD") else None,
+            costo_plataforma_usd=float(os.environ.get("ITIER_COSTO_PLATAFORMA_USD", "60")),
             mesh_support_group=(os.environ.get("ITIER_MESH_SUPPORT_GROUP", "SOPORTE") or "").strip(),
             cloudflared_win_url=os.environ.get("ITIER_CLOUDFLARED_WIN_URL") or (
                 "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-windows-amd64.exe"),

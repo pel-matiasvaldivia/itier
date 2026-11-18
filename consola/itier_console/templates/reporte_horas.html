@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+{% block titulo %}Horas por cliente · Consola de iTier{% endblock %}
+{% macro usd(x) %}{% if x is none %}—{% else %}US$ {{ '%.0f'|format(x) }}{% endif %}{% endmacro %}
+{% macro ars(x) %}{% if x is none %}—{% else %}$ {{ '{:,.0f}'.format(x).replace(',', '.') }}{% endif %}{% endmacro %}
+{% block contenido %}
+  <div class="l-head">
+    <div>
+      <h1>Horas y rentabilidad por cliente</h1>
+      <p class="u-sub">Las horas salen del tiempo que se registra en cada ticket. El margen = lo que facturás (en USD) − el costo de las horas − la parte del costo fijo de la plataforma.</p>
+    </div>
+    <form method="get" action="/reportes/horas" class="inline" style="display:flex;gap:.5rem;align-items:center">
+      <input type="month" name="mes" value="{{ mes }}" aria-label="Mes" onchange="this.form.submit()" class="l-sel">
+      <noscript><button class="u-b" type="submit">Ver</button></noscript>
+    </form>
+  </div>
+
+  {% if error %}<div class="u-err">No se pudo leer GLPI: {{ error }}</div>{% endif %}
+
+  {% if rep %}
+  <div class="u-stats">
+    <div class="u-stat"><b>{{ '%.1f'|format(rep.totales.horas) }} h</b><span>Horas del mes</span></div>
+    <div class="u-stat"><b>{{ usd(rep.totales.costo) }}</b><span>Costo (horas + plataforma)</span></div>
+    <div class="u-stat"><b>{{ usd(rep.totales.ingreso) }}</b><span>Facturado en USD</span></div>
+    <div class="u-stat {{ 'bad' if rep.totales.margen is not none and rep.totales.margen < 0 else '' }}"><b>{{ usd(rep.totales.margen) }}</b><span>Margen del mes</span></div>
+  </div>
+
+  {% if not rep.fx %}<div class="note"><strong>Falta la cotización del dólar.</strong> Sin ella no se puede pasar lo facturado a USD ni calcular el margen. Cargala abajo, en «Parámetros».</div>{% endif %}
+  {% if rep.sin_tarifa %}<div class="note"><strong>Sin tarifa por hora:</strong> {{ rep.sin_tarifa|join(', ') }}. Sus horas figuran con costo 0. Cargá la tarifa abajo.</div>{% endif %}
+  {% if rep.sin_facturacion %}<div class="note"><strong>Sin facturación mensual cargada:</strong> {{ rep.sin_facturacion|join(', ') }}.</div>{% endif %}
+
+  <div class="l-wrap">
+    <div class="l-bar-top"><h2 style="margin:0">Por cliente · {{ mes }}</h2></div>
+    <table class="l-table">
+      <thead><tr><th>Cliente</th><th>Horas</th><th>Quién</th><th>Costo horas</th><th>Plataforma</th><th>Facturación</th><th>Margen</th><th>USD/hora</th></tr></thead>
+      <tbody>
+      {% for f in rep.filas %}
+        <tr>
+          <td><b>{{ f.nombre }}</b></td>
+          <td>{{ '%.1f'|format(f.horas) }} h</td>
+          <td class="small">{% for d in f.detalle %}{{ d.nombre }} {{ '%.1f'|format(d.horas) }} h{{ ', ' if not loop.last }}{% else %}<span class="muted">—</span>{% endfor %}</td>
+          <td>{{ usd(f.costo_horas) }}</td>
+          <td>{{ usd(f.plataforma) }}</td>
+          <td>{{ ars(f.facturacion_ars) }}<br><span class="muted small">{{ usd(f.ingreso) }}</span></td>
+          <td>{% if f.margen is none %}—{% else %}<span class="l-pill {{ 'ok' if f.margen_pct >= 40 else ('warn' if f.margen >= 0 else 'bad') }}">{{ usd(f.margen) }} · {{ '%.0f'|format(f.margen_pct) }}%</span>{% endif %}</td>
+          <td>{{ usd(f.usd_hora_efectivo) }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    <p class="muted small" style="padding:.6rem 1.1rem">Costo de plataforma repartido en partes iguales entre los clientes activos. «USD/hora» = lo que facturás ÷ horas trabajadas (compará con tu costo por hora).
+      {% if rep.por_persona %}· Horas del mes por persona: {% for n, h in rep.por_persona %}{{ n }} {{ '%.1f'|format(h) }} h{{ ', ' if not loop.last }}{% endfor %}.{% endif %}</p>
+  </div>
+  {% endif %}
+
+  <div class="d-cols" style="margin-top:1.4rem">
+    <section class="u-card">
+      <h2>⚙️ Parámetros</h2>
+      <form method="post" action="/reportes/parametros" class="form">
+        <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="mes" value="{{ mes }}">
+        <label>Dólar de referencia (pesos por USD){% if cfg_ef.fx_fecha %} <span class="muted small">· {{ 'cargado a mano' if cfg_ef.fx_fecha == 'manual' else 'BCRA ' ~ cfg_ef.fx_fecha }}</span>{% endif %}
+          <input type="text" name="fx_ars_usd" value="{{ cfg_ef.fx_ars_usd or '' }}" placeholder="1400"></label>
+        <label>Costo mensual de la plataforma (VPS y otros, USD)
+          <input type="text" name="costo_plataforma_usd" value="{{ cfg_ef.costo_plataforma_usd|int if cfg_ef.costo_plataforma_usd == cfg_ef.costo_plataforma_usd|int else cfg_ef.costo_plataforma_usd }}"></label>
+        <button class="u-btn" type="submit">Guardar</button>
+      </form>
+      <form method="post" action="/reportes/fx-bcra" class="form" style="margin-top:.6rem">
+        <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="mes" value="{{ mes }}">
+        <button class="u-b" type="submit">Traer la cotización del BCRA</button>
+      </form>
+    </section>
+
+    <section class="u-card">
+      <h2>👤 Costo por hora de cada persona (USD)</h2>
+      <form method="post" action="/reportes/tarifas" class="form">
+        <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="mes" value="{{ mes }}">
+        {% for u in operadores %}
+        <label>{{ u.nombre or u.username }} <span class="muted small">({{ u.username }})</span>
+          <input type="text" name="t_{{ u.username }}" value="{{ tarifas.get(u.username, '') }}" placeholder="6"></label>
+        {% endfor %}
+        <button class="u-b" type="submit">Guardar tarifas</button>
+      </form>
+      <p class="muted small">Costo real para vos (incluí cargas sociales si corresponde). Solo se cuentan personas con cuenta de GLPI vinculada.</p>
+    </section>
+  </div>
+
+  <section class="u-card" style="margin-top:1.4rem">
+    <h2>💵 Facturación mensual por cliente (pesos)</h2>
+    <form method="post" action="/reportes/facturacion" class="form">
+      <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="mes" value="{{ mes }}">
+      {% for c in clientes %}
+      <label>{{ c.nombre }}
+        <input type="text" name="f_{{ c.slug }}" value="{{ '%.0f'|format(c.facturacion_ars) if c.facturacion_ars is not none else '' }}" placeholder="257000"></label>
+      {% endfor %}
+      <button class="u-b" type="submit">Guardar facturación</button>
+    </form>
+    <p class="muted small">Lo que le cobrás hoy a cada cliente por mes, sin IVA. Se convierte a USD con la cotización de arriba.</p>
+  </section>
+{% endblock %}

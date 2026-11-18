@@ -21,6 +21,7 @@ MISION = {
 RESPONSABILIDADES = {
     "tecnico": [
         "Atender y actualizar los tickets que se te asignan, dentro de los tiempos acordados con cada cliente; si hay un ticket nuevo sin técnico, tomarlo con «Tomar este caso».",
+        "Registrar en cada ticket el tiempo que le dedicaste («Tiempo dedicado»): de ahí salen las horas por cliente y la rentabilidad de cada contrato.",
         "Revisar todos los días la pantalla Equipos: discos con más del 90 % de uso, antivirus apagado o ausente y equipos sin conexión; "
         "resolverlo o abrir un ticket.",
         "Conectarte de forma remota solo con un motivo registrado en el ticket y, si hay una persona usando el equipo, avisándole antes.",
@@ -45,6 +46,7 @@ RESPONSABILIDADES = {
         "Mantener operativos y actualizados GLPI, Zabbix, MeshCentral y la consola, y verificar los respaldos.",
         "Mantener los canales de entrada (pantalla Canales): la cuenta IMAP del correo de soporte y el número de WhatsApp vinculado por QR; si WhatsApp se desvincula, volver a escanear.",
         "Revisar la auditoría y la integridad de su cadena de hash; investigar cualquier anomalía.",
+        "Revisar cada mes la pantalla Horas: horas por cliente y por persona, costo y margen; mantener actualizadas las tarifas por hora, la facturación de cada cliente y la cotización del dólar.",
         "Autorizar y ejecutar las bajas de clientes (borra su configuración), sabiendo que es irreversible.",
         "Gestionar los incidentes de seguridad: contener, avisar a los afectados y dejar constancia.",
     ],

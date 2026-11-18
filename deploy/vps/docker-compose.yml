@@ -308,6 +308,9 @@ services:
       ITIER_WA_API_URL: ${ITIER_WA_API_URL:-http://openwa:8080}
       ITIER_WA_API_KEY: ${ITIER_WA_API_KEY:-}
       ITIER_WA_NUMERO: ${ITIER_WA_NUMERO:-}
+      # Reporte de horas: valores iniciales (se editan en la pantalla Horas).
+      ITIER_FX_ARS_USD: ${ITIER_FX_ARS_USD:-}
+      ITIER_COSTO_PLATAFORMA_USD: ${ITIER_COSTO_PLATAFORMA_USD:-60}
       ITIER_CANAL_LIMITE_HORA: ${ITIER_CANAL_LIMITE_HORA:-20}
       ITIER_SMTP_HOST: ${ITIER_SMTP_HOST:-}
       ITIER_SMTP_PORT: ${ITIER_SMTP_PORT:-587}

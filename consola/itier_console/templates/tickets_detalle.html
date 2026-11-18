@@ -24,6 +24,7 @@
       {% if t.content %}<div class="d-body">{{ t.content }}</div>{% else %}<p class="muted">Sin descripción.</p>{% endif %}
     </section>
 
+    <div>
     <section class="u-card">
       <h2>👤 Asignar</h2>
       {% if puedo_tomar %}
@@ -47,5 +48,18 @@
       {% if not tecnicos %}<p class="muted small">Ningún usuario de la plataforma tiene cuenta de GLPI vinculada todavía.</p>{% endif %}
       {% endif %}
     </section>
+
+    <section class="u-card">
+      <h2>⏱ Tiempo dedicado</h2>
+      <p class="u-lead">Cargá cuánto trabajaste en este ticket: de ahí salen las horas por cliente.{% if total_min %} Total: <b>{{ (total_min / 60)|round(1) }} h</b>.{% endif %}</p>
+      {% for x in tiempos %}<p class="small" style="margin:.2rem 0">· {{ x.minutos }} min — {{ x.tecnico or 's/d' }}{% if x.content %}: {{ x.content[:80] }}{% endif %}</p>{% endfor %}
+      <form method="post" action="/tickets/{{ t.id }}/tiempo" class="form">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <label>Minutos <input type="number" name="minutos" min="1" max="1440" required placeholder="30"></label>
+        <label>Qué hiciste (opcional) <input type="text" name="nota" maxlength="200"></label>
+        <button class="u-b" type="submit">Registrar tiempo</button>
+      </form>
+    </section>
+    </div>
   </div>
 {% endblock %}
