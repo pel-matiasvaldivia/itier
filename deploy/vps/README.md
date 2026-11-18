@@ -266,7 +266,8 @@ HTTPS/443 hacia el VPS: no hace falta túnel, VPN ni equipo central en el client
    ⚠ **Sin** aplicación de Access: los agentes no pueden iniciar sesión. (Los WebSockets ya vienen habilitados.)
 3. Entrá a `https://itier-mesh.pymesenlinea.com.ar` y creá tu cuenta (la primera es administradora; activale 2FA).
    Creá además una cuenta **de servicio** `itier-api` **sin 2FA** (la API por contraseña no soporta TOTP).
-4. `.env`: `MESH_NEW_ACCOUNTS=false`, `ITIER_MESH_URL`, `ITIER_MESH_USER=itier-api`, `ITIER_MESH_PASSWORD`.
+4. `.env`: `MESH_NEW_ACCOUNTS=false`, `ITIER_MESH_URL`, `ITIER_MESH_USER=itier-api`, `ITIER_MESH_PASSWORD` y
+   `ITIER_MESH_SHARE_USERS=<tu usuario de Mesh>` (los grupos los crea `itier-api` y solo los ven su dueño y quienes tengan acceso).
    `docker compose up -d` (recrea la consola y MeshCentral).
    La config de MeshCentral se reescribe sola en cada arranque desde el `.env` (no hace falta borrar volúmenes).
    En el log tiene que aparecer `[iTier] config escrita: host=itier-mesh… puerto=4430`.

@@ -259,6 +259,8 @@ services:
       ITIER_MESH_URL: ${ITIER_MESH_URL:-}
       ITIER_MESH_USER: ${ITIER_MESH_USER:-}
       ITIER_MESH_PASSWORD: ${ITIER_MESH_PASSWORD:-}
+      # Usuarios de Mesh (separados por coma) que ven todos los grupos de cliente.
+      ITIER_MESH_SHARE_USERS: ${ITIER_MESH_SHARE_USERS:-}
       ITIER_SMTP_HOST: ${ITIER_SMTP_HOST:-}
       ITIER_SMTP_PORT: ${ITIER_SMTP_PORT:-587}
       ITIER_SMTP_USER: ${ITIER_SMTP_USER:-}

@@ -92,6 +92,7 @@ class Config:
     mesh_url: str | None = None          # https://itier-mesh.<dominio> (MeshCentral, soporte remoto)
     mesh_user: str | None = None
     mesh_password: str | None = None
+    mesh_share_users: tuple = ()          # usuarios de Mesh con acceso total a cada grupo de cliente
 
     @classmethod
     def from_env(cls) -> "Config":
@@ -161,6 +162,7 @@ class Config:
             mesh_url=(os.environ.get("ITIER_MESH_URL") or "").rstrip("/") or ("https://itier-mesh.demo.example" if demo else None),
             mesh_user=os.environ.get("ITIER_MESH_USER") or None,
             mesh_password=os.environ.get("ITIER_MESH_PASSWORD") or None,
+            mesh_share_users=tuple(u.strip().lower() for u in (os.environ.get("ITIER_MESH_SHARE_USERS") or "").split(",") if u.strip()),
             cloudflared_win_url=os.environ.get("ITIER_CLOUDFLARED_WIN_URL") or (
                 "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-windows-amd64.exe"),
         )

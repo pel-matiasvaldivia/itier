@@ -91,15 +91,32 @@ class MeshClient:
         """Devuelve el id corto del grupo del cliente; lo crea si no existe."""
         if self._cfg.demo:
             return "MESHDEMO@" + nombre.split("-", 1)[-1]
+        completo = self._buscar(nombre)
+        if not completo:
+            self._pedir({"action": "createmesh", "meshname": nombre, "meshtype": 2,
+                         "desc": "Cliente iTier"}, "createmesh")
+            completo = self._buscar(nombre)
+        if not completo:
+            raise AdapterError("mesh", f"se creó el grupo «{nombre}» pero no aparece en la lista")
+        self._compartir(completo)
+        return id_corto(completo)
+
+    def _buscar(self, nombre: str) -> str | None:
         for g in self._grupos():
             if g.get("name") == nombre and g.get("mtype") == 2:
-                return id_corto(g["_id"])
-        self._pedir({"action": "createmesh", "meshname": nombre, "meshtype": 2,
-                     "desc": "Cliente iTier"}, "createmesh")
-        for g in self._grupos():
-            if g.get("name") == nombre and g.get("mtype") == 2:
-                return id_corto(g["_id"])
-        raise AdapterError("mesh", f"se creó el grupo «{nombre}» pero no aparece en la lista")
+                return g["_id"]
+        return None
+
+    def _compartir(self, meshid: str) -> None:
+        """Da acceso total al grupo a los usuarios de ITIER_MESH_SHARE_USERS: los grupos
+        solo los ve su dueño (la cuenta de servicio) y quienes tengan acceso. Idempotente."""
+        usuarios = [u"user//" + u for u in self._cfg.mesh_share_users]
+        if not usuarios:
+            return
+        dominio = meshid.split("/")[1] if meshid.count("/") >= 2 else ""
+        usuarios = [f"user/{dominio}/{u.split('/')[-1]}" for u in usuarios]
+        self._pedir({"action": "addmeshuser", "meshid": meshid, "userids": usuarios,
+                     "meshadmin": 0xFFFFFFFF}, "addmeshuser")
 
     def equipos(self, mesh_id: str) -> list[dict]:
         """Equipos del grupo: [{nombre, conectado}]."""

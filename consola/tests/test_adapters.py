@@ -277,6 +277,9 @@ def _mesh_servidor(ws):
         elif m["action"] == "createmesh":
             _mesh_grupos.append({"_id": "mesh//NUEVO@$id", "name": m["meshname"], "mtype": m["meshtype"]})
             ws.send(json.dumps({"action": "createmesh", "responseid": m["responseid"], "result": "ok"}))
+        elif m["action"] == "addmeshuser":
+            _mesh_visto.setdefault("compartido", []).append((m["meshid"], m["userids"], m["meshadmin"]))
+            ws.send(json.dumps({"action": "addmeshuser", "responseid": m["responseid"], "result": "ok"}))
         elif m["action"] == "nodes":
             ws.send(json.dumps({"action": "userinfo"}))  # ruido que debe ignorarse
             ws.send(json.dumps({"action": "nodes", "responseid": m["responseid"], "nodes": {
@@ -286,7 +289,7 @@ def _mesh_servidor(ws):
 _srv = serve(_mesh_servidor, "127.0.0.1", 0)
 threading.Thread(target=_srv.serve_forever, daemon=True).start()
 cfg_mesh = dataclasses.replace(cfg, mesh_url=f"http://127.0.0.1:{_srv.socket.getsockname()[1]}",
-                               mesh_user="itier", mesh_password="clave")
+                               mesh_user="itier", mesh_password="clave", mesh_share_users=("matias",))
 with mesh_mod.cliente(cfg_mesh) as mc:
     mid = mc.asegurar_grupo("itier-x")
     eq = mc.equipos(mid)
@@ -301,6 +304,10 @@ with mesh_mod.cliente(cfg_mesh) as mc2:
           and _mesh_visto["acciones"].count("createmesh") == antes)
 check("mesh: URL del agente Windows x64, en segundo plano",
       mesh_mod.url_agente_windows(cfg_mesh, "NUEVO@$id").endswith("/meshagents?id=4&meshid=NUEVO@$id&installflags=2"))
+check("mesh: comparte el grupo con los usuarios configurados (acceso total)",
+      _mesh_visto.get("compartido") and _mesh_visto["compartido"][0] == ("mesh//NUEVO@$id", ["user//matias"], 0xFFFFFFFF),
+      _mesh_visto.get("compartido"))
+check("mesh: re-compartir al re-aprovisionar (idempotente)", len(_mesh_visto["compartido"]) == 2)
 _srv.shutdown()
 
 httpx.Client = _real_Client  # type: ignore[assignment]
