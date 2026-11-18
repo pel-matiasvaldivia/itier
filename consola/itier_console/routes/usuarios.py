@@ -37,7 +37,12 @@ def _resumen(estados: dict[str, str]) -> str:
 @router.get("/usuarios", response_class=HTMLResponse)
 def lista(request: Request, user: dict = Depends(require_permiso("usuarios")), conn: sqlite3.Connection = Depends(get_db)):
     nueva = request.session.pop("_clave_usuario", None)   # se muestra UNA sola vez
-    return render(request, "usuarios.html", usuarios=svc.listar(conn), roles=rbac.ROLES, nueva=nueva, yo=user["uid"],
+    lista_u = svc.listar(conn)
+    resumen = {"total": len(lista_u), "activos": sum(1 for u in lista_u if not u["disabled"]),
+               "baja": sum(1 for u in lista_u if u["disabled"]),
+               "errores": sum(1 for u in lista_u if any((u.get(k) or "").startswith("error")
+                                                         for k in ("sync_glpi", "sync_zbx", "sync_mesh")))}
+    return render(request, "usuarios.html", usuarios=lista_u, resumen=resumen, roles=rbac.ROLES, nueva=nueva, yo=user["uid"],
                   cfg_glpi=request.app.state.cfg.glpi_configurado, cfg_zbx=request.app.state.cfg.zbx_configurado,
                   cfg_mesh=request.app.state.cfg.mesh_enabled, smtp=correo.configurado(request.app.state.cfg))
 
