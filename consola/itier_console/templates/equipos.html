@@ -1,77 +1,101 @@
 {% extends "base.html" %}
 {% block titulo %}Equipos · Consola de iTier{% endblock %}
 {% block contenido %}
-  <div class="page-head">
-    <h1>Equipos</h1>
-    <div class="acciones"><a class="btn" href="/equipos?actualizar=1{% if filtro_cliente %}&cliente={{ filtro_cliente }}{% endif %}{% if solo_alertas %}&alertas=1{% endif %}">Actualizar</a></div>
+  <div class="l-head">
+    <div>
+      <h1>Equipos</h1>
+      <p class="u-sub">Estado de los equipos de todos los clientes: conexión, discos, antivirus y alertas. Conectate sin salir del panel.</p>
+    </div>
+    <div class="acciones"><a class="u-b" href="/equipos?actualizar=1{% if filtro_cliente %}&cliente={{ filtro_cliente }}{% endif %}{% if solo_alertas %}&alertas=1{% endif %}" style="text-decoration:none">↻ Actualizar datos</a></div>
   </div>
 
-  <section class="tiles">
-    <div class="tile"><div class="tile-k">Con alertas</div>
-      <div class="tile-v big">{{ n_alertas }}</div>
-      <div class="tile-s"><a href="/equipos?alertas=1{% if filtro_cliente %}&cliente={{ filtro_cliente }}{% endif %}">ver solo estos →</a></div></div>
-    <div class="tile"><div class="tile-k">En línea</div>
-      <div class="tile-v big">{{ n_linea }}</div>
-      <div class="tile-s">de {{ filas | length }} mostrados</div></div>
-    <div class="tile"><div class="tile-k">Umbral de disco</div>
-      <div class="tile-v big">{{ umbral }} %</div>
-      <div class="tile-s">ITIER_ALERTA_DISCO_PCT</div></div>
-  </section>
+  <div class="u-stats">
+    <div class="u-stat {{ 'bad' if n_alertas else '' }}"><b>{{ n_alertas }}</b><span>Con alertas</span></div>
+    <div class="u-stat"><b>{{ n_linea }}</b><span>En línea</span></div>
+    <div class="u-stat"><b>{{ filas | length }}</b><span>{{ 'Equipos con alertas' if solo_alertas else 'Equipos' }}</span></div>
+    <div class="u-stat"><b>{{ umbral }}%</b><span>Umbral de disco</span></div>
+  </div>
 
-  <div class="card">
-    <form method="get" action="/equipos" class="form row">
-      <label>Cliente
-        <select name="cliente" onchange="this.form.submit()">
-          <option value="">Todos</option>
-          {% for c in clientes %}<option value="{{ c.slug }}" {% if c.slug == filtro_cliente %}selected{% endif %}>{{ c.nombre }}</option>{% endfor %}
+  <div class="l-wrap">
+    <div class="l-bar-top">
+      <form method="get" action="/equipos" class="l-filters" id="l-form">
+        <select class="l-sel" name="cliente" onchange="this.form.submit()" aria-label="Cliente">
+          <option value="">Todos los clientes</option>
+          {% for c in clientes %}<option value="{{ c.slug }}" {{ 'selected' if c.slug == filtro_cliente }}>{{ c.nombre }}</option>{% endfor %}
         </select>
-      </label>
-      <label><input type="checkbox" name="alertas" value="1" {% if solo_alertas %}checked{% endif %} onchange="this.form.submit()"> Solo con alertas</label>
-      <noscript><button class="btn" type="submit">Filtrar</button></noscript>
-    </form>
-    {% if notas %}<div class="note note-bad small">Sin datos de algunas fuentes — {{ notas | join(' · ') }}.</div>{% endif %}
+        <a class="l-toggle {{ '' if solo_alertas else 'on' }}" href="/equipos{{ '?cliente=' ~ filtro_cliente if filtro_cliente }}">Todos</a>
+        <a class="l-toggle {{ 'on' if solo_alertas else '' }}" href="/equipos?alertas=1{{ '&cliente=' ~ filtro_cliente if filtro_cliente }}">⚠ Solo con alertas</a>
+      </form>
+      <input class="u-search" type="search" id="l-buscar" placeholder="Buscar equipo…" aria-label="Buscar equipo">
+    </div>
+    {% if notas %}<div class="u-err" style="margin:1rem 1.1rem 0">Sin datos de algunas fuentes — {{ notas | join(' · ') }}.</div>{% endif %}
 
     {% if filas %}
-    <table class="tabla">
-      <thead><tr><th>Cliente</th><th>Equipo</th><th>Conexión</th><th>Discos</th><th>Antivirus</th><th>Alertas</th><th></th></tr></thead>
+    <table class="l-table" id="l-lista">
+      <thead><tr><th>Equipo</th><th>Conexión</th><th>Discos</th><th>Antivirus</th><th>Alertas</th><th></th></tr></thead>
       <tbody>
         {% for e in filas %}
-        <tr>
-          <td>{{ e.cliente }}</td>
-          <td><strong>{{ e.nombre }}</strong></td>
-          <td>{% if e.en_linea %}<span class="dot ok"></span>En línea
-              {% elif e.en_mesh %}<span class="dot warn"></span>Sin conexión
-              {% else %}<span class="muted">sin agente de soporte</span>{% endif %}</td>
+        <tr data-q="{{ (e.nombre ~ ' ' ~ e.cliente)|lower }}">
           <td>
-            {% for d in e.discos %}
-              <div class="small"><span class="dot {{ 'bad' if d.alerta else 'ok' }}"></span><code>{{ d.nombre }}</code> {{ d.pct }} %
-                <span class="muted">({{ d.libre_gb }} GB libres)</span></div>
-            {% else %}<span class="muted">sin datos</span>{% endfor %}
+            <div class="l-name"><span class="l-ico">💻</span>
+              <div><strong>{{ e.nombre }}</strong><small>{{ e.cliente }}</small></div></div>
           </td>
           <td>
-            {% if e.av_estado == 'on' %}<span class="dot ok"></span>ON
-            {% elif e.av_estado == 'off' %}<span class="dot bad"></span><strong>OFF</strong>
-            {% elif e.av_estado == 'ninguno' %}<span class="dot warn"></span>Ninguno
-            {% else %}<span class="muted">sin datos</span>{% endif %}
+            {% if e.en_linea %}<span class="l-pill ok"><i></i>En línea</span>
+            {% elif e.en_mesh %}<span class="l-pill warn"><i></i>Sin conexión</span>
+            {% else %}<span class="l-pill off"><i></i>Sin agente</span>{% endif %}
           </td>
           <td>
-            {% for nivel, texto in e.alertas %}
-              <div class="small"><span class="dot {{ 'bad' if nivel == 'alta' else 'warn' }}"></span>{{ texto }}</div>
-            {% else %}<span class="muted">—</span>{% endfor %}
+            {% if e.discos %}
+            <div class="l-disks">
+              {% for d in e.discos %}
+              <div class="l-disk" title="{{ d.libre_gb }} GB libres de {{ d.total_gb }} GB">
+                <code>{{ d.nombre }}</code>
+                <div class="l-bar {{ 'bad' if d.alerta else ('warn' if d.pct >= umbral - 10 else '') }}"><i style="width:{{ [d.pct, 100] | min }}%"></i></div>
+                <b>{{ d.pct }}%</b>
+              </div>
+              {% endfor %}
+            </div>
+            {% else %}<span class="muted small">sin datos</span>{% endif %}
           </td>
-          <td class="acciones">
-            {% if e.nodeid and mesh_ok and e.en_linea %}
-              <a class="btn btn-sm btn-primary" href="/equipos/{{ e.slug }}/{{ e.nodeid | urlencode }}/remoto?n={{ e.nombre | urlencode }}">Conectar</a>
+          <td>
+            {% if e.av_estado == 'on' %}<span class="l-pill ok"><i></i>ON</span>
+            {% elif e.av_estado == 'off' %}<span class="l-pill bad"><i></i>OFF</span>
+            {% elif e.av_estado == 'ninguno' %}<span class="l-pill warn"><i></i>Ninguno</span>
+            {% else %}<span class="muted small">sin datos</span>{% endif %}
+          </td>
+          <td>
+            {% if e.alertas %}
+            <div class="l-alerts">
+              {% for nivel, texto in e.alertas %}<span class="l-alert {{ nivel }}">{{ '🔴' if nivel == 'alta' else ('🟠' if nivel == 'media' else '⚪') }} {{ texto }}</span>{% endfor %}
+            </div>
+            {% else %}<span class="l-ok">✓ Sin alertas</span>{% endif %}
+          </td>
+          <td class="tight">
+            {% if e.nodeid and mesh_ok and e.en_linea and puede('equipos.remoto') %}
+              <a class="u-btn" style="text-decoration:none;padding:.5rem 1rem;font-size:.85rem;box-shadow:none" href="/equipos/{{ e.slug }}/{{ e.nodeid | urlencode }}/remoto?n={{ e.nombre | urlencode }}">🖥 Conectar</a>
             {% endif %}
           </td>
         </tr>
         {% endfor %}
+        <tr id="l-vacio" hidden><td colspan="6" class="l-empty">Ningún equipo coincide con la búsqueda.</td></tr>
       </tbody>
     </table>
-    <p class="muted small">Discos y antivirus salen del último inventario del GLPI Agent (normalmente una vez al día); la
-      conexión sale de MeshCentral en vivo.</p>
+    <p class="u-foot-note" style="padding:0 1.1rem 1rem">Discos y antivirus salen del último inventario del GLPI Agent (normalmente una vez al día); la conexión sale de MeshCentral en vivo.</p>
     {% else %}
-      <p class="muted">{% if solo_alertas %}Sin alertas activas. 🎉{% else %}Todavía no hay equipos.{% endif %}</p>
+      <div class="l-empty">{% if solo_alertas %}<b>🎉</b>Sin alertas activas.{% else %}<b>🖥</b>Todavía no hay equipos.{% endif %}</div>
     {% endif %}
   </div>
+  <script>
+    (function () {
+      var q = document.getElementById('l-buscar'); if (!q) return;
+      q.addEventListener('input', function () {
+        var t = q.value.trim().toLowerCase(), n = 0;
+        document.querySelectorAll('#l-lista tbody tr[data-q]').forEach(function (r) {
+          var ok = !t || (r.getAttribute('data-q') || '').indexOf(t) >= 0; r.hidden = !ok; if (ok) n++;
+        });
+        var v = document.getElementById('l-vacio'); if (v) v.hidden = n > 0;
+      });
+    })();
+  </script>
 {% endblock %}

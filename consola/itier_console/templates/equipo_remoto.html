@@ -1,15 +1,23 @@
 {% extends "base.html" %}
 {% block titulo %}Conexión remota · {{ nombre }} · Consola de iTier{% endblock %}
 {% block contenido %}
-  <div class="page-head">
-    <h1>{{ nombre }} <span class="muted small">· {{ cli.nombre }}</span></h1>
+  <div class="l-head">
+    <div>
+      <h1>🖥 {{ nombre }}</h1>
+      <p class="u-sub">{{ cli.nombre }} · conexión remota con MeshCentral, sin salir del panel.</p>
+    </div>
     <div class="acciones">
-      <a class="btn" href="{{ src }}" target="_blank" rel="noopener">Abrir en otra pestaña</a>
-      <a class="btn" href="/equipos">← Volver a equipos</a>
+      <a class="u-b" href="{{ src }}" target="_blank" rel="noopener" style="text-decoration:none">↗ Abrir en otra pestaña</a>
+      <a class="u-b" href="/equipos" style="text-decoration:none">← Volver a equipos</a>
     </div>
   </div>
-  <div class="note small">La primera vez, iniciá sesión en MeshCentral dentro del recuadro con tu usuario de técnico
-    (queda guardada). Solo ves los equipos que el grupo <strong>SOPORTE</strong> tiene asignados.</div>
-  <iframe src="{{ src }}" title="Conexión remota a {{ nombre }}" allow="clipboard-read; clipboard-write; fullscreen"
-          style="width:100%;height:78vh;border:1px solid var(--line);border-radius:var(--radius);background:#fff"></iframe>
+  <div class="l-tip">La primera vez iniciá sesión en MeshCentral dentro del recuadro con tu usuario de técnico (queda guardada).
+    Solo ves los equipos que el grupo <strong>SOPORTE</strong> tiene asignados. Registrá en el ticket el motivo de la conexión.</div>
+  <div class="l-remote">
+    <div class="l-remote-bar">
+      <span class="l-pill ok"><i></i>Sesión remota</span>
+      <span class="muted small">Si el recuadro queda en blanco o bloqueado, usá «Abrir en otra pestaña».</span>
+    </div>
+    <iframe src="{{ src }}" title="Conexión remota a {{ nombre }}" allow="clipboard-read; clipboard-write; fullscreen"></iframe>
+  </div>
 {% endblock %}

@@ -1,38 +1,67 @@
 {% extends "base.html" %}
 {% block titulo %}Clientes · Consola de iTier{% endblock %}
 {% block contenido %}
-  <div class="page-head">
-    <h1>Clientes</h1>
-    <a class="btn btn-primary" href="/clientes/nuevo">+ Nuevo cliente</a>
+  <div class="l-head">
+    <div>
+      <h1>Clientes</h1>
+      <p class="u-sub">Cada cliente tiene su entidad en GLPI, su grupo en Zabbix y su grupo de equipos en MeshCentral.</p>
+    </div>
+    {% if puede('clientes.editar') %}<a class="u-btn" href="/clientes/nuevo" style="text-decoration:none">+ Nuevo cliente</a>{% endif %}
+  </div>
+
+  <div class="u-stats">
+    <div class="u-stat"><b>{{ resumen.total }}</b><span>Clientes</span></div>
+    <div class="u-stat"><b>{{ resumen.activos }}</b><span>Activos</span></div>
+    <div class="u-stat {{ 'bad' if resumen.avisos else '' }}"><b>{{ resumen.avisos }}</b><span>Con avisos</span></div>
+    <div class="u-stat"><b>{{ resumen.equipos }}</b><span>Equipos instalados</span></div>
   </div>
 
   {% if clientes %}
-  <div class="card">
-    <table class="tabla">
-      <thead>
-        <tr><th>Cliente</th><th>Tenant</th><th>Entidad GLPI</th><th>Proxy Zabbix</th><th>Estado</th><th></th></tr>
-      </thead>
-      <tbody>
-        {% for c in clientes %}
-        <tr>
-          <td><a href="/clientes/{{ c.slug }}">{{ c.nombre }}</a></td>
-          <td><code>{{ c.slug }}</code></td>
-          <td>{{ c.glpi_entity_id or '—' }}</td>
-          <td>{{ c.zbx_proxy_name or '—' }}</td>
-          <td><span class="badge badge-{{ c.estado }}">{{ c.estado }}</span></td>
-          <td class="acciones">
-            <a href="/clientes/{{ c.slug }}">Bundle</a>
-            <a href="/clientes/{{ c.slug }}/agentes">Agentes</a>
-          </td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
+  <div class="l-bar-top" style="background:transparent;border:0;padding:0 0 .9rem">
+    <input class="u-search" type="search" id="l-buscar" placeholder="Buscar cliente…" aria-label="Buscar cliente">
   </div>
+  <div class="l-cards" id="l-lista">
+    {% for c in clientes %}
+    <article class="l-client" data-q="{{ (c.nombre ~ ' ' ~ c.slug)|lower }}">
+      <div class="l-client-head">
+        <span class="l-logo">{{ (c.nombre.split()[0][:1] ~ (c.nombre.split()[1][:1] if c.nombre.split()|length > 1 else c.nombre[1:2]))|upper }}</span>
+        <div style="min-width:0">
+          <h3><a href="/clientes/{{ c.slug }}">{{ c.nombre }}</a></h3>
+          <small>{{ c.slug }}</small>
+        </div>
+        {% if c.estado == 'activo' %}<span class="l-pill ok"><i></i>Activo</span>
+        {% elif c.estado == 'error' %}<span class="l-pill bad"><i></i>Con error</span>
+        {% else %}<span class="l-pill warn"><i></i>{{ c.estado|capitalize }}</span>{% endif %}
+      </div>
+      <div class="l-kv">
+        <div><span>GLPI</span><b>{{ ('#' ~ c.glpi_entity_id) if c.glpi_entity_id else '—' }}</b></div>
+        <div><span>Mesh</span><b>{{ 'grupo creado' if c.mesh_id else '—' }}</b></div>
+        <div><span>Equipos</span><b>{{ c.n_equipos }}</b></div>
+      </div>
+      <div class="l-client-foot">
+        <a class="pri" href="/clientes/{{ c.slug }}">Ver ficha</a>
+        {% if puede('equipos') %}<a href="/equipos?cliente={{ c.slug }}">Equipos</a>{% endif %}
+        {% if puede('instaladores') %}<a href="/clientes/{{ c.slug }}/instaladores">Instaladores</a>{% endif %}
+        {% if puede('agentes') %}<a href="/clientes/{{ c.slug }}/agentes">Agentes</a>{% endif %}
+      </div>
+    </article>
+    {% endfor %}
+    <div class="l-empty" id="l-vacio" hidden style="grid-column:1/-1">Ningún cliente coincide con la búsqueda.</div>
+  </div>
+  <script>
+    (function () {
+      var q = document.getElementById('l-buscar'); if (!q) return;
+      q.addEventListener('input', function () {
+        var t = q.value.trim().toLowerCase(), n = 0;
+        document.querySelectorAll('#l-lista .l-client').forEach(function (r) {
+          var ok = !t || (r.getAttribute('data-q') || '').indexOf(t) >= 0; r.hidden = !ok; if (ok) n++;
+        });
+        document.getElementById('l-vacio').hidden = n > 0;
+      });
+    })();
+  </script>
   {% else %}
-  <div class="empty">
-    <p>Todavía no hay clientes.</p>
-    <a class="btn btn-primary" href="/clientes/nuevo">Dar de alta el primero</a>
-  </div>
+  <div class="l-wrap"><div class="l-empty"><b>🏢</b>Todavía no hay clientes.<br><br>
+    {% if puede('clientes.editar') %}<a class="u-btn" href="/clientes/nuevo" style="text-decoration:none;display:inline-block">Dar de alta el primero</a>{% endif %}</div></div>
   {% endif %}
 {% endblock %}

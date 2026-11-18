@@ -2,7 +2,9 @@
 # Capa fina sobre la imagen oficial, con la versión FIJADA: el VPS hace `pull` de
 # nuestra imagen (GHCR) y no depende de un `latest` que cambie solo. Para
 # actualizar, subí MESH_VERSION y dejá que build-meshcentral.yml publique.
-ARG MESH_VERSION=1.1.53
+# ≥ 1.1.57: desde esa versión existe `allowedFramingOrigins` (embeber Mesh en la consola solo desde nuestro
+# origen). Con la 1.1.53 el ajuste se ignora y Mesh manda X-Frame-Options: sameorigin → recuadro bloqueado.
+ARG MESH_VERSION=1.1.60
 FROM ghcr.io/ylianst/meshcentral:${MESH_VERSION}
 
 ARG MESH_VERSION

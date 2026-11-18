@@ -285,7 +285,7 @@ import itier_console.routes.equipos as _r_eq  # noqa: E402
 _r_eq._CACHE.clear()
 pe = c.get("/equipos")
 check("equipos: el técnico ve la lista con discos, antivirus OFF y alertas",
-      pe.status_code == 200 and "PC-VENTAS-01" in pe.text and "Antivirus APAGADO" in pe.text and "<strong>OFF</strong>" in pe.text
+      pe.status_code == 200 and "PC-VENTAS-01" in pe.text and "Antivirus APAGADO" in pe.text and 'l-pill bad"><i></i>OFF' in pe.text and 'class="l-bar' in pe.text
       and "Disco C: al 94 %" in pe.text, pe.text[-300:])
 check("equipos: botón Conectar lleva al control remoto embebido", "/remoto?n=PC-VENTAS-01" in pe.text and "Conectar" in pe.text)
 check("equipos: filtro «solo con alertas» oculta los equipos sanos",

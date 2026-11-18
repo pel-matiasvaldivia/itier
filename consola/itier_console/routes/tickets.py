@@ -38,7 +38,14 @@ def listar(request: Request, cliente: str = "", user: dict = Depends(require_per
         lista = svc.listar(cfg, entity_id=entity_id)
     except AdapterError as e:
         error = e.detalle
-    return render(request, "tickets_lista.html", tickets=lista, clientes=clientes, sel=cliente, error=error)
+    por_entidad = {str(c["glpi_entity_id"]): c["nombre"] for c in clientes}
+    for t in lista:
+        t["cliente"] = por_entidad.get(str(t.get("entities_id")), "")
+    st = lambda t: int(t.get("status", 0) or 0)  # noqa: E731
+    resumen = {"total": len(lista), "abiertos": sum(1 for t in lista if st(t) in (1, 2, 3, 4)),
+               "nuevos": sum(1 for t in lista if st(t) == 1), "cerrados": sum(1 for t in lista if st(t) in (5, 6)),
+               "urgentes": sum(1 for t in lista if int(t.get("priority", 0) or 0) >= 5 and st(t) in (1, 2, 3, 4))}
+    return render(request, "tickets_lista.html", tickets=lista, clientes=clientes, sel=cliente, error=error, resumen=resumen)
 
 
 @router.get("/tickets/nuevo", response_class=HTMLResponse)

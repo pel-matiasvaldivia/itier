@@ -17,8 +17,15 @@ router = APIRouter()
 
 @router.get("/clientes", response_class=HTMLResponse)
 def listar(request: Request, user: dict = Depends(require_permiso("clientes.ver")), conn: sqlite3.Connection = Depends(get_db)):
+    equipos = {r["client_id"]: r["n"] for r in conn.execute(
+        "SELECT client_id, COUNT(*) n FROM endpoint_reports GROUP BY client_id")}
     clientes = onboarding.listar_clientes(conn)
-    return render(request, "clientes_lista.html", clientes=clientes)
+    for c in clientes:
+        c["n_equipos"] = equipos.get(c["id"], 0)
+    resumen = {"total": len(clientes), "activos": sum(1 for c in clientes if c["estado"] == "activo"),
+               "avisos": sum(1 for c in clientes if c["estado"] != "activo"),
+               "equipos": sum(c["n_equipos"] for c in clientes)}
+    return render(request, "clientes_lista.html", clientes=clientes, resumen=resumen)
 
 
 @router.get("/clientes/nuevo", response_class=HTMLResponse)

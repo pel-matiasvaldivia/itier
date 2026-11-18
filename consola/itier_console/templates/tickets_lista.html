@@ -1,43 +1,75 @@
 {% extends "base.html" %}
 {% block titulo %}Tickets · Consola de iTier{% endblock %}
+{# color de estado y de prioridad (GLPI: estado 1 nuevo … 6 cerrado; prioridad 1 muy baja … 6 mayor) #}
+{% macro estado_pill(t) -%}
+  {%- set s = t.status|int -%}
+  <span class="l-pill {{ 'info' if s == 1 else ('warn' if s in (2, 3) else ('off' if s == 4 else ('ok' if s == 5 else 'dark'))) }}"><i></i>{{ t.estado_label }}</span>
+{%- endmacro %}
+{% macro prio_pill(t) -%}
+  {%- set p = t.priority|int -%}
+  <span class="l-pill {{ 'bad' if p >= 5 else ('warn' if p == 4 else ('info' if p == 3 else 'off')) }}">{{ t.prioridad_label }}</span>
+{%- endmacro %}
 {% block contenido %}
-  <div class="page-head">
-    <h1>Tickets</h1>
-    <a class="btn btn-primary" href="/tickets/nuevo">+ Nuevo ticket</a>
+  <div class="l-head">
+    <div>
+      <h1>Tickets</h1>
+      <p class="u-sub">Los tickets viven en GLPI: acá los ves de todos los clientes, abrís nuevos y los asignás.</p>
+    </div>
+    <a class="u-btn" href="/tickets/nuevo" style="text-decoration:none">+ Nuevo ticket</a>
   </div>
 
-  <div class="card">
-    <form method="get" action="/tickets" class="filtro">
-      <label>Cliente
-        <select name="cliente" onchange="this.form.submit()">
-          <option value="">Todos</option>
-          {% for c in clientes %}
-          <option value="{{ c.slug }}" {{ 'selected' if sel == c.slug else '' }}>{{ c.nombre }}</option>
-          {% endfor %}
-        </select>
-      </label>
-      <noscript><button class="btn btn-sm" type="submit">Filtrar</button></noscript>
-    </form>
+  <div class="u-stats">
+    <div class="u-stat"><b>{{ resumen.abiertos }}</b><span>Abiertos</span></div>
+    <div class="u-stat"><b>{{ resumen.nuevos }}</b><span>Nuevos</span></div>
+    <div class="u-stat {{ 'bad' if resumen.urgentes else '' }}"><b>{{ resumen.urgentes }}</b><span>Urgentes abiertos</span></div>
+    <div class="u-stat"><b>{{ resumen.cerrados }}</b><span>Resueltos / cerrados</span></div>
+  </div>
 
-    {% if error %}<div class="note note-bad">No se pudo leer GLPI: {{ error }}</div>{% endif %}
+  <div class="l-wrap">
+    <div class="l-bar-top">
+      <form method="get" action="/tickets" class="l-filters">
+        <select class="l-sel" name="cliente" onchange="this.form.submit()" aria-label="Cliente">
+          <option value="">Todos los clientes</option>
+          {% for c in clientes %}<option value="{{ c.slug }}" {{ 'selected' if sel == c.slug else '' }}>{{ c.nombre }}</option>{% endfor %}
+        </select>
+        <noscript><button class="u-b" type="submit">Filtrar</button></noscript>
+      </form>
+      <input class="u-search" type="search" id="l-buscar" placeholder="Buscar por asunto o número…" aria-label="Buscar ticket">
+    </div>
+
+    {% if error %}<div class="u-err" style="margin:1rem 1.1rem 0">No se pudo leer GLPI: {{ error }}</div>{% endif %}
 
     {% if tickets %}
-    <table class="tabla">
-      <thead><tr><th>#</th><th>Asunto</th><th>Estado</th><th>Prioridad</th><th>Fecha</th></tr></thead>
+    <table class="l-table" id="l-lista">
+      <thead><tr><th>#</th><th>Asunto</th><th>Cliente</th><th>Estado</th><th>Prioridad</th><th>Fecha</th></tr></thead>
       <tbody>
         {% for t in tickets %}
-        <tr>
-          <td><a href="/tickets/{{ t.id }}">{{ t.id }}</a></td>
-          <td><a href="/tickets/{{ t.id }}">{{ t.name }}</a></td>
-          <td><span class="badge">{{ t.estado_label }}</span></td>
-          <td>{{ t.prioridad_label }}</td>
-          <td class="muted">{{ t.date or '—' }}</td>
+        <tr data-q="{{ (t.id|string ~ ' ' ~ t.name ~ ' ' ~ t.cliente)|lower }}">
+          <td class="tight"><a class="l-id" href="/tickets/{{ t.id }}">#{{ t.id }}</a></td>
+          <td><a class="l-link" href="/tickets/{{ t.id }}">{{ t.name }}</a></td>
+          <td>{{ t.cliente or '—' }}</td>
+          <td>{{ estado_pill(t) }}</td>
+          <td>{{ prio_pill(t) }}</td>
+          <td class="muted small nowrap">{{ t.date or '—' }}</td>
         </tr>
         {% endfor %}
+        <tr id="l-vacio" hidden><td colspan="6" class="l-empty">Ningún ticket coincide con la búsqueda.</td></tr>
       </tbody>
     </table>
     {% else %}
-    <p class="muted">No hay tickets para mostrar.</p>
+    <div class="l-empty"><b>🎫</b>No hay tickets para mostrar.</div>
     {% endif %}
   </div>
+  <script>
+    (function () {
+      var q = document.getElementById('l-buscar'); if (!q) return;
+      q.addEventListener('input', function () {
+        var t = q.value.trim().toLowerCase(), n = 0;
+        document.querySelectorAll('#l-lista tbody tr[data-q]').forEach(function (r) {
+          var ok = !t || (r.getAttribute('data-q') || '').indexOf(t) >= 0; r.hidden = !ok; if (ok) n++;
+        });
+        var v = document.getElementById('l-vacio'); if (v) v.hidden = n > 0;
+      });
+    })();
+  </script>
 {% endblock %}
