@@ -261,10 +261,12 @@ TICKET_EMPTY = False
 import base64  # noqa: E402
 import threading  # noqa: E402
 from websockets.sync.server import serve  # noqa: E402
-from itier_console.adapters import mesh as mesh_mod  # noqa: E402
+from itier_console.adapters import AdapterError, mesh as mesh_mod  # noqa: E402
 
 _mesh_visto = {"auth": None, "acciones": []}
 _mesh_grupos = [{"_id": "mesh//OTRO@$x", "name": "otro", "mtype": 2}]
+_mesh_ugrupos = {}
+_mesh_denegar = False
 
 
 def _mesh_servidor(ws):
@@ -277,9 +279,18 @@ def _mesh_servidor(ws):
         elif m["action"] == "createmesh":
             _mesh_grupos.append({"_id": "mesh//NUEVO@$id", "name": m["meshname"], "mtype": m["meshtype"]})
             ws.send(json.dumps({"action": "createmesh", "responseid": m["responseid"], "result": "ok"}))
+        elif m["action"] == "usergroups":
+            ws.send(json.dumps({"action": "usergroups", "ugroups": _mesh_ugrupos or None}))
+        elif m["action"] == "createusergroup":
+            _mesh_ugrupos["ugrp//NUEVOUG"] = {"name": m["name"]}
+            ws.send(json.dumps({"action": "createusergroup", "responseid": m["responseid"], "result": "ok",
+                                "ugrpid": "ugrp//NUEVOUG"}))
         elif m["action"] == "addmeshuser":
             _mesh_visto.setdefault("compartido", []).append((m["meshid"], m["userids"], m["meshadmin"]))
-            ws.send(json.dumps({"action": "addmeshuser", "responseid": m["responseid"], "result": "ok"}))
+            if _mesh_denegar:
+                ws.send(json.dumps({"action": "addmeshuser", "responseid": m["responseid"], "result": "Permission denied"}))
+            else:  # éxito real: result vacío + success/failed
+                ws.send(json.dumps({"action": "addmeshuser", "responseid": m["responseid"], "result": "", "success": 1, "failed": 0}))
         elif m["action"] == "nodes":
             ws.send(json.dumps({"action": "userinfo"}))  # ruido que debe ignorarse
             ws.send(json.dumps({"action": "nodes", "responseid": m["responseid"], "nodes": {
@@ -289,7 +300,7 @@ def _mesh_servidor(ws):
 _srv = serve(_mesh_servidor, "127.0.0.1", 0)
 threading.Thread(target=_srv.serve_forever, daemon=True).start()
 cfg_mesh = dataclasses.replace(cfg, mesh_url=f"http://127.0.0.1:{_srv.socket.getsockname()[1]}",
-                               mesh_user="itier", mesh_password="clave", mesh_share_users=("matias",))
+                               mesh_user="itier", mesh_password="clave", mesh_support_group="SOPORTE")
 with mesh_mod.cliente(cfg_mesh) as mc:
     mid = mc.asegurar_grupo("itier-x")
     eq = mc.equipos(mid)
@@ -304,10 +315,20 @@ with mesh_mod.cliente(cfg_mesh) as mc2:
           and _mesh_visto["acciones"].count("createmesh") == antes)
 check("mesh: URL del agente Windows x64, en segundo plano",
       mesh_mod.url_agente_windows(cfg_mesh, "NUEVO@$id").endswith("/meshagents?id=4&meshid=NUEVO@$id&installflags=2"))
-check("mesh: comparte el grupo con los usuarios configurados (acceso total)",
-      _mesh_visto.get("compartido") and _mesh_visto["compartido"][0] == ("mesh//NUEVO@$id", ["user//matias"], 0xFFFFFFFF),
+check("mesh: crea el grupo de usuarios SOPORTE si no existe y comparte el grupo del cliente con él",
+      _mesh_visto.get("compartido") and _mesh_visto["compartido"][0] == ("mesh//NUEVO@$id", ["ugrp//NUEVOUG"], 4 | 8 | 16 | 32 | 64 | 128),
       _mesh_visto.get("compartido"))
-check("mesh: re-compartir al re-aprovisionar (idempotente)", len(_mesh_visto["compartido"]) == 2)
+check("mesh: los técnicos NO reciben derechos de editar el grupo ni administrar usuarios",
+      _mesh_visto["compartido"][0][2] & 3 == 0)
+check("mesh: re-compartir es idempotente y reutiliza el grupo de usuarios", len(_mesh_visto["compartido"]) == 2
+      and list(_mesh_ugrupos) == ["ugrp//NUEVOUG"])
+_mesh_denegar = True
+try:
+    with mesh_mod.cliente(cfg_mesh) as mc3:
+        mc3.asegurar_grupo("itier-x")
+    check("mesh: un rechazo al compartir se informa", False)
+except AdapterError as e:
+    check("mesh: un rechazo al compartir se informa", "Permission denied" in str(e), str(e))
 _srv.shutdown()
 
 httpx.Client = _real_Client  # type: ignore[assignment]

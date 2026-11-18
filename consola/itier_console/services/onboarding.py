@@ -118,7 +118,7 @@ def autoasignar(conn: sqlite3.Connection, cfg, actor: str, cid: int) -> None:
     marca = f"itier-{cli['slug']}"
     rule_id, action_id = cli.get("glpi_rule_id"), cli.get("zbx_action_id")
     errores = []
-    if cfg.mesh_enabled:   # idempotente: también re-comparte el grupo con los usuarios configurados
+    if cfg.mesh_enabled:   # idempotente: también re-comparte el grupo con el grupo de usuarios SOPORTE
         try:
             with mesh_mod.cliente(cfg) as m:
                 mesh_id = m.asegurar_grupo(marca)

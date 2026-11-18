@@ -26,6 +26,10 @@ from . import AdapterError
 
 _ESPERA_S = 15.0
 
+# Derechos de los técnicos sobre cada grupo de cliente: gestionar equipos, control remoto,
+# terminal/consola, archivos, wake-on-lan y notas. NO editar el grupo ni administrar usuarios.
+DERECHOS_SOPORTE = 4 | 8 | 16 | 32 | 64 | 128
+
 # Demo: un equipo ya conectado en cualquier grupo.
 _DEMO_EQUIPOS = [{"nombre": "PC-VENTAS-01", "conectado": True}]
 
@@ -65,8 +69,11 @@ class MeshClient:
             except Exception:  # noqa: BLE001
                 pass
 
-    def _pedir(self, accion: dict, esperar: str, responseid: str = "itier") -> dict:
-        """Envía una acción y devuelve la primera respuesta del tipo esperado."""
+    def _pedir(self, accion: dict, esperar: str, responseid: str = "itier", ok=None) -> dict:
+        """Envía una acción y devuelve la primera respuesta del tipo esperado.
+
+        Por defecto un `result` de texto distinto de "ok" es un error; `ok(msg)` permite
+        otro criterio (addmeshuser responde result vacío + success/failed)."""
         accion = {**accion, "responseid": responseid}
         self._ws.send(json.dumps(accion))
         limite = time.monotonic() + _ESPERA_S
@@ -78,7 +85,10 @@ class MeshClient:
             except Exception as e:  # noqa: BLE001
                 raise AdapterError("mesh", f"conexión interrumpida: {e}") from e
             if msg.get("action") == esperar and msg.get("responseid", responseid) == responseid:
-                if isinstance(msg.get("result"), str) and msg["result"] != "ok":
+                if ok is not None:
+                    if not ok(msg):
+                        raise AdapterError("mesh", f"{esperar}: {msg.get('result') or 'sin cambios'}")
+                elif isinstance(msg.get("result"), str) and msg["result"] != "ok":
                     raise AdapterError("mesh", f"{esperar}: {msg['result']}")
                 return msg
         raise AdapterError("mesh", f"sin respuesta a «{esperar}»")
@@ -107,16 +117,39 @@ class MeshClient:
                 return g["_id"]
         return None
 
+    def _grupo_usuarios(self, nombre: str) -> str:
+        """Id del grupo de usuarios (técnicos); lo crea si no existe."""
+        def buscar() -> str | None:
+            for gid, g in (self._pedir({"action": "usergroups"}, "usergroups").get("ugroups") or {}).items():
+                if g.get("name") == nombre:
+                    return gid
+            return None
+        gid = buscar()
+        if gid:
+            return gid
+        try:
+            r = self._pedir({"action": "createusergroup", "name": nombre,
+                             "desc": "Técnicos de soporte iTier"}, "createusergroup")
+        except AdapterError as e:
+            raise AdapterError("mesh", f"no se pudo crear el grupo de usuarios «{nombre}» ({e.detalle}). Creálo en MeshCentral "
+                               "(Mis usuarios → Grupos de usuarios) o dale a la cuenta de servicio el permiso "
+                               "«Administrar grupos de usuarios».") from e
+        return r.get("ugrpid") or buscar() or ""
+
     def _compartir(self, meshid: str) -> None:
-        """Da acceso total al grupo a los usuarios de ITIER_MESH_SHARE_USERS: los grupos
-        solo los ve su dueño (la cuenta de servicio) y quienes tengan acceso. Idempotente."""
-        usuarios = [u"user//" + u for u in self._cfg.mesh_share_users]
-        if not usuarios:
+        """Da acceso al grupo del cliente al grupo de usuarios de soporte (los técnicos son
+        miembros de ese grupo). Idempotente. Los grupos de dispositivos solo los ven su dueño
+        (la cuenta de servicio) y quienes tengan acceso."""
+        nombre = self._cfg.mesh_support_group
+        if not nombre:
             return
-        dominio = meshid.split("/")[1] if meshid.count("/") >= 2 else ""
-        usuarios = [f"user/{dominio}/{u.split('/')[-1]}" for u in usuarios]
-        self._pedir({"action": "addmeshuser", "meshid": meshid, "userids": usuarios,
-                     "meshadmin": 0xFFFFFFFF}, "addmeshuser")
+        if not hasattr(self, "_ugrp"):
+            self._ugrp = self._grupo_usuarios(nombre)
+        if not self._ugrp:
+            raise AdapterError("mesh", f"no se encontró el grupo de usuarios «{nombre}»")
+        self._pedir({"action": "addmeshuser", "meshid": meshid, "userids": [self._ugrp],
+                     "meshadmin": DERECHOS_SOPORTE}, "addmeshuser",
+                    ok=lambda m: m.get("failed", 0) == 0 and m.get("success", 0) >= 1)
 
     def equipos(self, mesh_id: str) -> list[dict]:
         """Equipos del grupo: [{nombre, conectado}]."""

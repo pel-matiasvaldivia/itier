@@ -266,13 +266,26 @@ HTTPS/443 hacia el VPS: no hace falta túnel, VPN ni equipo central en el client
    ⚠ **Sin** aplicación de Access: los agentes no pueden iniciar sesión. (Los WebSockets ya vienen habilitados.)
 3. Entrá a `https://itier-mesh.pymesenlinea.com.ar` y creá tu cuenta (la primera es administradora; activale 2FA).
    Creá además una cuenta **de servicio** `itier-api` **sin 2FA** (la API por contraseña no soporta TOTP).
-4. `.env`: `MESH_NEW_ACCOUNTS=false`, `ITIER_MESH_URL`, `ITIER_MESH_USER=itier-api`, `ITIER_MESH_PASSWORD` y
-   `ITIER_MESH_SHARE_USERS=<tu usuario de Mesh>` (los grupos los crea `itier-api` y solo los ven su dueño y quienes tengan acceso).
+4. `.env`: `MESH_NEW_ACCOUNTS=false`, `ITIER_MESH_URL`, `ITIER_MESH_USER=itier-api`, `ITIER_MESH_PASSWORD`
+   y `ITIER_MESH_SUPPORT_GROUP=SOPORTE` (ver «Técnicos de soporte» abajo).
    `docker compose up -d` (recrea la consola y MeshCentral).
    La config de MeshCentral se reescribe sola en cada arranque desde el `.env` (no hace falta borrar volúmenes).
    En el log tiene que aparecer `[iTier] config escrita: host=itier-mesh… puerto=4430`.
 5. En la consola, ficha del cliente → **Reintentar aprovisionamiento**: crea el grupo `itier-<slug>` en MeshCentral.
    Desde ahí, **Instaladores** ya incluye el Mesh Agent en el instalador de Windows.
+
+### Técnicos de soporte (acceso a los equipos de todos los clientes)
+
+Los grupos de equipos los crea la cuenta de servicio `itier-api` y en MeshCentral solo los ve su dueño y quien tenga acceso.
+Por eso los técnicos se manejan con un **grupo de usuarios** (`SOPORTE`):
+
+1. **Una vez**, dejá que la consola cree el grupo de usuarios `SOPORTE` (necesita que `itier-api` tenga el permiso de sitio
+   «Administrar grupos de usuarios»), o creálo vos en Mesh → *Mis usuarios* → *Grupos de usuarios* → Nuevo: `SOPORTE`.
+2. Cada vez que la consola crea o reprovisiona un cliente, le da al grupo `SOPORTE` acceso a su grupo de equipos
+   (gestionar equipos, control remoto, terminal/consola, archivos, wake-on-lan y notas; **no** editar el grupo ni administrar usuarios).
+3. **Alta de un técnico:** en Mesh, *Mis usuarios* → *Crear cuenta* (con 2FA) → abrí el grupo `SOPORTE` → *Agregar usuario*.
+   Desde ese momento ve los equipos de todos los clientes, presentes y futuros. Para quitarle el acceso, sacalo del grupo.
+4. Para los clientes que ya existían: «Reintentar aprovisionamiento» en su ficha vuelve a compartirlos con `SOPORTE`.
 
 > El instalador baja el agente de `/meshagents?id=4&meshid=…&installflags=2` sin login (mientras no actives
 > `lockAgentDownload` en MeshCentral). El enlace lleva el id del grupo del cliente, que no es un secreto fuerte: solo

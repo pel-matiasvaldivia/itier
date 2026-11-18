@@ -14,7 +14,7 @@
 
   <div class="card">
     <h2>Soporte remoto (MeshCentral)</h2>
-    {% if mesh_ok %}<p><span class="dot ok"></span>Configurado: <code>{{ mesh_url }}</code>. Cada cliente tiene su grupo de equipos; desde ahí tomás el control remoto.
+    {% if mesh_ok %}<p><span class="dot ok"></span>Configurado: <code>{{ mesh_url }}</code>. Cada cliente tiene su grupo de equipos, compartido con el grupo de usuarios <code>{{ mesh_soporte or 'SOPORTE' }}</code> (los técnicos); desde ahí toman el control remoto.
       {% if mesh_grupo %}Grupo del cliente: creado.{% else %}<span class="dot warn"></span>Este cliente aún no tiene grupo.{% endif %}</p>
     {% else %}<p><span class="dot bad"></span>Sin configurar (<code>ITIER_MESH_URL</code>, <code>ITIER_MESH_USER</code>, <code>ITIER_MESH_PASSWORD</code>). Ver <code>deploy/vps/README.md</code>.</p>{% endif %}
   </div>
