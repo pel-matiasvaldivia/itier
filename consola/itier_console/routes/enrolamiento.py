@@ -28,7 +28,7 @@ from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import HTMLResponse, PlainTextResponse, RedirectResponse, Response
 
 from .. import audit, security
-from ..deps import flash, get_db, render, require_user
+from ..deps import flash, get_db, render, require_permiso
 from ..adapters import glpi as glpi_mod, mesh as mesh_mod, zabbix as zbx_mod
 from ..deps import templates
 from ..services import ServiceError, correo, enrolamiento, onboarding
@@ -93,7 +93,7 @@ def _cliente(request: Request, conn: sqlite3.Connection, slug: str) -> dict | No
 # ── Operador ─────────────────────────────────────────────────────────────────
 
 @router.get("/clientes/{slug}/instaladores", response_class=HTMLResponse)
-def pagina(request: Request, slug: str, user: dict = Depends(require_user),
+def pagina(request: Request, slug: str, user: dict = Depends(require_permiso("instaladores")),
            conn: sqlite3.Connection = Depends(get_db)):
     cli = _cliente(request, conn, slug)
     if not cli:
@@ -137,7 +137,7 @@ def pagina(request: Request, slug: str, user: dict = Depends(require_user),
 
 @router.post("/clientes/{slug}/instaladores/enlace-equipos")
 def enlace_equipos(request: Request, slug: str, email: str = Form(""), csrf: str = Form(""),
-                   user: dict = Depends(require_user), conn: sqlite3.Connection = Depends(get_db)):
+                   user: dict = Depends(require_permiso("instaladores")), conn: sqlite3.Connection = Depends(get_db)):
     """Genera el enlace de descarga del instalador de Windows y, si se indicó un
     correo y hay SMTP, se lo envía al cliente."""
     cli = _cliente(request, conn, slug)
@@ -172,7 +172,7 @@ def enlace_equipos(request: Request, slug: str, email: str = Form(""), csrf: str
 
 @router.post("/clientes/{slug}/instaladores/enlace")
 def crear_enlace(request: Request, slug: str, csrf: str = Form(""),
-                 user: dict = Depends(require_user), conn: sqlite3.Connection = Depends(get_db)):
+                 user: dict = Depends(require_permiso("instaladores")), conn: sqlite3.Connection = Depends(get_db)):
     cli = _cliente(request, conn, slug)
     if not cli:
         return RedirectResponse("/clientes", status_code=303)
@@ -192,7 +192,7 @@ def crear_enlace(request: Request, slug: str, csrf: str = Form(""),
 
 @router.post("/clientes/{slug}/instaladores/enlace/{tid}/revocar")
 def revocar(request: Request, slug: str, tid: int, csrf: str = Form(""),
-            user: dict = Depends(require_user), conn: sqlite3.Connection = Depends(get_db)):
+            user: dict = Depends(require_permiso("instaladores")), conn: sqlite3.Connection = Depends(get_db)):
     cli = _cliente(request, conn, slug)
     if not cli:
         return RedirectResponse("/clientes", status_code=303)
@@ -210,7 +210,7 @@ def _descarga(cuerpo: str, nombre: str) -> Response:
 
 
 @router.get("/clientes/{slug}/instaladores/appliance.sh")
-def bajar_appliance(request: Request, slug: str, user: dict = Depends(require_user),
+def bajar_appliance(request: Request, slug: str, user: dict = Depends(require_permiso("instaladores")),
                     conn: sqlite3.Connection = Depends(get_db)):
     cli = _cliente(request, conn, slug)
     if not cli:
@@ -232,7 +232,7 @@ def bajar_appliance(request: Request, slug: str, user: dict = Depends(require_us
 
 @router.get("/clientes/{slug}/instaladores/windows.{ext}")
 def bajar_windows(request: Request, slug: str, ext: str, rol: str = "equipo",
-                  user: dict = Depends(require_user), conn: sqlite3.Connection = Depends(get_db)):
+                  user: dict = Depends(require_permiso("instaladores")), conn: sqlite3.Connection = Depends(get_db)):
     cli = _cliente(request, conn, slug)
     if not cli:
         return RedirectResponse("/clientes", status_code=303)

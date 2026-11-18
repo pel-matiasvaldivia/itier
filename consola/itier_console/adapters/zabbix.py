@@ -47,6 +47,9 @@ DISPONIBILIDAD = {"0": "Desconocida", "1": "Disponible", "2": "No disponible"}
 ESTADO_HOST = {"0": "Monitoreado", "1": "Sin monitorear"}
 
 
+_DEMO_USUARIOS: dict[str, dict] = {}
+
+
 class ZabbixClient:
     def __init__(self, cfg):
         self.cfg = cfg
@@ -164,6 +167,90 @@ class ZabbixClient:
         res = self._rpc("proxy.get", {"filter": {"name": [nombre]},
                                        "output": ["proxyid", "name", "operating_mode", "lastaccess"]})
         return res[0] if res else None
+
+    # -- usuarios de plataforma (técnicos / PM / administradores) ---------------
+
+    # rol de iTier → tipo de rol de Zabbix (1 User · 2 Admin · 3 Super admin)
+    TIPOS = {"admin": 3, "pm": 2, "tecnico": 1}
+
+    def _rol_id(self, rol: str) -> str:
+        tipo = self.TIPOS[rol]
+        for r in self._rpc("role.get", {"output": ["roleid", "name", "type"]}):
+            if str(r.get("type")) == str(tipo):
+                return str(r["roleid"])
+        raise AdapterError("Zabbix", f"no existe un rol de tipo {tipo} para «{rol}»")
+
+    def grupo_usuarios(self, nombre: str) -> str:
+        """Id del grupo de usuarios de soporte; lo crea (sin permisos) si no existe."""
+        if self.demo:
+            return "90"
+        r = self._rpc("usergroup.get", {"filter": {"name": [nombre]}, "output": ["usrgrpid"]})
+        if r:
+            return str(r[0]["usrgrpid"])
+        return str(self._rpc("usergroup.create", {"name": nombre})["usrgrpids"][0])
+
+    def dar_acceso_grupo(self, nombre_grupo_usuarios: str, hostgroup_id: str, permiso: int = 3) -> None:
+        """Da al grupo de usuarios de soporte acceso al grupo de hosts de un cliente (3 = lectura y
+        escritura: permite reconocer problemas; el ROL del usuario limita lo que puede editar)."""
+        if self.demo or not hostgroup_id:
+            return
+        gid = self.grupo_usuarios(nombre_grupo_usuarios)
+        actual = self._rpc("usergroup.get", {"usrgrpids": [gid], "output": ["usrgrpid"],
+                                             "selectHostGroupRights": "extend"})
+        derechos = {str(d["id"]): d for d in (actual[0].get("hostgroup_rights") if actual else []) or []}
+        if str(derechos.get(str(hostgroup_id), {}).get("permission")) == str(permiso):
+            return
+        derechos[str(hostgroup_id)] = {"id": str(hostgroup_id), "permission": str(permiso)}
+        self._rpc("usergroup.update", {"usrgrpid": gid, "hostgroup_rights": list(derechos.values())})
+
+    def buscar_usuario(self, username: str) -> dict | None:
+        if self.demo:
+            return _DEMO_USUARIOS.get(username.lower())
+        r = self._rpc("user.get", {"filter": {"username": [username]}, "output": ["userid", "username"]})
+        return {"id": str(r[0]["userid"])} if r else None
+
+    def asegurar_usuario(self, username: str, password: str, nombre: str, rol: str,
+                         grupo_soporte: str) -> tuple[str, str]:
+        """Crea el usuario o, si ya existe, le fija clave, rol y grupo. → (id, 'creado'|'actualizado')."""
+        if self.demo:
+            ya = username.lower() in _DEMO_USUARIOS
+            _DEMO_USUARIOS[username.lower()] = {"id": str(800 + len(_DEMO_USUARIOS))}
+            return _DEMO_USUARIOS[username.lower()]["id"], "actualizado" if ya else "creado"
+        grupo = self.grupo_usuarios(grupo_soporte)
+        base = {"roleid": self._rol_id(rol), "usrgrps": [{"usrgrpid": grupo}]}
+        ex = self.buscar_usuario(username)
+        if ex:
+            self._rpc("user.update", {"userid": ex["id"], "passwd": password, **base})
+            return ex["id"], "actualizado"
+        partes = (nombre or username).split(" ", 1)
+        r = self._rpc("user.create", {"username": username, "passwd": password, "name": partes[0],
+                                      "surname": partes[1] if len(partes) > 1 else "", **base})
+        return str(r["userids"][0]), "creado"
+
+    def fijar_password_usuario(self, uid: str, password: str) -> None:
+        if not self.demo:
+            self._rpc("user.update", {"userid": uid, "passwd": password})
+
+    def cambiar_rol_usuario(self, uid: str, rol: str) -> None:
+        if not self.demo:
+            self._rpc("user.update", {"userid": uid, "roleid": self._rol_id(rol)})
+
+    def activar_usuario(self, uid: str, activo: bool, grupo_soporte: str) -> None:
+        """Baja = pasarlo al grupo integrado «Disabled»; alta = devolverlo al grupo de soporte."""
+        if self.demo:
+            return
+        if activo:
+            grupos = [{"usrgrpid": self.grupo_usuarios(grupo_soporte)}]
+        else:
+            r = self._rpc("usergroup.get", {"filter": {"name": ["Disabled"]}, "output": ["usrgrpid"]})
+            if not r:
+                raise AdapterError("Zabbix", "no existe el grupo «Disabled» para dar de baja al usuario")
+            grupos = [{"usrgrpid": str(r[0]["usrgrpid"])}]
+        self._rpc("user.update", {"userid": uid, "usrgrps": grupos})
+
+    def eliminar_usuario(self, uid: str) -> None:
+        if not self.demo:
+            self._rpc("user.delete", [uid])
 
     def crear_proxy(self, nombre: str, psk_identity: str, psk_key: str) -> str:
         """Crea un proxy ACTIVO con PSK. Devuelve el proxyid."""

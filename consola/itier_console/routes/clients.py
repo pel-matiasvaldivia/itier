@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 
 from .. import audit, security
-from ..deps import flash, get_db, render, require_user
+from ..deps import flash, get_db, render, require_permiso
 from ..services import ServiceError
 from ..services import onboarding
 
@@ -16,13 +16,13 @@ router = APIRouter()
 
 
 @router.get("/clientes", response_class=HTMLResponse)
-def listar(request: Request, user: dict = Depends(require_user), conn: sqlite3.Connection = Depends(get_db)):
+def listar(request: Request, user: dict = Depends(require_permiso("clientes.ver")), conn: sqlite3.Connection = Depends(get_db)):
     clientes = onboarding.listar_clientes(conn)
     return render(request, "clientes_lista.html", clientes=clientes)
 
 
 @router.get("/clientes/nuevo", response_class=HTMLResponse)
-def nuevo_form(request: Request, user: dict = Depends(require_user)):
+def nuevo_form(request: Request, user: dict = Depends(require_permiso("clientes.editar"))):
     return render(request, "clientes_nuevo.html")
 
 
@@ -32,7 +32,7 @@ def nuevo_post(
     nombre: str = Form(...),
     notas: str = Form(""),
     csrf: str = Form(""),
-    user: dict = Depends(require_user),
+    user: dict = Depends(require_permiso("clientes.editar")),
     conn: sqlite3.Connection = Depends(get_db),
 ):
     if not security.verificar_csrf(request.session, csrf):
@@ -53,7 +53,7 @@ def nuevo_post(
 
 
 @router.get("/clientes/{slug}", response_class=HTMLResponse)
-def detalle(request: Request, slug: str, user: dict = Depends(require_user), conn: sqlite3.Connection = Depends(get_db)):
+def detalle(request: Request, slug: str, user: dict = Depends(require_permiso("clientes.ver")), conn: sqlite3.Connection = Depends(get_db)):
     cli = onboarding.obtener_cliente_por_slug(conn, slug)
     if not cli:
         flash(request, "Cliente no encontrado.", "error")
@@ -71,7 +71,7 @@ def crear_usuario_portal(
     username: str = Form(...),
     password: str = Form(...),
     csrf: str = Form(""),
-    user: dict = Depends(require_user),
+    user: dict = Depends(require_permiso("clientes.editar")),
     conn: sqlite3.Connection = Depends(get_db),
 ):
     cli = onboarding.obtener_cliente_por_slug(conn, slug)
@@ -103,7 +103,7 @@ def eliminar_usuario_portal(
     slug: str,
     uid: int,
     csrf: str = Form(""),
-    user: dict = Depends(require_user),
+    user: dict = Depends(require_permiso("clientes.editar")),
     conn: sqlite3.Connection = Depends(get_db),
 ):
     cli = onboarding.obtener_cliente_por_slug(conn, slug)
@@ -128,7 +128,7 @@ def reintentar(
     request: Request,
     slug: str,
     csrf: str = Form(""),
-    user: dict = Depends(require_user),
+    user: dict = Depends(require_permiso("clientes.editar")),
     conn: sqlite3.Connection = Depends(get_db),
 ):
     cli = onboarding.obtener_cliente_por_slug(conn, slug)
@@ -152,7 +152,7 @@ def eliminar(
     request: Request,
     slug: str,
     csrf: str = Form(""),
-    user: dict = Depends(require_user),
+    user: dict = Depends(require_permiso("clientes.editar")),
     conn: sqlite3.Connection = Depends(get_db),
 ):
     cli = onboarding.obtener_cliente_por_slug(conn, slug)

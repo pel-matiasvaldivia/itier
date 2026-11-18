@@ -9,14 +9,14 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 
 from .. import audit, security
 from ..adapters import AdapterError
-from ..deps import flash, get_db, render, require_user
+from ..deps import flash, get_db, render, require_permiso
 from ..services import ServiceError, curacion, onboarding
 
 router = APIRouter()
 
 
 @router.get("/clientes/{slug}/criticidad", response_class=HTMLResponse)
-def panel(request: Request, slug: str, user: dict = Depends(require_user), conn: sqlite3.Connection = Depends(get_db)):
+def panel(request: Request, slug: str, user: dict = Depends(require_permiso("curacion")), conn: sqlite3.Connection = Depends(get_db)):
     cli = onboarding.obtener_cliente_por_slug(conn, slug)
     if not cli:
         flash(request, "Cliente no encontrado.", "error")
@@ -38,7 +38,7 @@ def fijar(
     nombre: str = Form(""),
     criticidad: str = Form(...),
     csrf: str = Form(""),
-    user: dict = Depends(require_user),
+    user: dict = Depends(require_permiso("curacion")),
     conn: sqlite3.Connection = Depends(get_db),
 ):
     cli = onboarding.obtener_cliente_por_slug(conn, slug)

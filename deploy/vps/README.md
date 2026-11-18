@@ -287,6 +287,30 @@ Por eso los técnicos se manejan con un **grupo de usuarios** (`SOPORTE`):
    Desde ese momento ve los equipos de todos los clientes, presentes y futuros. Para quitarle el acceso, sacalo del grupo.
 4. Para los clientes que ya existían: «Reintentar aprovisionamiento» en su ficha vuelve a compartirlos con `SOPORTE`.
 
+### Usuarios de la plataforma (técnicos, PM, administradores)
+
+La consola tiene **Usuarios** (solo el rol Administrador). Un alta crea la **misma cuenta con la misma clave inicial** en la
+consola, GLPI, Zabbix y MeshCentral, con el perfil equivalente al rol; la clave se genera, se muestra **una sola vez** y no se guarda.
+
+| Rol | Consola | GLPI | Zabbix | MeshCentral |
+|---|---|---|---|---|
+| Administrador (full) | todo, incl. este ABM | Super-Admin | Super admin | administrador del sitio + grupo SOPORTE |
+| PM | clientes, instaladores, descubrimiento, curación, auditoría | Supervisor | Admin (+ grupo «iTier Soporte») | sin crear grupos + SOPORTE |
+| Técnico | tickets, equipos y conexión remota, ver clientes | Technician | User (+ grupo «iTier Soporte») | sin crear grupos + SOPORTE |
+
+Permisos que necesitan las cuentas de servicio que usa la consola:
+- **GLPI**: el usuario de la API (el del `ITIER_GLPI_USER_TOKEN`) con perfil **Super-Admin** para crear usuarios y asignar perfiles.
+- **Zabbix**: el usuario/token de la API con rol **Super admin** (crea usuarios, roles y el grupo de usuarios).
+- **Mesh**: `itier-api` con los permisos de sitio **«Gestionar usuarios»** y **«Grupos de usuarios»**; para crear otros *administradores* tiene que ser administrador completo.
+
+Qué hace cada acción: **Reiniciar clave** pone una clave nueva en los tres (en Mesh la API no permite fijar la clave de otro usuario: se
+**recrea la cuenta** y se vuelve a sumar a SOPORTE). **Dar de baja** deshabilita en la consola, GLPI (inactivo), Zabbix (grupo «Disabled») y
+Mesh (cuenta bloqueada + fuera de SOPORTE); la baja y los cambios de rol rigen **al instante**, aunque tenga la sesión abierta.
+**Eliminar** borra la cuenta en los cuatro. Cada sistema es independiente: si uno falla, el estado queda a la vista por sistema en la lista.
+
+> ⚠ La clave solo es la misma **al principio**: la consola y Mesh piden cambiarla en el primer ingreso y cada sistema la maneja después por su cuenta.
+> Cada usuario debería activar 2FA en las cuatro. Para un único inicio de sesión real habría que pasar a SSO (OIDC/SAML).
+
 ### Panel de equipos, alertas y conexión remota embebida
 
 La consola tiene **Equipos** (menú): todos los equipos de todos los clientes con su conexión, **discos** (alerta desde

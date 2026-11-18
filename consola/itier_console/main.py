@@ -21,7 +21,7 @@ from starlette.middleware.sessions import SessionMiddleware
 from . import security
 from .config import Config
 from .db import connect, init_db
-from .deps import AccesoConsola, AccesoPortal, AuthRequired, CambioClaveRequerido, BASE, flash
+from .deps import AccesoConsola, AccesoPortal, AuthRequired, CambioClaveRequerido, PermisoDenegado, BASE, flash
 from .routes import agents as r_agents
 from .routes import audit as r_audit
 from .routes import clients as r_clients
@@ -32,6 +32,7 @@ from .routes import enrolamiento as r_enrolamiento
 from .routes import equipos as r_equipos
 from .routes import portal as r_portal
 from .routes import tickets as r_tickets
+from .routes import usuarios as r_usuarios
 from . import auth as r_auth
 
 log = logging.getLogger("itier.consola")
@@ -93,6 +94,11 @@ def create_app() -> FastAPI:
     async def _acceso_portal(request: Request, _exc: AccesoPortal):
         return RedirectResponse("/portal", status_code=303)
 
+    @app.exception_handler(PermisoDenegado)
+    async def _permiso_denegado(request: Request, _exc: PermisoDenegado):
+        flash(request, "Tu rol no tiene permiso para esa sección.", "error")
+        return RedirectResponse("/", status_code=303)
+
     @app.exception_handler(AccesoConsola)
     async def _acceso_consola(request: Request, _exc: AccesoConsola):
         return RedirectResponse("/", status_code=303)
@@ -108,6 +114,7 @@ def create_app() -> FastAPI:
     app.include_router(r_discovery.router)
     app.include_router(r_enrolamiento.router)
     app.include_router(r_equipos.router)
+    app.include_router(r_usuarios.router)
     app.include_router(r_curacion.router)
     app.include_router(r_tickets.router)
     app.include_router(r_audit.router)

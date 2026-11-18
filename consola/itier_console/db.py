@@ -33,7 +33,14 @@ CREATE TABLE IF NOT EXISTS users (
     last_login    TEXT,
     -- NULL = usuario operador (consola). Con valor = usuario del PORTAL, atado a
     -- ese cliente (ve solo su empresa). Ver docs/08.
-    client_id     INTEGER
+    client_id     INTEGER,
+    -- Rol de plataforma de un operador: admin | pm | tecnico (NULL en usuarios del portal).
+    rol           TEXT,
+    email         TEXT,
+    nombre        TEXT,
+    -- Cuentas equivalentes en los otros sistemas y su estado de sincronización.
+    glpi_user_id  TEXT, zbx_user_id TEXT,
+    sync_glpi     TEXT, sync_zbx TEXT, sync_mesh TEXT
 );
 
 CREATE TABLE IF NOT EXISTS clients (
@@ -163,6 +170,12 @@ def _migrar(conn: sqlite3.Connection) -> None:
                 "glpi_rule_id", "zbx_action_id", "autoasig_detalle", "report_key", "central_key", "mesh_id"):
         if col not in ccols:
             conn.execute(f"ALTER TABLE clients ADD COLUMN {col} TEXT")
+    ucols = {r["name"] for r in conn.execute("PRAGMA table_info(users)").fetchall()}
+    for col in ("rol", "email", "nombre", "glpi_user_id", "zbx_user_id", "sync_glpi", "sync_zbx", "sync_mesh"):
+        if col not in ucols:
+            conn.execute(f"ALTER TABLE users ADD COLUMN {col} TEXT")
+    conn.execute("UPDATE users SET rol='admin' WHERE rol IS NULL AND client_id IS NULL AND is_admin=1")
+    conn.execute("UPDATE users SET rol='tecnico' WHERE rol IS NULL AND client_id IS NULL AND is_admin=0")
     ecols = {r["name"] for r in conn.execute("PRAGMA table_info(endpoint_reports)").fetchall()}
     if ecols and "rol" not in ecols:
         conn.execute("ALTER TABLE endpoint_reports ADD COLUMN rol TEXT NOT NULL DEFAULT 'equipo'")

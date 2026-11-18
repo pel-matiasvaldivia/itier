@@ -9,7 +9,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 
 from .. import audit, security
 from ..adapters import AdapterError
-from ..deps import flash, get_db, render, require_user
+from ..deps import flash, get_db, render, require_permiso
 from ..services import onboarding
 from ..services import tickets as svc
 
@@ -21,7 +21,7 @@ def _clientes_con_entidad(conn: sqlite3.Connection) -> list[dict]:
 
 
 @router.get("/tickets", response_class=HTMLResponse)
-def listar(request: Request, cliente: str = "", user: dict = Depends(require_user), conn: sqlite3.Connection = Depends(get_db)):
+def listar(request: Request, cliente: str = "", user: dict = Depends(require_permiso("tickets")), conn: sqlite3.Connection = Depends(get_db)):
     cfg = request.app.state.cfg
     clientes = _clientes_con_entidad(conn)
     entity_id = None
@@ -42,7 +42,7 @@ def listar(request: Request, cliente: str = "", user: dict = Depends(require_use
 
 
 @router.get("/tickets/nuevo", response_class=HTMLResponse)
-def nuevo_form(request: Request, user: dict = Depends(require_user), conn: sqlite3.Connection = Depends(get_db)):
+def nuevo_form(request: Request, user: dict = Depends(require_permiso("tickets")), conn: sqlite3.Connection = Depends(get_db)):
     clientes = _clientes_con_entidad(conn)
     return render(request, "tickets_nuevo.html", clientes=clientes)
 
@@ -55,7 +55,7 @@ def nuevo_post(
     contenido: str = Form(""),
     prioridad: int = Form(3),
     csrf: str = Form(""),
-    user: dict = Depends(require_user),
+    user: dict = Depends(require_permiso("tickets")),
     conn: sqlite3.Connection = Depends(get_db),
 ):
     if not security.verificar_csrf(request.session, csrf):
@@ -78,7 +78,7 @@ def nuevo_post(
 
 
 @router.get("/tickets/{ticket_id}", response_class=HTMLResponse)
-def detalle(request: Request, ticket_id: int, user: dict = Depends(require_user)):
+def detalle(request: Request, ticket_id: int, user: dict = Depends(require_permiso("tickets"))):
     cfg = request.app.state.cfg
     try:
         t = svc.ver(cfg, ticket_id)
@@ -94,7 +94,7 @@ def asignar(
     ticket_id: int,
     users_id: int = Form(...),
     csrf: str = Form(""),
-    user: dict = Depends(require_user),
+    user: dict = Depends(require_permiso("tickets")),
     conn: sqlite3.Connection = Depends(get_db),
 ):
     if not security.verificar_csrf(request.session, csrf):

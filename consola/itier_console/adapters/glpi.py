@@ -89,6 +89,9 @@ _DEMO_SALUD = {
 }
 
 
+_DEMO_USUARIOS: dict[str, dict] = {}
+
+
 class GLPIClient:
     def __init__(self, cfg):
         self.cfg = cfg
@@ -160,6 +163,13 @@ class GLPIClient:
         if r.status_code not in (200, 201):
             raise AdapterError("GLPI", f"POST {ruta} → {r.status_code}: {r.text[:200]}")
         return r.json()
+
+    def _delete(self, ruta: str, params: dict | None = None) -> Any:
+        self._asegurar_sesion()
+        r = self._client().delete(f"{self._base}{ruta}", headers=self._headers_sesion(), params=params)
+        if r.status_code not in (200, 204):
+            raise AdapterError("GLPI", f"DELETE {ruta} → {r.status_code}: {r.text[:200]}")
+        return r.json() if r.content else {}
 
     def _put(self, ruta: str, cuerpo: dict) -> Any:
         self._asegurar_sesion()
@@ -311,6 +321,76 @@ class GLPIClient:
         return [{"itemtype": "Computer", "id": str(c.get("id")), "name": c.get("name"),
                  "criticidad": nombres.get(str(c.get("businesscriticities_id")), "")}
                 for c in comps]
+
+    # -- usuarios de plataforma (técnicos / PM / administradores) ---------------
+
+    # rol de iTier → (nombre del perfil de GLPI, id por defecto de una instalación estándar)
+    PERFILES = {"admin": ("Super-Admin", 4), "pm": ("Supervisor", 7), "tecnico": ("Technician", 6)}
+
+    def _perfil_id(self, rol: str) -> int:
+        nombre, por_defecto = self.PERFILES[rol]
+        try:
+            for p in self._get("/Profile", params={"range": "0-200"}) or []:
+                if isinstance(p, dict) and (p.get("name") or "").strip().lower() == nombre.lower():
+                    return int(p["id"])
+        except AdapterError:
+            pass
+        return por_defecto
+
+    def buscar_usuario(self, username: str) -> dict | None:
+        if self.demo:
+            return _DEMO_USUARIOS.get(username.lower())
+        for u in self._get("/User", params={"range": "0-1999"}) or []:
+            if isinstance(u, dict) and (u.get("name") or "").lower() == username.lower():
+                return {"id": str(u["id"]), "activo": bool(int(u.get("is_active") or 0))}
+        return None
+
+    def _asignar_perfil(self, uid: str, rol: str) -> None:
+        """Deja al usuario con UN solo perfil (el del rol), sobre la entidad raíz y sus hijas
+        (todos los clientes, presentes y futuros)."""
+        try:
+            for pu in self._get(f"/User/{uid}/Profile_User") or []:
+                if isinstance(pu, dict) and pu.get("id") is not None:
+                    self._delete(f"/Profile_User/{pu['id']}")
+        except AdapterError:
+            pass
+        self._post("/Profile_User", {"input": {"users_id": int(uid), "profiles_id": self._perfil_id(rol),
+                                               "entities_id": 0, "is_recursive": 1}})
+
+    def asegurar_usuario(self, username: str, password: str, email: str, nombre: str, rol: str) -> tuple[str, str]:
+        """Crea el usuario o, si ya existe, le fija clave, perfil y lo activa. → (id, 'creado'|'actualizado')."""
+        if self.demo:
+            ya = username.lower() in _DEMO_USUARIOS
+            _DEMO_USUARIOS[username.lower()] = {"id": str(700 + len(_DEMO_USUARIOS)), "activo": True}
+            return _DEMO_USUARIOS[username.lower()]["id"], "actualizado" if ya else "creado"
+        ex = self.buscar_usuario(username)
+        if ex:
+            self._put(f"/User/{ex['id']}", {"input": {"password": password, "password2": password, "is_active": 1}})
+            self._asignar_perfil(ex["id"], rol)
+            return ex["id"], "actualizado"
+        partes = (nombre or username).split(" ", 1)
+        r = self._post("/User", {"input": {
+            "name": username, "password": password, "password2": password, "is_active": 1,
+            "firstname": partes[0], "realname": partes[1] if len(partes) > 1 else "",
+            "_useremails": [email], "_profiles_id": self._perfil_id(rol), "_entities_id": 0, "_is_recursive": 1}})
+        uid = str(r["id"] if isinstance(r, dict) else r[0]["id"])
+        return uid, "creado"
+
+    def fijar_password_usuario(self, uid: str, password: str) -> None:
+        if not self.demo:
+            self._put(f"/User/{uid}", {"input": {"password": password, "password2": password}})
+
+    def cambiar_rol_usuario(self, uid: str, rol: str) -> None:
+        if not self.demo:
+            self._asignar_perfil(uid, rol)
+
+    def activar_usuario(self, uid: str, activo: bool) -> None:
+        if not self.demo:
+            self._put(f"/User/{uid}", {"input": {"is_active": 1 if activo else 0}})
+
+    def eliminar_usuario(self, uid: str) -> None:
+        if not self.demo:
+            self._delete(f"/User/{uid}", params={"force_purge": 1})
 
     def salud_cis(self, ids: list[str]) -> dict[str, dict]:
         """Discos y antivirus que el GLPI Agent inventarió, por id de Computer.

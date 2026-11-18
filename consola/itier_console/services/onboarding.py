@@ -143,6 +143,12 @@ def autoasignar(conn: sqlite3.Connection, cfg, actor: str, cid: int) -> None:
                 action_id = z.asegurar_autoregistro(f"iTier · {cli['nombre']}", marca, cli["zbx_hostgroup_id"])
         except (AdapterError, KeyError, IndexError) as e:
             errores.append(f"Zabbix (autorregistro): {e}")
+    if cfg.zbx_configurado and cli.get("zbx_hostgroup_id"):
+        try:   # el grupo de usuarios de soporte de Zabbix ve los hosts de este cliente
+            with zbx_mod.cliente(cfg) as z:
+                z.dar_acceso_grupo(cfg.zbx_soporte_grupo, cli["zbx_hostgroup_id"])
+        except (AdapterError, KeyError, IndexError) as e:
+            errores.append(f"Zabbix (acceso de soporte): {getattr(e, 'detalle', e)}")
     detalle = "; ".join(errores)[:500] or None
     conn.execute("UPDATE clients SET glpi_rule_id=?, zbx_action_id=?, autoasig_detalle=? WHERE id=?",
                  (str(rule_id) if rule_id else None, str(action_id) if action_id else None, detalle, cid))

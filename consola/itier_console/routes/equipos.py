@@ -18,7 +18,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 
 from .. import audit
 from ..adapters import mesh as mesh_mod
-from ..deps import flash, get_db, render, require_user
+from ..deps import flash, get_db, render, require_permiso
 from ..services import equipos as equipos_svc, onboarding
 
 router = APIRouter()
@@ -40,7 +40,7 @@ def _datos(cfg, cli: dict, forzar: bool) -> dict:
 
 @router.get("/equipos", response_class=HTMLResponse)
 def lista(request: Request, cliente: str = "", alertas: str = "", actualizar: str = "",
-          user: dict = Depends(require_user), conn: sqlite3.Connection = Depends(get_db)):
+          user: dict = Depends(require_permiso("equipos")), conn: sqlite3.Connection = Depends(get_db)):
     cfg = request.app.state.cfg
     clientes = [c for c in onboarding.listar_clientes(conn) if c.get("estado") == "activo"]
     todos = [{"slug": c["slug"], "nombre": c["nombre"]} for c in clientes]
@@ -66,7 +66,7 @@ def lista(request: Request, cliente: str = "", alertas: str = "", actualizar: st
 
 
 @router.get("/equipos/{slug}/{nodo}/remoto", response_class=HTMLResponse)
-def remoto(request: Request, slug: str, nodo: str, n: str = "", user: dict = Depends(require_user),
+def remoto(request: Request, slug: str, nodo: str, n: str = "", user: dict = Depends(require_permiso("equipos.remoto")),
            conn: sqlite3.Connection = Depends(get_db)):
     cfg = request.app.state.cfg
     cli = onboarding.obtener_cliente_por_slug(conn, slug)

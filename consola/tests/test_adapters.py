@@ -55,6 +55,20 @@ def handler(request: httpx.Request) -> httpx.Response:
         return httpx.Response(200, json={"session_token": "SESS"})
     if p.endswith("/killSession"):
         return httpx.Response(200, json={})
+    if p.endswith("/Profile") and request.method == "GET":
+        return httpx.Response(200, json=[{"id": 4, "name": "Super-Admin"}, {"id": 6, "name": "Technician"}, {"id": 7, "name": "Supervisor"}])
+    if p.endswith("/User") and request.method == "GET":
+        return httpx.Response(200, json=[{"id": 11, "name": "existente", "is_active": 1}])
+    if p.endswith("/User") and request.method == "POST":
+        return httpx.Response(201, json={"id": 77})
+    if p.endswith("/User/11/Profile_User") and request.method == "GET":
+        return httpx.Response(200, json=[{"id": 301, "users_id": 11, "profiles_id": 4}])
+    if "/Profile_User/301" in p and request.method == "DELETE":
+        return httpx.Response(200, json=[True])
+    if p.endswith("/Profile_User") and request.method == "POST":
+        return httpx.Response(201, json={"id": 302})
+    if "/User/11" in p and request.method == "PUT":
+        return httpx.Response(200, json=[{"11": True}])
     if p.endswith("/Entity"):
         if request.method == "POST":
             return httpx.Response(201, json={"id": 42})
@@ -130,6 +144,21 @@ def handler(request: httpx.Request) -> httpx.Response:
             return _rpc(body, [{"hostid": "501", "host": "SRV", "name": "srv", "status": "0",
                                 "proxyid": "9", "interfaces": [{"available": "1"}],
                                 "hostgroups": [{"name": "iTier/X", "groupid": "5"}]}])
+        if m == "role.get":
+            return _rpc(body, [{"roleid": "1", "name": "User role", "type": "1"}, {"roleid": "2", "name": "Admin role", "type": "2"},
+                               {"roleid": "3", "name": "Super admin role", "type": "3"}])
+        if m == "usergroup.get":
+            if (params.get("filter") or {}).get("name") == ["iTier Soporte"]:
+                return _rpc(body, [{"usrgrpid": "90"}])
+            return _rpc(body, [{"usrgrpid": "90", "hostgroup_rights": [{"id": "7", "permission": "2"}]}])
+        if m == "usergroup.update":
+            return _rpc(body, {"usrgrpids": ["90"]})
+        if m == "user.get":
+            return _rpc(body, [])
+        if m == "user.create":
+            return _rpc(body, {"userids": ["55"]})
+        if m == "user.update":
+            return _rpc(body, {"userids": ["55"]})
         if m == "host.update":
             return _rpc(body, {"hostids": ["501"]})
     return httpx.Response(404, json={"error": "ruta no simulada"})
@@ -217,6 +246,32 @@ check("glpi.salud_cis: discos de ese equipo (y no los de otros) en MB", [d["nomb
       and sal["501"]["discos"][0]["libre_mb"] == 8000, str(sal))
 check("glpi.salud_cis: antivirus apagado detectado", sal["501"]["antivirus"] == [{"nombre": "Defender", "activo": False, "actualizado": True}], str(sal))
 check("glpi.salud_cis: equipo sin inventario queda marcado", sal["601"]["inventariado"] is False and sal["501"]["inventariado"] is True)
+_n0 = len(captured)
+with glpi_mod.cliente(cfg) as g:
+    gid, que = g.asegurar_usuario("jperez", "Cl4ve-Segura!", "jperez@x.com", "Juan Pérez", "tecnico")
+    gid2, que2 = g.asegurar_usuario("existente", "Otra-Clave1!", "e@x.com", "Ex Istente", "pm")
+_cap = captured[_n0:]
+cre = next((x for x in _cap if x["path"].endswith("/User") and x["method"] == "POST"), None)
+check("glpi: crea el usuario con perfil Technician en la entidad raíz (recursivo)",
+      gid == "77" and que == "creado" and cre["body"]["input"]["_profiles_id"] == 6 and cre["body"]["input"]["_is_recursive"] == 1
+      and cre["body"]["input"]["_useremails"] == ["jperez@x.com"] and cre["body"]["input"]["password"] == cre["body"]["input"]["password2"], str(cre))
+check("glpi: si el usuario ya existe lo actualiza (clave) y le cambia el perfil a Supervisor",
+      gid2 == "11" and que2 == "actualizado"
+      and any("/Profile_User/301" in x["path"] and x["method"] == "DELETE" for x in _cap)
+      and any(x["path"].endswith("/Profile_User") and x["method"] == "POST" and x["body"]["input"]["profiles_id"] == 7 for x in _cap))
+_n1 = len(captured)
+with zbx_mod.cliente(cfg) as z:
+    zid, zque = z.asegurar_usuario("jperez", "Cl4ve-Segura!", "Juan Pérez", "tecnico", "iTier Soporte")
+    z.dar_acceso_grupo("iTier Soporte", "5")
+_capz = captured[_n1:]
+zc = next((x for x in _capz if x.get("body", {}).get("method") == "user.create"), None)
+check("zabbix: crea el usuario con rol User (tipo 1), clave y grupo de soporte",
+      zid == "55" and zc["body"]["params"]["roleid"] == "1" and zc["body"]["params"]["passwd"] == "Cl4ve-Segura!"
+      and zc["body"]["params"]["usrgrps"] == [{"usrgrpid": "90"}] and zc["body"]["params"]["name"] == "Juan", str(zc))
+zu = next((x for x in _capz if x.get("body", {}).get("method") == "usergroup.update"), None)
+check("zabbix: da lectura/escritura al grupo de hosts del cliente SIN pisar los derechos que ya tenía",
+      zu and {d["id"] for d in zu["body"]["params"]["hostgroup_rights"]} == {"7", "5"}
+      and [d for d in zu["body"]["params"]["hostgroup_rights"] if d["id"] == "5"][0]["permission"] == "3", str(zu))
 put = next((x for x in captured if x["path"].endswith("/Computer/501") and x["method"] == "PUT"), None)
 check("glpi.fijar_criticidad hace PUT con businesscriticities_id",
       put and "businesscriticities_id" in put["body"]["input"], str(put["body"]) if put else "—")
@@ -280,6 +335,7 @@ from itier_console.adapters import AdapterError, mesh as mesh_mod  # noqa: E402
 _mesh_visto = {"auth": None, "acciones": []}
 _mesh_grupos = [{"_id": "mesh//OTRO@$x", "name": "otro", "mtype": 2}]
 _mesh_ugrupos = {}
+_mesh_usuarios = set()
 _mesh_denegar = False
 
 
@@ -299,6 +355,14 @@ def _mesh_servidor(ws):
             _mesh_ugrupos["ugrp//NUEVOUG"] = {"name": m["name"]}
             ws.send(json.dumps({"action": "createusergroup", "responseid": m["responseid"], "result": "ok",
                                 "ugrpid": "ugrp//NUEVOUG"}))
+        elif m["action"] == "adduser":
+            _mesh_visto.setdefault("usuarios", []).append(m)
+            dup = m["username"] in _mesh_usuarios
+            _mesh_usuarios.add(m["username"])
+            ws.send(json.dumps({"action": "adduser", "responseid": m["responseid"], "result": "User already exists" if dup else "ok"}))
+        elif m["action"] in ("addusertousergroup", "removeuserfromusergroup", "edituser", "deleteuser"):
+            _mesh_visto.setdefault("ops", []).append(m)
+            ws.send(json.dumps({"action": m["action"], "responseid": m["responseid"], "result": "ok"}))
         elif m["action"] == "addmeshuser":
             _mesh_visto.setdefault("compartido", []).append((m["meshid"], m["userids"], m["meshadmin"]))
             if _mesh_denegar:
@@ -349,6 +413,22 @@ try:
     check("mesh: un rechazo al compartir se informa", False)
 except AdapterError as e:
     check("mesh: un rechazo al compartir se informa", "Permission denied" in str(e), str(e))
+with mesh_mod.cliente(cfg_mesh) as mu:
+    est1 = mu.asegurar_usuario("jperez", "Cl4ve!", "j@x.com", "tecnico", "SOPORTE")
+    est2 = mu.asegurar_usuario("jperez", "Cl4ve!", "j@x.com", "tecnico", "SOPORTE")
+    mu.bloquear_usuario("jperez", True, "tecnico", "SOPORTE")
+    mu.bloquear_usuario("jperez", False, "tecnico", "SOPORTE")
+    mu.cambiar_rol_usuario("jperez", "pm")
+    mu.eliminar_usuario("jperez")
+au = _mesh_visto["usuarios"][0]
+check("mesh: alta de usuario con clave, correo, cambio de clave obligatorio y sin permiso de crear grupos",
+      est1 == "creado" and au["pass"] == "Cl4ve!" and au["email"] == "j@x.com" and au["resetNextLogin"] is True and au["siteadmin"] == 64, str(au))
+check("mesh: si el usuario ya existía no falla y lo informa", est2 == "existente")
+ops = [(o["action"], o.get("siteadmin"), o.get("usernames") or o.get("userid")) for o in _mesh_visto["ops"]]
+check("mesh: lo suma al grupo SOPORTE", ("addusertousergroup", None, ["jperez"]) in ops, str(ops))
+check("mesh: baja = cuenta bloqueada (32) y fuera de SOPORTE; alta = derechos del rol y de vuelta",
+      ("edituser", 32, "jperez") in ops and ("removeuserfromusergroup", None, "user//jperez") in ops and ("edituser", 64, "jperez") in ops, str(ops))
+check("mesh: cambio de rol y eliminación", ("edituser", 64, "jperez") in ops and ("deleteuser", None, "jperez") in ops)
 _srv.shutdown()
 
 httpx.Client = _real_Client  # type: ignore[assignment]

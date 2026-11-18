@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{% block titulo %}Usuarios · Consola de iTier{% endblock %}
+{% macro estado(v) -%}
+  {% if v is none or v == '' %}<span class="muted">—</span>
+  {% elif v.startswith('ok') %}<span class="dot ok" title="{{ v }}"></span>{{ 'ok' if v == 'ok' else 'ok*' }}
+  {% elif v == 'no configurado' %}<span class="muted">no config.</span>
+  {% else %}<span class="dot bad" title="{{ v }}"></span><span class="small">{{ v[:70] }}</span>{% endif %}
+{%- endmacro %}
+{% block contenido %}
+  <div class="page-head"><h1>Usuarios de la plataforma</h1></div>
+
+  {% if nueva %}
+  <div class="card">
+    <h2>{{ 'Usuario creado' if nueva.motivo == 'alta' else 'Clave reiniciada' }}: <code>{{ nueva.usuario }}</code></h2>
+    <div class="bundle-head"><span class="bundle-t">Usuario y clave inicial (misma en los tres sistemas)</span>
+      <button class="btn btn-sm" type="button" data-copy="#cred-nueva">Copiar</button></div>
+    <pre class="codeblock" id="cred-nueva">Usuario: {{ nueva.usuario }}
+Clave:   {{ nueva.clave }}</pre>
+    <div class="note small"><strong>Copiala ahora:</strong> no se vuelve a mostrar ni se guarda. Entregásela por un canal seguro.
+      En el primer ingreso la consola y MeshCentral piden cambiarla; GLPI y Zabbix la conservan hasta que la cambie el usuario.</div>
+    <table class="tabla">
+      <thead><tr><th>Consola</th><th>GLPI</th><th>Zabbix</th><th>MeshCentral</th></tr></thead>
+      <tbody><tr><td><span class="dot ok"></span>ok</td><td>{{ estado(nueva.estados.glpi) }}</td>
+        <td>{{ estado(nueva.estados.zbx) }}</td><td>{{ estado(nueva.estados.mesh) }}</td></tr></tbody>
+    </table>
+  </div>
+  {% endif %}
+
+  <div class="card">
+    <h2>Nuevo usuario</h2>
+    <p class="muted small">Se crea con la misma clave inicial en la consola, GLPI, Zabbix y MeshCentral, y el perfil equivalente al rol.
+      En Mesh se suma al grupo de soporte para que vea los equipos de todos los clientes.</p>
+    <form method="post" action="/usuarios" class="form row">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <label>Usuario <input name="username" required pattern="[a-z0-9][a-z0-9._-]{2,31}" placeholder="jperez"></label>
+      <label>Nombre <input name="nombre" placeholder="Juan Pérez"></label>
+      <label>Correo <input type="email" name="email" required placeholder="jperez@pymesenlinea.com.ar"></label>
+      <label>Rol
+        <select name="rol">
+          {% for k, v in roles.items() %}<option value="{{ k }}" {{ 'selected' if k == 'tecnico' }}>{{ v }}</option>{% endfor %}
+        </select>
+      </label>
+      <button class="btn btn-primary" type="submit">Crear en todos los sistemas</button>
+    </form>
+    <details class="small"><summary>¿Qué puede hacer cada rol?</summary>
+      <ul>
+        <li><strong>Administrador (full):</strong> todo, incluido este ABM. GLPI Super-Admin · Zabbix Super admin · Mesh administrador.</li>
+        <li><strong>PM:</strong> clientes, instaladores, descubrimiento, curación, tickets, equipos y auditoría. GLPI Supervisor · Zabbix Admin · Mesh sin crear grupos.</li>
+        <li><strong>Técnico:</strong> tickets, equipos (con conexión remota) y ver clientes. GLPI Technician · Zabbix User · Mesh sin crear grupos.</li>
+      </ul>
+    </details>
+  </div>
+
+  <div class="card">
+    <h2>Usuarios</h2>
+    <table class="tabla">
+      <thead><tr><th>Usuario</th><th>Rol</th><th>Estado</th><th>GLPI</th><th>Zabbix</th><th>Mesh</th><th>Último ingreso</th><th></th></tr></thead>
+      <tbody>
+        {% for u in usuarios %}
+        <tr>
+          <td><strong>{{ u.username }}</strong><div class="muted small">{{ u.nombre or '' }} {{ u.email or '' }}</div></td>
+          <td>
+            <form method="post" action="/usuarios/{{ u.id }}/rol" class="inline">
+              <input type="hidden" name="csrf" value="{{ csrf }}">
+              <select name="rol" onchange="this.form.submit()">
+                {% for k, v in roles.items() %}<option value="{{ k }}" {{ 'selected' if k == u.rol }}>{{ v }}</option>{% endfor %}
+              </select>
+            </form>
+          </td>
+          <td>{% if u.disabled %}<span class="dot bad"></span>de baja{% else %}<span class="dot ok"></span>activo{% endif %}
+              {% if u.must_change_pw %}<div class="muted small">debe cambiar la clave</div>{% endif %}</td>
+          <td>{{ estado(u.sync_glpi) }}</td><td>{{ estado(u.sync_zbx) }}</td><td>{{ estado(u.sync_mesh) }}</td>
+          <td class="muted small">{{ u.last_login or 'nunca' }}</td>
+          <td class="acciones">
+            <form method="post" action="/usuarios/{{ u.id }}/clave" class="inline" onsubmit="return confirm('¿Reiniciar la clave de {{ u.username }} en todos los sistemas?')">
+              <input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn btn-sm" type="submit">Reiniciar clave</button></form>
+            {% if u.id != yo %}
+              {% if u.disabled %}
+              <form method="post" action="/usuarios/{{ u.id }}/alta" class="inline"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn btn-sm" type="submit">Dar de alta</button></form>
+              {% else %}
+              <form method="post" action="/usuarios/{{ u.id }}/baja" class="inline" onsubmit="return confirm('¿Dar de baja a {{ u.username }} en todos los sistemas?')"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn btn-sm" type="submit">Dar de baja</button></form>
+              {% endif %}
+              <form method="post" action="/usuarios/{{ u.id }}/eliminar" class="inline" onsubmit="return confirm('¿ELIMINAR a {{ u.username }} de todos los sistemas? No se puede deshacer.')"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn btn-sm" type="submit">Eliminar</button></form>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    <p class="muted small">«ok*» = ya existía en ese sistema y se actualizó. En Mesh, si la cuenta ya existía su clave no se puede sincronizar por API:
+      cambiala en Mesh o usá «Reiniciar clave» (recrea la cuenta). Pasá el mouse por un estado con error para ver el detalle.</p>
+  </div>
+{% endblock %}

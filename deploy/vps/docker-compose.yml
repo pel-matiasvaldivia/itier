@@ -265,6 +265,8 @@ services:
       # todos los clientes: la consola le comparte cada grupo de cliente que crea.
       ITIER_MESH_SUPPORT_GROUP: ${ITIER_MESH_SUPPORT_GROUP:-SOPORTE}
       ITIER_ALERTA_DISCO_PCT: ${ITIER_ALERTA_DISCO_PCT:-90}
+      # Grupo de usuarios de Zabbix al que pertenecen los técnicos y PM (la consola le da acceso a cada cliente).
+      ITIER_ZBX_SOPORTE_GROUP: ${ITIER_ZBX_SOPORTE_GROUP:-iTier Soporte}
       ITIER_SMTP_HOST: ${ITIER_SMTP_HOST:-}
       ITIER_SMTP_PORT: ${ITIER_SMTP_PORT:-587}
       ITIER_SMTP_USER: ${ITIER_SMTP_USER:-}

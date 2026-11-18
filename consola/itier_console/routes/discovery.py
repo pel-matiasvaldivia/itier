@@ -12,7 +12,7 @@ from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 
 from .. import audit, security
-from ..deps import flash, get_db, render, require_user
+from ..deps import flash, get_db, render, require_permiso
 from ..services import ServiceError, discovery, onboarding
 
 router = APIRouter()
@@ -27,7 +27,7 @@ def _cli_o_redir(request: Request, conn, slug: str):
 
 
 @router.get("/clientes/{slug}/descubrimiento", response_class=HTMLResponse)
-def panel(request: Request, slug: str, user: dict = Depends(require_user), conn: sqlite3.Connection = Depends(get_db)):
+def panel(request: Request, slug: str, user: dict = Depends(require_permiso("descubrimiento")), conn: sqlite3.Connection = Depends(get_db)):
     cli, redir = _cli_o_redir(request, conn, slug)
     if redir:
         return redir
@@ -50,7 +50,7 @@ def agregar(
     priv_proto: str = Form(""),
     priv_pass: str = Form(""),
     csrf: str = Form(""),
-    user: dict = Depends(require_user),
+    user: dict = Depends(require_permiso("descubrimiento")),
     conn: sqlite3.Connection = Depends(get_db),
 ):
     cli, redir = _cli_o_redir(request, conn, slug)
@@ -84,7 +84,7 @@ def agregar(
 @router.post("/clientes/{slug}/descubrimiento/{rid}/reaplicar")
 def reaplicar(
     request: Request, slug: str, rid: int, csrf: str = Form(""),
-    user: dict = Depends(require_user), conn: sqlite3.Connection = Depends(get_db),
+    user: dict = Depends(require_permiso("descubrimiento")), conn: sqlite3.Connection = Depends(get_db),
 ):
     cli, redir = _cli_o_redir(request, conn, slug)
     if redir:
@@ -108,7 +108,7 @@ def reaplicar(
 @router.post("/clientes/{slug}/descubrimiento/{rid}/eliminar")
 def eliminar(
     request: Request, slug: str, rid: int, csrf: str = Form(""),
-    user: dict = Depends(require_user), conn: sqlite3.Connection = Depends(get_db),
+    user: dict = Depends(require_permiso("descubrimiento")), conn: sqlite3.Connection = Depends(get_db),
 ):
     cli, redir = _cli_o_redir(request, conn, slug)
     if redir:

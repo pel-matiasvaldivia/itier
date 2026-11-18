@@ -3,7 +3,7 @@
 {% block contenido %}
   <div class="page-head">
     <h1>Tablero</h1>
-    <a class="btn btn-primary" href="/clientes/nuevo">+ Nuevo cliente</a>
+    {% if puede('clientes.editar') %}<a class="btn btn-primary" href="/clientes/nuevo">+ Nuevo cliente</a>{% endif %}
   </div>
 
   <section class="tiles">
@@ -73,10 +73,10 @@
   <section class="card">
     <h2>Accesos rápidos</h2>
     <div class="quick">
-      <a href="/clientes/nuevo">Dar de alta un cliente →</a>
+      {% if puede('clientes.editar') %}<a href="/clientes/nuevo">Dar de alta un cliente →</a>{% endif %}
       <a href="/clientes">Ver clientes y bundles →</a>
       <a href="/tickets/nuevo">Crear un ticket →</a>
-      <a href="/auditoria">Revisar auditoría →</a>
+      {% if puede('auditoria') %}<a href="/auditoria">Revisar auditoría →</a>{% endif %}
     </div>
   </section>
 {% endblock %}

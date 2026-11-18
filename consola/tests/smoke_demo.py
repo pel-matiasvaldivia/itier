@@ -417,6 +417,79 @@ r = c.post("/clientes/prueba-srl/eliminar", data={"csrf": csrf_de(det)})
 check("eliminar lleva a la lista", r.url.path == "/clientes", r.url.path)
 check("eliminar quitó el cliente", "Prueba SRL" not in c.get("/clientes").text)
 
+# ── ABM de usuarios de la plataforma + permisos por rol ─────────────────────
+def _login_operador(usuario, clave):
+    t = TestClient(app, follow_redirects=True)
+    html_ = t.get("/login").text
+    r_ = t.post("/login", data={"username": usuario, "password": clave, "csrf": csrf_de(html_)})
+    m_ = re.search(r'class="codebox"><code>([^<]+)</code>', r_.text)
+    sec = m_.group(1) if m_ else ""
+    r_ = t.post("/login/2fa/enrolar", data={"code": pyotp.TOTP(sec).now(), "csrf": csrf_de(r_.text)})
+    if r_.url.path == "/cambiar-clave":
+        r_ = t.post("/cambiar-clave", data={"actual": "", "nueva": "Clave-Propia-123", "repetir": "Clave-Propia-123",
+                                            "csrf": csrf_de(r_.text)})
+    return t, r_
+
+
+pag = c.get("/usuarios")
+check("usuarios: el administrador ve el ABM", pag.status_code == 200 and "Usuarios de la plataforma" in pag.text)
+r = c.post("/usuarios", data={"username": "Mal Usuario", "email": "x@y.com", "nombre": "", "rol": "tecnico", "csrf": csrf_de(pag.text)})
+check("usuarios: nombre inválido rechazado", "Usuario inválido" in r.text and "Clave:" not in r.text)
+r = c.post("/usuarios", data={"username": "jperez", "email": "jperez@pymesenlinea.com.ar", "nombre": "Juan Pérez",
+                              "rol": "tecnico", "csrf": csrf_de(c.get("/usuarios").text)})
+mclave = re.search(r"Clave:\s+([^\s<]+)", r.text)
+check("usuarios: alta de técnico muestra usuario y clave UNA vez", "Usuario creado" in r.text and bool(mclave), r.text[-300:])
+clave_jp = mclave.group(1) if mclave else ""
+check("usuarios: la clave generada es fuerte", len(clave_jp) >= 16 and re.search(r"[a-z]", clave_jp) and re.search(r"[A-Z]", clave_jp)
+      and re.search(r"\d", clave_jp))
+check("usuarios: en GLPI, Zabbix y Mesh queda creado (demo)", r.text.count('title="ok"') >= 3, r.text[-600:])
+lst = c.get("/usuarios").text
+check("usuarios: la clave NO se vuelve a mostrar", clave_jp not in lst and "Clave:" not in lst)
+check("usuarios: aparece en la lista con su rol", "jperez" in lst and "Técnico" in lst)
+check("auditoría del alta no guarda la clave", clave_jp not in c.get("/auditoria").text and "usuario.creado" in c.get("/auditoria").text)
+r = c.post("/usuarios", data={"username": "jperez", "email": "otro@y.com", "nombre": "", "rol": "pm", "csrf": csrf_de(c.get("/usuarios").text)})
+check("usuarios: usuario repetido rechazado", "Ya existe" in r.text)
+
+tj, rj = _login_operador("jperez", clave_jp)
+check("técnico: entra a la consola con la clave generada (pide cambiarla)", rj.url.path == "/", rj.url.path)
+check("técnico: ve equipos y tickets", tj.get("/equipos").status_code == 200 and tj.get("/tickets").status_code == 200)
+check("técnico: NO ve el ABM de usuarios", tj.get("/usuarios").url.path == "/" and "Usuarios de la plataforma" not in tj.get("/usuarios").text)
+check("técnico: NO ve auditoría ni instaladores", tj.get("/auditoria").url.path == "/" and tj.get("/instaladores").status_code == 404)
+tj_menu = tj.get("/").text
+check("técnico: el menú no muestra Usuarios ni Auditoría", "/usuarios" not in tj_menu and "/auditoria" not in tj_menu and "/equipos" in tj_menu)
+check("técnico: no puede crear clientes", tj.post("/clientes/nuevo", data={"nombre": "X", "notas": "", "csrf": csrf_de(tj.get("/").text)}).url.path == "/")
+
+pp = c.post("/usuarios", data={"username": "mgomez", "email": "mgomez@pymesenlinea.com.ar", "nombre": "María Gómez",
+                               "rol": "pm", "csrf": csrf_de(c.get("/usuarios").text)})
+clave_pm = re.search(r"Clave:\s+([^\s<]+)", pp.text).group(1)
+tp, _ = _login_operador("mgomez", clave_pm)
+check("PM: ve auditoría y clientes pero NO el ABM de usuarios",
+      "Auditoría" in tp.get("/auditoria").text and tp.get("/clientes").status_code == 200 and tp.get("/usuarios").url.path == "/")
+
+# cambio de rol, reinicio de clave, baja/alta y protecciones
+uid_jp = int(re.search(r'/usuarios/(\d+)/rol', c.get("/usuarios").text.split("<strong>jperez</strong>")[1]).group(1))
+r = c.post(f"/usuarios/{uid_jp}/rol", data={"rol": "pm", "csrf": csrf_de(c.get("/usuarios").text)})
+check("usuarios: cambio de rol", "Rol actualizado" in r.text)
+check("usuarios: el técnico ascendido a PM ya ve auditoría", "Auditoría" in tj.get("/auditoria").text)
+r = c.post(f"/usuarios/{uid_jp}/clave", data={"csrf": csrf_de(c.get("/usuarios").text)})
+clave_nueva = re.search(r"Clave:\s+([^\s<]+)", r.text).group(1)
+check("usuarios: reiniciar clave genera otra y la muestra una vez", "Clave reiniciada" in r.text and clave_nueva != clave_jp)
+r = c.post(f"/usuarios/{uid_jp}/baja", data={"csrf": csrf_de(c.get("/usuarios").text)})
+check("usuarios: baja en todos los sistemas", "dado de baja" in r.text)
+tbaja = TestClient(app, follow_redirects=True)
+rb = tbaja.post("/login", data={"username": "jperez", "password": clave_nueva, "csrf": csrf_de(tbaja.get("/login").text)})
+check("usuarios: un usuario dado de baja no puede entrar", rb.url.path == "/login", rb.url.path)
+r = c.post(f"/usuarios/{uid_jp}/alta", data={"csrf": csrf_de(c.get("/usuarios").text)})
+check("usuarios: reactivación", "Usuario activado" in r.text)
+uid_admin = int(re.search(r'/usuarios/(\d+)/rol', c.get("/usuarios").text.split("<strong>admin</strong>")[1]).group(1))
+r = c.post(f"/usuarios/{uid_admin}/rol", data={"rol": "tecnico", "csrf": csrf_de(c.get("/usuarios").text)})
+check("usuarios: no se puede dejar la plataforma sin administrador", "al menos un administrador" in r.text)
+r = c.post(f"/usuarios/{uid_admin}/eliminar", data={"csrf": csrf_de(c.get("/usuarios").text)})
+check("usuarios: nadie puede eliminarse a sí mismo", "propio usuario" in r.text)
+r = c.post(f"/usuarios/{uid_jp}/eliminar", data={"csrf": csrf_de(c.get("/usuarios").text)})
+check("usuarios: eliminar", "Usuario eliminado" in r.text and "<strong>jperez</strong>" not in c.get("/usuarios").text)
+check("usuarios: CSRF inválido no crea", "zzz" not in c.post("/usuarios", data={"username": "zzz", "email": "z@z.com", "rol": "tecnico", "csrf": "mal"}).text)
+
 # 10) Logout
 c.post("/logout", data={"csrf": csrf_de(c.get("/").text)})
 check("logout: / vuelve a /login", c.get("/").url.path == "/login")

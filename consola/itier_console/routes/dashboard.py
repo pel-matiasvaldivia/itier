@@ -10,7 +10,7 @@ from fastapi.responses import HTMLResponse
 from ..adapters import AdapterError
 from ..adapters import glpi as glpi_mod
 from ..adapters import zabbix as zbx_mod
-from ..deps import get_db, render, require_user
+from ..deps import get_db, render, require_permiso
 from ..services import onboarding
 from ..services import tickets as tickets_svc
 
@@ -18,7 +18,7 @@ router = APIRouter()
 
 
 @router.get("/", response_class=HTMLResponse)
-def dashboard(request: Request, user: dict = Depends(require_user), conn: sqlite3.Connection = Depends(get_db)):
+def dashboard(request: Request, user: dict = Depends(require_permiso("tablero")), conn: sqlite3.Connection = Depends(get_db)):
     cfg = request.app.state.cfg
 
     with glpi_mod.cliente(cfg) as g:

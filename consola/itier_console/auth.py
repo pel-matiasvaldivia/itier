@@ -19,6 +19,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 
 from . import audit, security
 from .deps import flash, get_db, render, sesion_usuario
+from .services import rbac
 
 router = APIRouter()
 
@@ -28,6 +29,7 @@ def _finalizar_login(request: Request, user: sqlite3.Row) -> None:
     request.session["uid"] = int(user["id"])
     request.session["user"] = user["username"]
     request.session["is_admin"] = bool(user["is_admin"])
+    request.session["rol"] = rbac.rol_de_fila(bool(user["is_admin"]), user["client_id"], user["rol"])
     request.session["client_id"] = user["client_id"]
     request.session["must_change"] = bool(user["must_change_pw"])
     request.session["stage"] = "authed"

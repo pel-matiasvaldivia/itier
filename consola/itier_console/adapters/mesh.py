@@ -153,6 +153,58 @@ class MeshClient:
                      "meshadmin": DERECHOS_SOPORTE}, "addmeshuser",
                     ok=lambda m: m.get("failed", 0) == 0 and m.get("success", 0) >= 1)
 
+    # -- usuarios de plataforma (técnicos / PM / administradores) ---------------
+
+    # rol de iTier → derechos de sitio en Mesh. 64 = «no puede crear grupos de equipos»;
+    # 32 = cuenta bloqueada. La cuenta de servicio necesita «Gestionar usuarios» (y ser administradora
+    # completa para crear otros administradores).
+    DERECHOS_SITIO = {"admin": 0xFFFFFFFF, "pm": 64, "tecnico": 64}
+    BLOQUEADA = 32
+
+    def _en_soporte(self, username: str, grupo: str, agregar: bool) -> None:
+        if not grupo:
+            return
+        ugrp = self._grupo_usuarios(grupo)
+        if agregar:
+            self._pedir({"action": "addusertousergroup", "ugrpid": ugrp, "usernames": [username]}, "addusertousergroup")
+        else:
+            dominio = ugrp.split("/")[1] if ugrp.count("/") >= 2 else ""
+            self._pedir({"action": "removeuserfromusergroup", "ugrpid": ugrp,
+                         "userid": f"user/{dominio}/{username.lower()}"}, "removeuserfromusergroup")
+
+    def asegurar_usuario(self, username: str, password: str, email: str, rol: str, grupo_soporte: str) -> str:
+        """Crea la cuenta (con cambio de clave obligatorio en el primer login de Mesh) y la suma al
+        grupo de soporte. → 'creado' | 'existente' (si ya estaba: NO se puede fijar su clave por API)."""
+        if self._cfg.demo:
+            return "creado"
+        try:
+            self._pedir({"action": "adduser", "username": username, "pass": password, "email": email,
+                         "emailVerified": True, "resetNextLogin": True,
+                         "siteadmin": self.DERECHOS_SITIO[rol]}, "adduser")
+            estado = "creado"
+        except AdapterError as e:
+            if "already exists" not in e.detalle:
+                raise
+            estado = "existente"
+        self._en_soporte(username, grupo_soporte, True)
+        return estado
+
+    def cambiar_rol_usuario(self, username: str, rol: str) -> None:
+        if not self._cfg.demo:
+            self._pedir({"action": "edituser", "userid": username, "siteadmin": self.DERECHOS_SITIO[rol]}, "edituser")
+
+    def bloquear_usuario(self, username: str, bloquear: bool, rol: str, grupo_soporte: str) -> None:
+        """Baja = cuenta bloqueada + fuera del grupo de soporte; alta = derechos del rol + de vuelta al grupo."""
+        if self._cfg.demo:
+            return
+        self._pedir({"action": "edituser", "userid": username,
+                     "siteadmin": self.BLOQUEADA if bloquear else self.DERECHOS_SITIO[rol]}, "edituser")
+        self._en_soporte(username, grupo_soporte, not bloquear)
+
+    def eliminar_usuario(self, username: str) -> None:
+        if not self._cfg.demo:
+            self._pedir({"action": "deleteuser", "userid": username}, "deleteuser")
+
     def equipos(self, mesh_id: str) -> list[dict]:
         """Equipos del grupo: [{nombre, conectado, nodeid}] (nodeid corto, para el enlace remoto)."""
         if self._cfg.demo:

@@ -15,6 +15,7 @@ from fastapi.templating import Jinja2Templates
 
 from . import db as db_mod
 from . import security
+from .services import rbac
 
 BASE = Path(__file__).resolve().parent
 templates = Jinja2Templates(directory=str(BASE / "templates"))
@@ -56,8 +57,25 @@ def sesion_usuario(request: Request) -> dict | None:
             "user": s.get("user"),
             "is_admin": bool(s.get("is_admin")),
             "client_id": s.get("client_id"),
+            "rol": rbac.rol_de_fila(bool(s.get("is_admin")), s.get("client_id"), s.get("rol")),
         }
     return None
+
+
+def _refrescar(request: Request, u: dict) -> dict:
+    """Relee de la base el estado del usuario en CADA request: una baja o un cambio de rol rige al
+    instante (no al vencer la sesión). Un usuario eliminado o dado de baja pierde la sesión."""
+    conn = db_mod.connect(request.app.state.cfg.db_path)
+    try:
+        f = conn.execute("SELECT is_admin, disabled, client_id, rol FROM users WHERE id=?", (u["uid"],)).fetchone()
+    finally:
+        conn.close()
+    if not f or f["disabled"]:
+        request.session.clear()
+        raise AuthRequired()
+    request.session["is_admin"] = bool(f["is_admin"])
+    request.session["rol"] = rbac.rol_de_fila(bool(f["is_admin"]), f["client_id"], f["rol"])
+    return dict(u, is_admin=bool(f["is_admin"]), rol=request.session["rol"])
 
 
 def require_user(request: Request) -> dict:
@@ -65,6 +83,7 @@ def require_user(request: Request) -> dict:
     u = sesion_usuario(request)
     if not u:
         raise AuthRequired()
+    u = _refrescar(request, u)
     if u.get("client_id"):
         raise AccesoPortal()  # un cliente no entra a la consola de operador
     if request.session.get("must_change") and request.url.path not in ("/cambiar-clave", "/logout"):
@@ -72,11 +91,26 @@ def require_user(request: Request) -> dict:
     return u
 
 
+class PermisoDenegado(Exception):
+    """El rol del operador no alcanza para esa pantalla."""
+
+
+def require_permiso(permiso: str):
+    """Guard de operador + permiso del rol (services/rbac.py)."""
+    def dep(request: Request) -> dict:
+        u = require_user(request)
+        if not rbac.puede(u.get("rol"), permiso):
+            raise PermisoDenegado()
+        return u
+    return dep
+
+
 def require_cliente(request: Request) -> dict:
     """Guard de rutas del PORTAL (cliente). Devuelve el usuario con su client_id."""
     u = sesion_usuario(request)
     if not u:
         raise AuthRequired()
+    u = _refrescar(request, u)
     if not u.get("client_id"):
         raise AccesoConsola()  # un operador usa la consola, no el portal
     if request.session.get("must_change") and request.url.path not in ("/cambiar-clave", "/logout"):
@@ -103,6 +137,7 @@ def render(request: Request, name: str, *, user: dict | None = None, status_code
         "flashes": _tomar_flash(request),
         "demo": request.app.state.cfg.demo,
         "ruta": request.url.path,
+        "puede": lambda permiso: rbac.puede(((user if user is not None else sesion_usuario(request)) or {}).get("rol"), permiso),
     }
     base.update(ctx)
     return templates.TemplateResponse(request, name, base, status_code=status_code)
