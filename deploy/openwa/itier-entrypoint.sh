@@ -3,8 +3,7 @@
 set -euo pipefail
 : "${WA_API_KEY:?falta WA_API_KEY}"
 : "${ITIER_WEBHOOK_URL:?falta ITIER_WEBHOOK_URL}"
-# El perfil de Chrome (la sesión vinculada) vive en el volumen: si quedó un candado de un cierre brusco, se limpia.
-rm -f "${WA_USER_DATA_DIR:-/sessions/itier-soporte}"/Singleton* 2>/dev/null || true
+# La sesión vinculada se guarda (cifrada) en ${WA_SESSION_DATA_PATH:-/sessions}, que es un volumen.
 # La imagen base (para v4) define WA_POPUP=true & co.: v5 los lee como config y rechaza el texto
 # «true» donde espera un booleano («Failed to start … path: popup»). Se descartan.
 unset WA_POPUP WA_DISABLE_SPINS WA_CLI_CONFIG WA_USE_CHROME

@@ -84,7 +84,7 @@ def handler(request: httpx.Request) -> httpx.Response:
             return httpx.Response(201, json={"id": 1})
         # GET /Ticket/{id}/Ticket_User → actores (type 2 = asignado).
         return httpx.Response(200, json=[
-            {"tickets_id": 77, "users_id": 7, "type": 2},
+            {"id": 55, "tickets_id": 77, "users_id": 7, "type": 2},
             {"tickets_id": 77, "users_id": 3, "type": 1},
         ])
     if "/User/" in p:
@@ -513,6 +513,19 @@ check("rendimiento: Server-Timing nombra el total y cada sistema", perf.server_t
       and 'glpi;dur=' in perf.server_timing(0.25, _antes))
 _res = perf.paralelo([lambda: 1, lambda: (_ for _ in ()).throw(ValueError("x")), lambda: 3])
 check("rendimiento: paralelo conserva el orden y captura los errores", [r[0] for r in _res] == [True, False, True] and _res[0][1] == 1 and _res[2][1] == 3)
+# asignar / tomar un ticket es idempotente y la reasignación reemplaza
+_n3 = len(captured)
+with glpi_mod.cliente(cfg) as g:
+    g.asignar_ticket(77, 7)           # ya es el asignado → no debe pedir un duplicado
+_c3 = captured[_n3:]
+check("GLPI: tomar un ticket que ya es tuyo no hace POST (evita ERROR_GLPI_ADD)", not any(x["method"] == "POST" for x in _c3), _c3)
+_n3 = len(captured)
+with glpi_mod.cliente(cfg) as g:
+    g.asignar_ticket(77, 9, reemplazar=True)
+_c3 = captured[_n3:]
+check("GLPI: reasignar quita al asignado anterior y suma al nuevo",
+      any(x["method"] == "DELETE" and x["path"].endswith("/Ticket_User/55") for x in _c3)
+      and any(x["method"] == "POST" and x["body"]["input"]["users_id"] == 9 for x in _c3), _c3)
 # seguimiento de ticket (respuesta del solicitante por correo/WhatsApp)
 _n2 = len(captured)
 with glpi_mod.cliente(cfg) as g:

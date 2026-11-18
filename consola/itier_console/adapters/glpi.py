@@ -613,15 +613,33 @@ class GLPIClient:
             return
         self._post("/ITILFollowup", {"input": {"itemtype": "Ticket", "items_id": ticket_id, "content": contenido}})
 
-    def asignar_ticket(self, ticket_id: int, users_id: int) -> None:
+    def _asignados(self, ticket_id: int) -> list[dict]:
+        """Actores de tipo 2 (asignado) del ticket, con su id de Ticket_User y el users_id numérico."""
+        try:
+            recs = self._get(f"/Ticket/{ticket_id}/Ticket_User")
+        except AdapterError:
+            return []
+        return [r for r in (recs if isinstance(recs, list) else []) if str(r.get("type")) == "2"]
+
+    def asignar_ticket(self, ticket_id: int, users_id: int, reemplazar: bool = False) -> None:
+        """Asigna el ticket a un usuario (actor tipo 2 vía Ticket_User). Es idempotente: si ya es
+        el asignado no hace nada (GLPI rechaza el duplicado con ERROR_GLPI_ADD). Con `reemplazar`,
+        quita antes a los demás asignados (reasignación del PM)."""
         if self.demo:
             return
-        # Asignación = actor de tipo 2 (asignado) vía Ticket_User.
-        # ⚠ GLPI 11: confirmar el recurso Ticket_User y el campo type.
-        self._post(
-            "/Ticket_User",
-            {"input": {"tickets_id": ticket_id, "users_id": users_id, "type": 2}},
-        )
+        actuales = self._asignados(ticket_id)
+        if reemplazar:
+            for r in actuales:
+                if str(r.get("users_id")) != str(users_id) and r.get("id"):
+                    self._delete(f"/Ticket_User/{r['id']}")
+        if any(str(r.get("users_id")) == str(users_id) for r in actuales):
+            return
+        try:
+            self._post("/Ticket_User", {"input": {"tickets_id": ticket_id, "users_id": users_id, "type": 2}})
+        except AdapterError:
+            if any(str(r.get("users_id")) == str(users_id) for r in self._asignados(ticket_id)):
+                return                              # se asignó entre tanto
+            raise
 
 
 def cliente(cfg) -> GLPIClient:

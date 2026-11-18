@@ -120,7 +120,7 @@ def asignar(
         return RedirectResponse(f"/tickets/{ticket_id}", status_code=303)
     cfg = request.app.state.cfg
     try:
-        svc.asignar(cfg, ticket_id, int(users_id))
+        svc.asignar(cfg, ticket_id, int(users_id), reemplazar=True)
     except AdapterError as e:
         flash(request, f"No se pudo asignar: {e.detalle}", "error")
         return RedirectResponse(f"/tickets/{ticket_id}", status_code=303)

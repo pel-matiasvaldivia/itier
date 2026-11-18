@@ -30,7 +30,7 @@ RUN chmod +x /usr/local/bin/itier-entrypoint.sh
 
 ENV WA_EXECUTABLE_PATH=/usr/bin/google-chrome \
     WA_SESSION_ID=itier-soporte \
-    WA_USER_DATA_DIR=/sessions/itier-soporte \
+    WA_SESSION_DATA_PATH=/sessions \
     NODE_ENV=production
 
 USER owauser

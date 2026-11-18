@@ -49,9 +49,9 @@ def crear(cfg, titulo: str, contenido: str, entity_id: int, priority: int = 3) -
         return g.crear_ticket(titulo, contenido, entity_id, priority)
 
 
-def asignar(cfg, ticket_id: int, users_id: int) -> None:
+def asignar(cfg, ticket_id: int, users_id: int, reemplazar: bool = False) -> None:
     with glpi_mod.cliente(cfg) as g:
-        g.asignar_ticket(ticket_id, users_id)
+        g.asignar_ticket(ticket_id, users_id, reemplazar=reemplazar)
 
 
 def seguimiento(cfg, ticket_id: int, contenido: str) -> None:

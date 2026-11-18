@@ -4,6 +4,9 @@ const url = process.env.ITIER_WEBHOOK_URL;
 const secret = process.env.ITIER_WEBHOOK_SECRET;
 
 export default {
+  // La sesión vinculada de WhatsApp se guarda cifrada en este directorio (volumen persistente):
+  // sin esto, cada vez que se recrea el contenedor hay que volver a escanear el QR.
+  sessionDataPath: process.env.WA_SESSION_DATA_PATH || '/sessions',
   // Chrome dentro de Docker: sin sandbox del kernel (el contenedor ya es el aislamiento).
   chromiumArgs: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
   allowDangerousBrowserArgs: true,
