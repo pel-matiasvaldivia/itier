@@ -167,17 +167,18 @@ services:
       - "${WEB_BIND:-0.0.0.0}:${MESH_PORT:-8886}:4430"
 
   # ── WhatsApp de soporte (OPCIONAL): OpenWA ────────────────────────────────
-  # Se activa con:  docker compose --profile whatsapp up -d openwa
+  # Forma parte del stack: `docker compose pull && docker compose up -d` lo baja y lo levanta.
+  # Requiere ITIER_WA_API_KEY e ITIER_WA_HOOK_TOKEN en el .env (ver .env.example).
+  # Después hay que escanear el QR una vez (README → «WhatsApp de soporte»).
   # Usa un número DEDICADO (no tu WhatsApp personal): es una API no oficial y WhatsApp
   # puede bloquear el número. Ver deploy/vps/README.md → «WhatsApp de soporte».
   # Los flags de OpenWA cambian entre versiones: contrastalos con su documentación.
   openwa:
     <<: *comun
-    profiles: [whatsapp]
     image: ${OPENWA_IMAGE:-openwa/wa-automate:latest}
     command: >
-      --port 8080 --api-key ${ITIER_WA_API_KEY:-} --headless
-      --webhook http://consola:8080/hooks/whatsapp/${ITIER_WA_HOOK_TOKEN:-}
+      --port 8080 --api-key ${ITIER_WA_API_KEY:?definí ITIER_WA_API_KEY en el .env} --headless
+      --webhook http://consola:8080/hooks/whatsapp/${ITIER_WA_HOOK_TOKEN:?definí ITIER_WA_HOOK_TOKEN en el .env}
       --session-id itier-soporte
     environment:
       TZ: ${TZ:-America/Argentina/Buenos_Aires}
@@ -303,7 +304,7 @@ services:
       ITIER_IMAP_TLS: ${ITIER_IMAP_TLS:-ssl}
       ITIER_IMAP_POLL_S: ${ITIER_IMAP_POLL_S:-60}
       ITIER_WA_HOOK_TOKEN: ${ITIER_WA_HOOK_TOKEN:-}
-      ITIER_WA_API_URL: ${ITIER_WA_API_URL:-}
+      ITIER_WA_API_URL: ${ITIER_WA_API_URL:-http://openwa:8080}
       ITIER_WA_API_KEY: ${ITIER_WA_API_KEY:-}
       ITIER_WA_NUMERO: ${ITIER_WA_NUMERO:-}
       ITIER_CANAL_LIMITE_HORA: ${ITIER_CANAL_LIMITE_HORA:-20}

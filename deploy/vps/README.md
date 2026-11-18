@@ -354,13 +354,13 @@ al mismo ticket, pero solo si quien responde es del mismo cliente. Se ignoran au
 fallan SPF/DKIM/DMARC van a «Revisar» en lugar de abrir ticket (pueden ser suplantación). Para que el SMTP de salida confirme
 al cliente, configurá también `ITIER_SMTP_*`.
 
-**WhatsApp (OpenWA).** Es opcional y usa una API **no oficial**: WhatsApp puede bloquear el número y viola sus términos.
+**WhatsApp (OpenWA).** Viene en el stack (`docker compose pull && up -d` lo baja) y usa una API **no oficial**: WhatsApp puede bloquear el número y viola sus términos.
 Usá un número **dedicado** de la empresa. Para operar sin ese riesgo, la alternativa es la API oficial (WhatsApp Business Cloud API).
 1. `ITIER_WA_HOOK_TOKEN=$(openssl rand -hex 24)` y `ITIER_WA_API_KEY` en el `.env`.
-2. `docker compose --profile whatsapp up -d openwa consola` y abrí `http://127.0.0.1:8002` (por túnel SSH) para **escanear el QR**
+2. `docker compose pull && docker compose up -d` y abrí `http://127.0.0.1:8002` (por túnel SSH) para **escanear el QR**
    con el celular del número de soporte. Verificá los flags del contenedor contra la versión de OpenWA que uses.
 3. El webhook ya apunta a `http://consola:8080/hooks/whatsapp/<token>`. Si OpenWA corre en otro lado, publicá esa URL.
-4. Para que la consola conteste (confirmación «abrimos el caso #N»), poné `ITIER_WA_API_URL=http://openwa:8080`.
+4. La consola contesta al cliente («abrimos el caso #N») por `ITIER_WA_API_URL`, que ya apunta al servicio `openwa`.
    Es de mejor esfuerzo: si la respuesta falla, el ticket igual se crea.
 
 Cada mensaje de un número conocido abre un ticket; los siguientes (hasta 24 h) se suman al mismo. Los grupos, mensajes
