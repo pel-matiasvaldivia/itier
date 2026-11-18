@@ -7,13 +7,13 @@ FROM ghcr.io/ylianst/meshcentral:${MESH_VERSION}
 
 ARG MESH_VERSION
 
-# Plantilla de config detrás de Cloudflare (nuestra copia de la plantilla oficial,
-# con aliasPort 443, solo WAN y ping cada 60 s): los agentes tienen que conectarse
-# al puerto 443 PÚBLICO (el server escucha en otro puerto sin TLS) y el túnel no
-# debe cerrar el WebSocket por inactividad. El resto (hostname, puerto, proxy,
-# cuentas) lo completa el entrypoint con variables de entorno cuando
-# DYNAMIC_CONFIG=true (ver deploy/vps/docker-compose.yml).
-COPY config.json.template /opt/meshcentral/config.json.template
+# Entrypoint propio: escribe la config (host, puerto 4430, aliasPort 443, TLS offload
+# de Cloudflare, solo WAN, ping 60 s) en cada arranque a partir de MESH_HOSTNAME /
+# MESH_NEW_ACCOUNTS / MESH_TLS_OFFLOAD y recién entonces llama al oficial. Así no
+# dependemos del modo dinámico de la imagen base, que cambia entre versiones.
+COPY itier-entrypoint.sh /opt/meshcentral/itier-entrypoint.sh
+RUN chmod 755 /opt/meshcentral/itier-entrypoint.sh
+ENTRYPOINT ["/bin/bash", "/opt/meshcentral/itier-entrypoint.sh"]
 
 LABEL org.opencontainers.image.title="itier-meshcentral" \
       org.opencontainers.image.description="MeshCentral para iTier (soporte remoto)" \

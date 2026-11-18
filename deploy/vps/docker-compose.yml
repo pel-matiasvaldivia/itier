@@ -149,23 +149,13 @@ services:
     <<: *comun
     image: ${MESHCENTRAL_IMAGE:-ghcr.io/pel-matiasvaldivia/itier-meshcentral:latest}
     environment:
-      # ⚠ Sin DYNAMIC_CONFIG=true la imagen IGNORA todas estas variables y deja la
-      # plantilla (myserver.mydomain.com:443) → 502 detrás del túnel.
-      DYNAMIC_CONFIG: "true"
-      HOSTNAME: ${MESH_HOSTNAME:-localhost}
-      # Detrás de Cloudflare: TLS lo termina el túnel (tlsOffload) y los agentes
-      # usan el puerto 443 público.
-      REVERSE_PROXY: ${MESH_HOSTNAME:-}
-      REVERSE_PROXY_TLS_PORT: "443"
-      PORT: "4430"
-      REDIR_PORT: "0"
-      # Sin TLS en el contenedor (lo termina Cloudflare); confía en el X-Forwarded-*
-      # que llega por las redes de Docker / loopback.
-      TLS_OFFLOAD: ${MESH_TLS_OFFLOAD:-172.16.0.0/12,127.0.0.1}
-      TRUSTED_PROXY: ${MESH_TRUSTED_PROXY:-}
+      # El entrypoint de NUESTRA imagen escribe la config de MeshCentral en cada
+      # arranque con estas variables (deploy/meshcentral/itier-entrypoint.sh).
+      MESH_HOSTNAME: ${MESH_HOSTNAME:-}
       # Solo true el primer día, para crear tu cuenta (la primera es administradora).
-      ALLOW_NEW_ACCOUNTS: ${MESH_NEW_ACCOUNTS:-false}
-      IFRAME: "false"
+      MESH_NEW_ACCOUNTS: ${MESH_NEW_ACCOUNTS:-false}
+      # Redes de las que confía en el X-Forwarded-* (el túnel llega por Docker/loopback).
+      MESH_TLS_OFFLOAD: ${MESH_TLS_OFFLOAD:-172.16.0.0/12,127.0.0.1}
       TZ: ${TZ:-America/Argentina/Buenos_Aires}
     volumes:
       - mesh_data:/opt/meshcentral/meshcentral-data
