@@ -39,7 +39,10 @@ def listar(request: Request, cliente: str = "", user: dict = Depends(require_per
     except AdapterError as e:
         error = e.detalle
     por_entidad = {str(c["glpi_entity_id"]): c["nombre"] for c in clientes}
+    from ..services import canales
+    origenes = canales.origenes(conn)
     for t in lista:
+        t["canal"] = origenes.get(int(t["id"]), "")
         t["cliente"] = por_entidad.get(str(t.get("entities_id")), "")
     st = lambda t: int(t.get("status", 0) or 0)  # noqa: E731
     resumen = {"total": len(lista), "abiertos": sum(1 for t in lista if st(t) in (1, 2, 3, 4)),
@@ -94,7 +97,13 @@ def detalle(request: Request, ticket_id: int, user: dict = Depends(require_permi
         flash(request, f"No se pudo leer el ticket: {e.detalle}", "error")
         return RedirectResponse("/tickets", status_code=303)
     cliente = next((c for c in _clientes_con_entidad(conn) if str(c["glpi_entity_id"]) == str(t.get("entities_id"))), None)
-    return render(request, "tickets_detalle.html", t=t, cliente=cliente)
+    tecnicos = [dict(r) for r in conn.execute(
+        "SELECT username, nombre, glpi_user_id FROM users WHERE client_id IS NULL AND disabled = 0 "
+        "AND glpi_user_id IS NOT NULL AND glpi_user_id != '' ORDER BY COALESCE(nombre, username)")]
+    mi = conn.execute("SELECT glpi_user_id FROM users WHERE id = ?", (user["uid"],)).fetchone()
+    origen = conn.execute("SELECT canal, remitente FROM ticket_origen WHERE ticket_id = ?", (ticket_id,)).fetchone()
+    return render(request, "tickets_detalle.html", t=t, cliente=cliente, tecnicos=tecnicos,
+                  puedo_tomar=bool(mi and mi["glpi_user_id"]), origen=dict(origen) if origen else None)
 
 
 @router.post("/tickets/{ticket_id}/asignar")
@@ -117,4 +126,25 @@ def asignar(
         return RedirectResponse(f"/tickets/{ticket_id}", status_code=303)
     audit.registrar(conn, user["user"], "ticket.asignado", {"ticket_id": ticket_id, "users_id": users_id})
     flash(request, f"Ticket #{ticket_id} asignado (usuario {users_id}).", "ok")
+    return RedirectResponse(f"/tickets/{ticket_id}", status_code=303)
+
+
+@router.post("/tickets/{ticket_id}/tomar")
+def tomar(request: Request, ticket_id: int, csrf: str = Form(""),
+          user: dict = Depends(require_permiso("tickets")), conn: sqlite3.Connection = Depends(get_db)):
+    """El técnico se asigna el ticket a sí mismo (con su usuario de GLPI)."""
+    if not security.verificar_csrf(request.session, csrf):
+        flash(request, "Sesión expirada, reintentá.", "error")
+        return RedirectResponse(f"/tickets/{ticket_id}", status_code=303)
+    r = conn.execute("SELECT glpi_user_id FROM users WHERE id = ?", (user["uid"],)).fetchone()
+    if not r or not r["glpi_user_id"]:
+        flash(request, "Tu usuario no tiene cuenta en GLPI vinculada: pedile al administrador que la sincronice.", "error")
+        return RedirectResponse(f"/tickets/{ticket_id}", status_code=303)
+    try:
+        svc.asignar(request.app.state.cfg, ticket_id, int(r["glpi_user_id"]))
+    except (AdapterError, ValueError) as e:
+        flash(request, f"No se pudo tomar el ticket: {getattr(e, 'detalle', e)}", "error")
+        return RedirectResponse(f"/tickets/{ticket_id}", status_code=303)
+    audit.registrar(conn, user["user"], "ticket.tomado", {"ticket_id": ticket_id})
+    flash(request, f"Tomaste el ticket #{ticket_id}.", "ok")
     return RedirectResponse(f"/tickets/{ticket_id}", status_code=303)

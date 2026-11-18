@@ -17,7 +17,7 @@ ROLES = {
 }
 
 _TODOS = {"tablero", "tickets", "equipos", "equipos.remoto", "clientes.ver"}
-_PM = _TODOS | {"clientes.editar", "instaladores", "descubrimiento", "curacion", "agentes", "auditoria"}
+_PM = _TODOS | {"clientes.editar", "instaladores", "descubrimiento", "curacion", "agentes", "auditoria", "bandeja"}
 
 PERMISOS = {
     "admin": None,                      # None = todo

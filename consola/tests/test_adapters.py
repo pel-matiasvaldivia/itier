@@ -74,6 +74,8 @@ def handler(request: httpx.Request) -> httpx.Response:
         if request.method == "POST":
             return httpx.Response(201, json={"id": 42})
         return httpx.Response(200, json=[{"id": 0, "name": "Root"}])
+    if "/ITILFollowup" in p:
+        return httpx.Response(201, json={"id": 9})
     if "/Ticket_User" in p:
         if request.method == "POST":
             return httpx.Response(201, json={"id": 1})
@@ -508,6 +510,13 @@ check("rendimiento: Server-Timing nombra el total y cada sistema", perf.server_t
       and 'glpi;dur=' in perf.server_timing(0.25, _antes))
 _res = perf.paralelo([lambda: 1, lambda: (_ for _ in ()).throw(ValueError("x")), lambda: 3])
 check("rendimiento: paralelo conserva el orden y captura los errores", [r[0] for r in _res] == [True, False, True] and _res[0][1] == 1 and _res[2][1] == 3)
+# seguimiento de ticket (respuesta del solicitante por correo/WhatsApp)
+_n2 = len(captured)
+with glpi_mod.cliente(cfg) as g:
+    g.agregar_seguimiento(1042, "Ya volvió, gracias")
+_f = [x for x in captured[_n2:] if x["path"].endswith("/ITILFollowup")]
+check("GLPI: agregar_seguimiento hace POST /ITILFollowup sobre el ticket",
+      len(_f) == 1 and _f[0]["method"] == "POST" and _f[0]["body"]["input"] == {"itemtype": "Ticket", "items_id": 1042, "content": "Ya volvió, gracias"}, _f)
 httpx.Client = _real_Client  # type: ignore[assignment]
 print("\nRESULTADO:", "TODO OK" if not fails else f"{len(fails)} FALLAS: {fails}")
 sys.exit(1 if fails else 0)

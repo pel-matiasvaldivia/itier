@@ -96,6 +96,20 @@ class Config:
     alerta_disco_pct: int = 90             # alerta cuando un disco supera este % de uso
     zbx_soporte_grupo: str = "iTier Soporte"  # grupo de usuarios de Zabbix con acceso a los hosts de los clientes
     zbx_public_url: str | None = None      # URL pública de la web de Zabbix (solo para mostrarla en el correo de bienvenida)
+    # -- Canales de entrada -----------------------------------------------------------------
+    soporte_email: str | None = None       # casilla de soporte que se muestra a los clientes
+    imap_host: str | None = None
+    imap_port: int = 993
+    imap_user: str | None = None
+    imap_password: str | None = None
+    imap_folder: str = "INBOX"
+    imap_tls: str = "ssl"                  # ssl | starttls | no
+    imap_poll_s: int = 60
+    wa_hook_token: str | None = None       # secreto en la URL del webhook de OpenWA (/hooks/whatsapp/<token>)
+    wa_api_url: str | None = None          # API de OpenWA (para responder: confirmaciones)
+    wa_api_key: str | None = None
+    wa_numero: str | None = None           # número de soporte (solo para mostrarlo)
+    canal_limite_hora: int = 20            # mensajes por remitente y hora antes de frenarlo (anti-inundación)
     mesh_support_group: str = "SOPORTE"    # grupo de usuarios de Mesh (técnicos) con acceso a todos los clientes
 
     @classmethod
@@ -170,6 +184,19 @@ class Config:
             alerta_disco_pct=int(os.environ.get("ITIER_ALERTA_DISCO_PCT", "90")),
             zbx_soporte_grupo=(os.environ.get("ITIER_ZBX_SOPORTE_GROUP", "iTier Soporte") or "iTier Soporte").strip(),
             zbx_public_url=(os.environ.get("ITIER_ZBX_PUBLIC_URL") or "").rstrip("/") or None,
+            soporte_email=(os.environ.get("ITIER_SOPORTE_EMAIL") or "").strip() or None,
+            imap_host=os.environ.get("ITIER_IMAP_HOST") or None,
+            imap_port=int(os.environ.get("ITIER_IMAP_PORT", "993")),
+            imap_user=os.environ.get("ITIER_IMAP_USER") or None,
+            imap_password=os.environ.get("ITIER_IMAP_PASSWORD") or None,
+            imap_folder=os.environ.get("ITIER_IMAP_FOLDER") or "INBOX",
+            imap_tls=(os.environ.get("ITIER_IMAP_TLS") or "ssl").lower(),
+            imap_poll_s=max(15, int(os.environ.get("ITIER_IMAP_POLL_S", "60"))),
+            wa_hook_token=(os.environ.get("ITIER_WA_HOOK_TOKEN") or "").strip() or None,
+            wa_api_url=(os.environ.get("ITIER_WA_API_URL") or "").rstrip("/") or None,
+            wa_api_key=os.environ.get("ITIER_WA_API_KEY") or None,
+            wa_numero=(os.environ.get("ITIER_WA_NUMERO") or "").strip() or None,
+            canal_limite_hora=int(os.environ.get("ITIER_CANAL_LIMITE_HORA", "20")),
             mesh_support_group=(os.environ.get("ITIER_MESH_SUPPORT_GROUP", "SOPORTE") or "").strip(),
             cloudflared_win_url=os.environ.get("ITIER_CLOUDFLARED_WIN_URL") or (
                 "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-windows-amd64.exe"),
@@ -184,6 +211,14 @@ class Config:
     @property
     def zbx_configurado(self) -> bool:
         return self.demo or bool(self.zbx_url and (self.zbx_token or (self.zbx_user and self.zbx_password)))
+
+    @property
+    def imap_configurado(self) -> bool:
+        return bool(self.imap_host and self.imap_user and self.imap_password)
+
+    @property
+    def wa_configurado(self) -> bool:
+        return bool(self.wa_hook_token)
 
     @property
     def mesh_enabled(self) -> bool:

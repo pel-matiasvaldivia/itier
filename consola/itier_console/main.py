@@ -25,6 +25,7 @@ from .db import connect, init_db
 from .deps import AccesoConsola, AccesoPortal, AuthRequired, CambioClaveRequerido, PermisoDenegado, BASE, flash
 from .routes import agents as r_agents
 from .routes import audit as r_audit
+from .routes import canales as r_canales
 from .routes import clients as r_clients
 from .routes import curacion as r_curacion
 from .routes import dashboard as r_dashboard
@@ -71,6 +72,8 @@ def create_app() -> FastAPI:
 
     app = FastAPI(title="Consola de iTier", docs_url=None, redoc_url=None, openapi_url=None)
     app.state.cfg = cfg
+    from .services import canales as _canales
+    _canales.iniciar_poller(cfg)
 
     app.add_middleware(
         SessionMiddleware,
@@ -142,6 +145,7 @@ def create_app() -> FastAPI:
     app.include_router(r_manual.router)
     app.include_router(r_curacion.router)
     app.include_router(r_tickets.router)
+    app.include_router(r_canales.router)
     app.include_router(r_audit.router)
     app.include_router(r_portal.router)
 

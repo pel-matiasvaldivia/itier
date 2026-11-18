@@ -27,6 +27,11 @@
       <small>{% for estado, n in por_estado.items() %}<span class="l-pill {{ 'ok' if estado == 'activo' else ('bad' if estado == 'error' else 'warn') }}">{{ n }} {{ estado }}</span> {% endfor %}{% if not por_estado %}aún no hay clientes{% endif %}</small></div>
   </div>
 
+  {% if bandeja_pendientes and puede('bandeja') %}
+  <div class="note"><strong>📥 {{ bandeja_pendientes }} mensaje{{ 's' if bandeja_pendientes != 1 else '' }} sin atender en la Bandeja.</strong>
+    Llegaron por correo o WhatsApp y no se pudieron asociar solos a un cliente. <a href="/bandeja">Revisar →</a></div>
+  {% endif %}
+
   {% if not glpi_conf or not zbx_conf %}
   <div class="note">
     <strong>Configuración pendiente.</strong>

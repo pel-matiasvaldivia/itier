@@ -604,6 +604,15 @@ class GLPIClient:
             raise AdapterError("GLPI", f"crear_ticket sin id en respuesta: {resp}")
         return int(nuevo)
 
+    def agregar_seguimiento(self, ticket_id: int, contenido: str) -> None:
+        """Suma un seguimiento (respuesta del solicitante) a un ticket existente."""
+        if self.demo:
+            t = _DEMO_TICKETS_EXTRA.get(ticket_id)
+            if t is not None:
+                t.setdefault("seguimientos", []).append(contenido)
+            return
+        self._post("/ITILFollowup", {"input": {"itemtype": "Ticket", "items_id": ticket_id, "content": contenido}})
+
     def asignar_ticket(self, ticket_id: int, users_id: int) -> None:
         if self.demo:
             return

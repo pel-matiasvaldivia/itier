@@ -13,6 +13,7 @@ from ..adapters import glpi as glpi_mod
 from ..adapters import zabbix as zbx_mod
 from ..deps import get_db, render, require_permiso
 from ..services import onboarding
+from ..services import canales
 from ..services import tickets as tickets_svc
 
 router = APIRouter()
@@ -65,4 +66,5 @@ def dashboard(request: Request, user: dict = Depends(require_permiso("tablero"))
         n_clientes=n_clientes, por_estado=por_estado,
         glpi_conf=cfg.glpi_configurado, zbx_conf=cfg.zbx_configurado,
         tickets=tickets, error_tickets=error_tickets,
+        bandeja_pendientes=canales.pendientes(conn),
     )

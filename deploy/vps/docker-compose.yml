@@ -166,6 +166,28 @@ services:
     ports:
       - "${WEB_BIND:-0.0.0.0}:${MESH_PORT:-8886}:4430"
 
+  # ── WhatsApp de soporte (OPCIONAL): OpenWA ────────────────────────────────
+  # Se activa con:  docker compose --profile whatsapp up -d openwa
+  # Usa un número DEDICADO (no tu WhatsApp personal): es una API no oficial y WhatsApp
+  # puede bloquear el número. Ver deploy/vps/README.md → «WhatsApp de soporte».
+  # Los flags de OpenWA cambian entre versiones: contrastalos con su documentación.
+  openwa:
+    <<: *comun
+    profiles: [whatsapp]
+    image: ${OPENWA_IMAGE:-openwa/wa-automate:latest}
+    command: >
+      --port 8080 --api-key ${ITIER_WA_API_KEY:-} --headless
+      --webhook http://consola:8080/hooks/whatsapp/${ITIER_WA_HOOK_TOKEN:-}
+      --session-id itier-soporte
+    environment:
+      TZ: ${TZ:-America/Argentina/Buenos_Aires}
+    volumes:
+      - openwa_data:/sessions
+    networks: [interna, publica]
+    ports:
+      # La pantalla con el QR para vincular el número. Dejala solo en loopback.
+      - "127.0.0.1:${OPENWA_PORT:-8002}:8080"
+
   # ── Eventos y métricas: servidor Zabbix ───────────────────────────────────
   zabbix-server:
     <<: *comun
@@ -271,6 +293,20 @@ services:
       ITIER_ZBX_SOPORTE_GROUP: ${ITIER_ZBX_SOPORTE_GROUP:-iTier Soporte}
       # URL pública de la web de Zabbix: solo para mostrarla en el correo de bienvenida a los usuarios.
       ITIER_ZBX_PUBLIC_URL: ${ITIER_ZBX_PUBLIC_URL:-}
+      # Canales de entrada: correo (buzón IMAP de soporte) y WhatsApp (webhook de OpenWA).
+      ITIER_SOPORTE_EMAIL: ${ITIER_SOPORTE_EMAIL:-}
+      ITIER_IMAP_HOST: ${ITIER_IMAP_HOST:-}
+      ITIER_IMAP_PORT: ${ITIER_IMAP_PORT:-993}
+      ITIER_IMAP_USER: ${ITIER_IMAP_USER:-}
+      ITIER_IMAP_PASSWORD: ${ITIER_IMAP_PASSWORD:-}
+      ITIER_IMAP_FOLDER: ${ITIER_IMAP_FOLDER:-INBOX}
+      ITIER_IMAP_TLS: ${ITIER_IMAP_TLS:-ssl}
+      ITIER_IMAP_POLL_S: ${ITIER_IMAP_POLL_S:-60}
+      ITIER_WA_HOOK_TOKEN: ${ITIER_WA_HOOK_TOKEN:-}
+      ITIER_WA_API_URL: ${ITIER_WA_API_URL:-}
+      ITIER_WA_API_KEY: ${ITIER_WA_API_KEY:-}
+      ITIER_WA_NUMERO: ${ITIER_WA_NUMERO:-}
+      ITIER_CANAL_LIMITE_HORA: ${ITIER_CANAL_LIMITE_HORA:-20}
       ITIER_SMTP_HOST: ${ITIER_SMTP_HOST:-}
       ITIER_SMTP_PORT: ${ITIER_SMTP_PORT:-587}
       ITIER_SMTP_USER: ${ITIER_SMTP_USER:-}
@@ -307,3 +343,4 @@ volumes:
   consola_data:
   mesh_data:
   mesh_files:
+  openwa_data:

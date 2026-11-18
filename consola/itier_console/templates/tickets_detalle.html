@@ -19,21 +19,33 @@
         <span class="l-pill off">👤 Técnico: {{ t.tecnico or 'sin asignar' }}</span>
         {% if cliente %}<span class="l-pill off">🏢 {{ cliente.nombre }}</span>{% endif %}
         {% if t.date %}<span class="l-pill off">🕒 {{ t.date }}</span>{% endif %}
+        {% if origen %}<span class="l-pill off">{{ '💬 WhatsApp' if origen.canal == 'whatsapp' else '✉️ Correo' }} · {{ origen.remitente }}</span>{% endif %}
       </div>
       {% if t.content %}<div class="d-body">{{ t.content }}</div>{% else %}<p class="muted">Sin descripción.</p>{% endif %}
     </section>
 
     <section class="u-card">
       <h2>👤 Asignar</h2>
-      <p class="u-lead">Elegí quién toma el ticket.</p>
+      {% if puedo_tomar %}
+      <form method="post" action="/tickets/{{ t.id }}/tomar" class="form">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <button class="u-btn" type="submit" style="width:100%">✋ Tomar este caso</button>
+      </form>
+      {% endif %}
+      {% if puede('bandeja') %}
+      <p class="u-lead" style="margin-top:1rem">O asignalo a otra persona del equipo:</p>
       <form method="post" action="/tickets/{{ t.id }}/asignar" class="form">
         <input type="hidden" name="csrf" value="{{ csrf }}">
-        <label>ID de técnico (GLPI users_id)
-          <input type="number" name="users_id" min="1" required>
+        <label>Técnico
+          <select name="users_id" required>
+            <option value="">Elegí…</option>
+            {% for u in tecnicos %}<option value="{{ u.glpi_user_id }}">{{ u.nombre or u.username }}</option>{% endfor %}
+          </select>
         </label>
-        <button class="u-btn" type="submit">Asignar</button>
+        <button class="u-b" type="submit">Asignar</button>
       </form>
-      <p class="muted small" style="margin-top:.8rem">El ID del técnico es el de su usuario en GLPI (visible en Administración → Usuarios).</p>
+      {% if not tecnicos %}<p class="muted small">Ningún usuario de la plataforma tiene cuenta de GLPI vinculada todavía.</p>{% endif %}
+      {% endif %}
     </section>
   </div>
 {% endblock %}

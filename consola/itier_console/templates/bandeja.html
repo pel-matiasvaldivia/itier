@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% block titulo %}Bandeja · Consola de iTier{% endblock %}
+{% macro via(c) %}{{ '💬 WhatsApp' if c == 'whatsapp' else '✉️ Correo' }}{% endmacro %}
+{% block contenido %}
+  <div class="l-head">
+    <div>
+      <h1>Bandeja de entrada</h1>
+      <p class="u-sub">Consultas que llegaron por correo o WhatsApp. Las de clientes conocidos ya son tickets; acá quedan las que hay que asociar a mano.</p>
+    </div>
+  </div>
+
+  <div class="u-stats">
+    <div class="u-stat {{ 'bad' if pend else '' }}"><b>{{ pend|length }}</b><span>Sin atender</span></div>
+    <div class="u-stat"><b>{{ '✓' if imap_ok else '—' }}</b><span>Correo {{ soporte_email or ('conectado' if imap_ok else 'sin configurar') }}</span></div>
+    <div class="u-stat"><b>{{ '✓' if wa_ok else '—' }}</b><span>WhatsApp {{ wa_numero or ('conectado' if wa_ok else 'sin configurar') }}</span></div>
+  </div>
+
+  <div class="l-wrap">
+    <div class="l-bar-top"><h2 style="margin:0">Para atender</h2></div>
+    {% if pend %}
+    <table class="l-table">
+      <thead><tr><th>Vía</th><th>De</th><th>Mensaje</th><th>Motivo</th><th>Acción</th></tr></thead>
+      <tbody>
+      {% for e in pend %}
+        <tr>
+          <td class="nowrap">{{ via(e.canal) }}</td>
+          <td><b>{{ e.nombre or e.remitente }}</b>{% if e.nombre %}<br><span class="muted small">{{ e.remitente }}</span>{% endif %}<br><span class="muted small">{{ e.recibido_at[:16]|replace('T', ' ') }}</span></td>
+          <td style="max-width:28rem">{% if e.asunto %}<b>{{ e.asunto }}</b><br>{% endif %}<span class="small">{{ (e.cuerpo or '')[:300] }}</span></td>
+          <td class="small"><span class="l-pill {{ 'bad' if e.estado == 'error' else 'warn' }}">{{ {'sin_cliente': 'Sin cliente', 'revisar': 'Revisar', 'error': 'Error'}[e.estado] }}</span><br>{{ e.detalle or '' }}</td>
+          <td>
+            <form method="post" action="/bandeja/{{ e.id }}/asignar" class="form">
+              <input type="hidden" name="csrf" value="{{ csrf }}">
+              <select name="cliente" required aria-label="Cliente">
+                <option value="">Cliente…</option>
+                {% for c in clientes %}<option value="{{ c.slug }}" {{ 'selected' if e.client_id == c.id else '' }}>{{ c.nombre }}</option>{% endfor %}
+              </select>
+              <label class="small" style="display:flex;gap:.4rem;align-items:center"><input type="checkbox" name="recordar" value="1"> Recordar a esta persona</label>
+              <button class="u-btn" type="submit">Crear ticket</button>
+            </form>
+            <form method="post" action="/bandeja/{{ e.id }}/descartar" class="inline" onsubmit="return confirm('¿Descartar este mensaje?');">
+              <input type="hidden" name="csrf" value="{{ csrf }}"><button class="u-b danger" type="submit">Descartar</button>
+            </form>
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% else %}<div class="l-empty"><b>✅</b>No hay nada pendiente.</div>{% endif %}
+  </div>
+
+  <div class="l-wrap" style="margin-top:1.4rem">
+    <div class="l-bar-top"><h2 style="margin:0">Últimos mensajes procesados</h2></div>
+    {% if hist %}
+    <table class="l-table">
+      <thead><tr><th>Vía</th><th>De</th><th>Cliente</th><th>Resultado</th><th>Cuándo</th></tr></thead>
+      <tbody>
+      {% for e in hist %}
+        <tr>
+          <td class="nowrap">{{ via(e.canal) }}</td>
+          <td>{{ e.nombre or e.remitente }}</td>
+          <td>{{ e.cliente or '—' }}</td>
+          <td>{% if e.ticket_id %}<a class="l-id" href="/tickets/{{ e.ticket_id }}">#{{ e.ticket_id }}</a> {% endif %}<span class="muted small">{{ {'ticket': 'ticket creado', 'seguimiento': 'sumado a un ticket', 'descartado': 'descartado', 'ignorado': 'ignorado'}.get(e.estado, e.estado) }}</span></td>
+          <td class="muted small nowrap">{{ e.recibido_at[:16]|replace('T', ' ') }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% else %}<div class="l-empty"><b>📭</b>Todavía no entró nada.</div>{% endif %}
+  </div>
+{% endblock %}

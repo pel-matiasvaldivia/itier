@@ -23,6 +23,8 @@ os.environ.update(
     ITIER_CONSOLE_DB=os.path.join(tmp, "consola.sqlite3"),
     ITIER_CONSOLE_SECRET="smoke-" + "0" * 32,
     ITIER_LOG_LEVEL="WARNING",
+    ITIER_WA_HOOK_TOKEN="tok-wa-secreto-123",
+    ITIER_SOPORTE_EMAIL="soporte@pymesenlinea.com.ar",
 )
 
 import pyotp  # noqa: E402
@@ -566,6 +568,124 @@ check("rendimiento: cada pantalla informa Server-Timing", "app;dur=" in _pg.head
 check("rendimiento: hay barra de progreso de navegación", "nav-bar" in c.get(f"/static/app.js?v={_m.group(1)}").text)
 
 # 10) Logout
+
+# ── Canales de entrada: WhatsApp (OpenWA) y correo ──────────────────────────────
+from itier_console.services import canales as _cn  # noqa: E402
+from itier_console import db as _db  # noqa: E402
+
+check("canales: normaliza números argentinos", _cn.normalizar_whatsapp("11 5555-1234") == "5491155551234"
+      and _cn.normalizar_whatsapp("+54 9 11 5555 1234") == "5491155551234"
+      and _cn.normalizar_whatsapp("5491155551234@c.us") == "5491155551234" and _cn.normalizar_whatsapp("abc") is None)
+c.post("/clientes/nuevo", data={"nombre": "Canal SA", "notas": "", "csrf": csrf_de(c.get("/clientes/nuevo").text)})
+det = c.get("/clientes/canal-sa").text
+check("canales: la ficha del cliente muestra Canales de contacto", "Canales de contacto" in det and "soporte@pymesenlinea.com.ar" in det)
+csrf_c = lambda: csrf_de(c.get("/clientes/canal-sa").text)  # noqa: E731
+r = c.post("/clientes/canal-sa/dominios", data={"dominio": "gmail.com", "csrf": csrf_c()})
+check("canales: no se puede asociar un dominio público", "correo público" in r.text and "@gmail.com" not in r.text.split("Dominios de correo")[1].split("Personas")[0])
+r = c.post("/clientes/canal-sa/dominios", data={"dominio": "@PruebaSRL.com.ar", "csrf": csrf_c()})
+check("canales: dominio del cliente asociado", "@pruebasrl.com.ar" in r.text)
+r = c.post("/clientes/canal-sa/contactos", data={"nombre": "Ana", "email": "", "whatsapp": "11 5555 1234", "csrf": csrf_c()})
+check("canales: contacto de WhatsApp cargado", "Ana" in r.text and "5491155551234" in r.text)
+r = c.post("/clientes/canal-sa/contactos", data={"nombre": "Otra", "email": "", "whatsapp": "1155551234", "csrf": csrf_c()})
+check("canales: no se repite un número", "ya está cargado" in r.text)
+
+def _wa(texto, de="5491155551234@c.us", mid="m1", **extra):
+    m = {"id": mid, "from": de, "body": texto, "type": "chat", "isGroupMsg": False, "fromMe": False, "notifyName": "Ana"}
+    m.update(extra)
+    return {"event": "onMessage", "data": m}
+
+hook = "/hooks/whatsapp/tok-wa-secreto-123"
+anon = TestClient(app, follow_redirects=True)
+check("webhook: token incorrecto → 404", anon.post("/hooks/whatsapp/otro", json=_wa("hola")).status_code == 404)
+r = anon.post(hook, json=_wa("No me anda la impresora de recepción"))
+check("webhook: número conocido → ticket (sin login)", r.status_code == 200 and r.json()["estado"] == "ticket", r.text)
+_conn = _db.connect(os.environ["ITIER_CONSOLE_DB"])
+t1 = _conn.execute("SELECT ticket_id FROM entrantes WHERE canal='whatsapp' AND msg_id='m1'").fetchone()["ticket_id"]
+check("webhook: el ticket queda con origen WhatsApp", _conn.execute("SELECT canal FROM ticket_origen WHERE ticket_id=?", (t1,)).fetchone()["canal"] == "whatsapp")
+r = anon.post(hook, json=_wa("Es la del primer piso", mid="m2"))
+check("webhook: el segundo mensaje se suma al mismo ticket", r.json()["estado"] == "seguimiento"
+      and _conn.execute("SELECT ticket_id FROM entrantes WHERE msg_id='m2'").fetchone()["ticket_id"] == t1)
+check("webhook: reenvío del mismo mensaje no duplica", anon.post(hook, json=_wa("Es la del primer piso", mid="m2")).json()["estado"] == "duplicado")
+for nombre, payload in (("grupo", _wa("hola", de="123-456@g.us", mid="g1", isGroupMsg=True)),
+                        ("propio", _wa("hola", mid="g2", fromMe=True)), ("estado", _wa("hola", de="status@broadcast", mid="g3")),
+                        ("imagen", _wa("x", mid="g4", type="image")), ("vacío", _wa("  ", mid="g5"))):
+    check(f"webhook: ignora mensajes de tipo {nombre}", anon.post(hook, json=payload).json()["estado"] == "ignorado")
+r = anon.post(hook, json=_wa("Hola, necesito ayuda", de="5491122223333@c.us", mid="d1"))
+check("webhook: número desconocido → Bandeja", r.json()["estado"] == "sin_cliente")
+check("webhook: JSON inválido → 400", anon.post(hook, content=b"no es json").status_code == 400)
+
+band = c.get("/bandeja")
+check("bandeja: el PM/admin ve el mensaje sin cliente", band.status_code == 200 and "Hola, necesito ayuda" in band.text and "5491122223333" in band.text)
+check("bandeja: el tablero avisa mensajes pendientes", "sin atender en la Bandeja" in c.get("/").text)
+eid = _conn.execute("SELECT id FROM entrantes WHERE msg_id='d1'").fetchone()["id"]
+r = c.post(f"/bandeja/{eid}/asignar", data={"cliente": "canal-sa", "recordar": "1", "csrf": csrf_de(band.text)})
+check("bandeja: asignar a un cliente crea el ticket", re.fullmatch(r"/tickets/\d+", r.url.path) is not None, r.url.path)
+check("bandeja: «recordar» deja cargado el contacto", _conn.execute("SELECT 1 FROM client_contactos WHERE whatsapp='5491122223333'").fetchone() is not None)
+check("bandeja: ya no está pendiente", "Hola, necesito ayuda" not in c.get("/bandeja").text.split("Últimos mensajes")[0])
+r = c.post(f"/bandeja/{eid}/asignar", data={"cliente": "canal-sa", "csrf": csrf_de(c.get("/bandeja").text)})
+check("bandeja: no se asigna dos veces", "ya fue atendido" in r.text)
+
+# Correo
+def _mail(de, asunto, cuerpo, mid, extra=""):
+    return (f"From: {de}\r\nTo: soporte@pymesenlinea.com.ar\r\nSubject: {asunto}\r\nMessage-ID: <{mid}@x>\r\n{extra}"
+            f"Content-Type: text/plain; charset=utf-8\r\n\r\n{cuerpo}\r\n").encode()
+cfg_ = app.state.cfg
+r = _cn.procesar_email(cfg_, _conn, _mail("Luis Gómez <luis@pruebasrl.com.ar>", "Sin internet en caja", "Se cayó la red.\n\nEl lun escribió:\n> viejo", "e1"))
+check("correo: el dominio registrado asocia el ticket al cliente", r["estado"] == "ticket", str(r))
+cid_ = _conn.execute("SELECT id FROM clients WHERE slug='canal-sa'").fetchone()["id"]
+check("correo: queda en el cliente correcto y sin la cita", _conn.execute("SELECT client_id, cuerpo FROM entrantes WHERE msg_id='<e1@x>'").fetchone()["client_id"] == cid_
+      and "viejo" not in _conn.execute("SELECT cuerpo FROM entrantes WHERE msg_id='<e1@x>'").fetchone()["cuerpo"])
+t2 = r["ticket_id"]
+r = _cn.procesar_email(cfg_, _conn, _mail("luis@pruebasrl.com.ar", f"RE: [#{t2}] Sin internet en caja", "Ya volvió, gracias", "e2"))
+check("correo: la respuesta con [#id] se suma al ticket", r["estado"] == "seguimiento" and r["ticket_id"] == t2, str(r))
+r = _cn.procesar_email(cfg_, _conn, _mail("alguien@otraempresa.com", f"[#{t2}] metido", "quiero colarme en el ticket", "e3"))
+check("correo: un desconocido no puede escribir en un ticket ajeno", r["estado"] == "sin_cliente")
+r = _cn.procesar_email(cfg_, _conn, _mail("Pepe <pepe@desconocida.com.ar>", "Consulta", "¿Cuánto sale?", "e4"))
+check("correo: dominio no registrado → Bandeja", r["estado"] == "sin_cliente")
+check("correo: autorrespuestas y noreply se ignoran",
+      _cn.procesar_email(cfg_, _conn, _mail("luis@pruebasrl.com.ar", "Fuera de oficina", "estoy de vacaciones", "e5", "Auto-Submitted: auto-replied\r\n"))["estado"] == "ignorado"
+      and _cn.procesar_email(cfg_, _conn, _mail("noreply@pruebasrl.com.ar", "Aviso", "x", "e6"))["estado"] == "ignorado")
+r = _cn.procesar_email(cfg_, _conn, _mail("fake@pruebasrl.com.ar", "Urgente: transferí", "pasame los datos", "e7",
+                                        "Authentication-Results: mx.x; dkim=fail; spf=fail\r\n"))
+check("correo: SPF/DKIM fallido → a revisar, sin ticket", r["estado"] == "revisar" and r["ticket_id"] is None)
+check("correo: mismo Message-ID no se procesa dos veces", _cn.procesar_email(cfg_, _conn, _mail("luis@pruebasrl.com.ar", "Sin internet en caja", "Se cayó la red.", "e1"))["estado"] == "duplicado")
+html_mail = ("From: luis@pruebasrl.com.ar\r\nSubject: Impresora\r\nMessage-ID: <e8@x>\r\nContent-Type: text/html; charset=utf-8\r\n\r\n"
+             "<html><style>p{}</style><body><p>No <b>imprime</b></p><p>Gracias</p></body></html>").encode()
+check("correo: HTML se convierte a texto", "No imprime" in _cn.parsear_email(html_mail)["cuerpo"] and "<" not in _cn.parsear_email(html_mail)["cuerpo"])
+
+# Lectura del buzón IMAP (simulado)
+class _FakeImap:
+    def __init__(self, mails): self.mails, self.vistos = mails, []
+    def select(self, f): return "OK", [b"1"]
+    def search(self, *a): return "OK", [b" ".join(str(i + 1).encode() for i in range(len(self.mails)))]
+    def fetch(self, n, q): return "OK", [(b"1 (BODY[] {1})", self.mails[int(n) - 1])]
+    def store(self, n, *a): self.vistos.append(int(n))
+    def logout(self): pass
+_fi = _FakeImap([_mail("luis@pruebasrl.com.ar", "Pedido por IMAP", "Necesito un mouse", "i1")])
+n_ = _cn.sondear_buzon(cfg_, conectar=lambda _c: _fi)
+check("imap: lee, procesa y marca leído", n_ == 1 and _fi.vistos == [1]
+      and _conn.execute("SELECT estado FROM entrantes WHERE msg_id='<i1@x>'").fetchone()["estado"] == "ticket")
+
+# Anti-inundación
+estados = [anon.post(hook, json=_wa(f"spam {i}", de="5491100000000@c.us", mid=f"f{i}")).json()["estado"] for i in range(25)]
+check("anti-inundación: pasado el tope por hora se ignoran los mensajes", estados[-1] == "ignorado" and "sin_cliente" in estados)
+
+# Tomar caso y asignación
+tkt = c.get(f"/tickets/{t1}")
+check("ticket: muestra el canal de origen", "WhatsApp" in tkt.text and "5491155551234" in tkt.text)
+check("tickets: la lista muestra la vía", "💬 WhatsApp" in c.get("/tickets").text and "✉️ Correo" in c.get("/tickets").text)
+r = c.post(f"/tickets/{t1}/tomar", data={"csrf": csrf_de(tkt.text)})
+check("ticket: «tomar caso» responde (con o sin cuenta GLPI vinculada)", r.status_code == 200 and r.url.path == f"/tickets/{t1}")
+
+# RBAC: la Bandeja es de PM/admin
+check("RBAC: el técnico no entra a la Bandeja", tj.get("/bandeja").url.path != "/bandeja")
+check("RBAC: el PM sí", tp.get("/bandeja").url.path == "/bandeja")
+check("RBAC: técnico no puede cargar dominios", tj.post("/clientes/canal-sa/dominios", data={"dominio": "x.com.ar", "csrf": csrf_de(tj.get("/").text)}).url.path != "/clientes/canal-sa" or
+      _conn.execute("SELECT 1 FROM client_dominios WHERE dominio='x.com.ar'").fetchone() is None)
+r = c.post("/clientes/canal-sa/dominios/%d/quitar" % _conn.execute("SELECT id FROM client_dominios").fetchone()["id"], data={"csrf": csrf_c()})
+check("canales: se puede quitar un dominio", "@pruebasrl.com.ar" not in r.text.split("Dominios de correo")[1].split("Personas")[0])
+_conn.close()
+
 c.post("/logout", data={"csrf": csrf_de(c.get("/").text)})
 check("logout: / vuelve a /login", c.get("/").url.path == "/login")
 

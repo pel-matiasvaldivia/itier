@@ -93,6 +93,61 @@ CREATE TABLE IF NOT EXISTS endpoint_reports (
     UNIQUE(client_id, host)
 );
 
+-- ── Canales de entrada (correo y WhatsApp) ───────────────────────────────────
+-- Dominios de correo de un cliente: un mensaje de *@dominio se asocia a ese cliente.
+CREATE TABLE IF NOT EXISTS client_dominios (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    client_id  INTEGER NOT NULL,
+    dominio    TEXT    NOT NULL UNIQUE,
+    created_at TEXT    NOT NULL,
+    created_by TEXT
+);
+-- Personas autorizadas a pedir soporte: por correo y/o WhatsApp (número normalizado, solo dígitos).
+CREATE TABLE IF NOT EXISTS client_contactos (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    client_id  INTEGER NOT NULL,
+    nombre     TEXT,
+    email      TEXT,
+    whatsapp   TEXT,
+    created_at TEXT    NOT NULL,
+    created_by TEXT
+);
+CREATE UNIQUE INDEX IF NOT EXISTS ux_contacto_email ON client_contactos(email) WHERE email IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS ux_contacto_wa ON client_contactos(whatsapp) WHERE whatsapp IS NOT NULL;
+-- Todo lo que entra por un canal (bandeja): con su resultado, para auditar y para triage.
+CREATE TABLE IF NOT EXISTS entrantes (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    canal       TEXT    NOT NULL,            -- email | whatsapp
+    remitente   TEXT    NOT NULL,            -- correo o número
+    nombre      TEXT,
+    asunto      TEXT,
+    cuerpo      TEXT,
+    recibido_at TEXT    NOT NULL,
+    client_id   INTEGER,                     -- NULL = no se pudo asociar a un cliente
+    estado      TEXT    NOT NULL,            -- ticket | seguimiento | sin_cliente | revisar | descartado | ignorado | error
+    ticket_id   INTEGER,
+    msg_id      TEXT,
+    detalle     TEXT
+);
+CREATE UNIQUE INDEX IF NOT EXISTS ux_entrante_msg ON entrantes(canal, msg_id) WHERE msg_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS ix_entrante_rem ON entrantes(canal, remitente, recibido_at);
+-- De qué canal vino cada ticket (los de la consola no figuran) y a qué cliente pertenece.
+CREATE TABLE IF NOT EXISTS ticket_origen (
+    ticket_id  INTEGER PRIMARY KEY,
+    client_id  INTEGER,
+    canal      TEXT NOT NULL,
+    remitente  TEXT,
+    created_at TEXT NOT NULL
+);
+-- Conversación abierta de un remitente (WhatsApp): sus mensajes siguientes van al mismo ticket.
+CREATE TABLE IF NOT EXISTS conversaciones (
+    canal     TEXT NOT NULL,
+    remitente TEXT NOT NULL,
+    ticket_id INTEGER NOT NULL,
+    last_at   TEXT NOT NULL,
+    PRIMARY KEY (canal, remitente)
+);
+
 -- Enlaces de instalación del appliance: token de un solo propósito, con
 -- vencimiento y usos acotados. Se guarda SOLO el hash (el token se muestra una vez).
 CREATE TABLE IF NOT EXISTS enroll_tokens (

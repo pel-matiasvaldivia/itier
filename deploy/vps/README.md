@@ -336,6 +336,36 @@ el control remoto de MeshCentral dentro del panel (iframe).
 > `lockAgentDownload` en MeshCentral). El enlace lleva el id del grupo del cliente, que no es un secreto fuerte: solo
 > permite instalar un agente en ese grupo. Para revocarlo, borrá el grupo.
 
+## Canales de entrada: correo y WhatsApp → tickets
+
+Varias personas de un cliente piden soporte; ya no hace falta que entren a la consola. Todo lo que llega queda en la
+**Bandeja** (PM/administrador) y, si se reconoce al cliente, se convierte solo en un ticket de su entidad de GLPI.
+Después el técnico lo toma («Tomar este caso») o el PM lo asigna.
+
+**Cómo se reconoce al cliente** (ficha del cliente → *Canales de contacto*), en este orden:
+1. **Persona** cargada (correo o WhatsApp exactos) → ese cliente.
+2. **Dominio** de correo registrado (`@cuyopack.com.ar`) → ese cliente. No se aceptan dominios públicos (Gmail, Hotmail…):
+   para ellos se carga a cada persona.
+3. Si no coincide: queda en la Bandeja «sin cliente» y el PM lo asigna (con «Recordar a esta persona» la próxima vez entra directo).
+
+**Correo.** Creá una casilla (ej. `soporte@…`), completá `ITIER_IMAP_*` y `ITIER_SOPORTE_EMAIL`, y `docker compose up -d consola`.
+La consola lee los no leídos cada minuto. Responder al correo de confirmación (el asunto lleva `[#número]`) suma el mensaje
+al mismo ticket, pero solo si quien responde es del mismo cliente. Se ignoran autorrespuestas y `noreply`, y los correos que
+fallan SPF/DKIM/DMARC van a «Revisar» en lugar de abrir ticket (pueden ser suplantación). Para que el SMTP de salida confirme
+al cliente, configurá también `ITIER_SMTP_*`.
+
+**WhatsApp (OpenWA).** Es opcional y usa una API **no oficial**: WhatsApp puede bloquear el número y viola sus términos.
+Usá un número **dedicado** de la empresa. Para operar sin ese riesgo, la alternativa es la API oficial (WhatsApp Business Cloud API).
+1. `ITIER_WA_HOOK_TOKEN=$(openssl rand -hex 24)` y `ITIER_WA_API_KEY` en el `.env`.
+2. `docker compose --profile whatsapp up -d openwa consola` y abrí `http://127.0.0.1:8002` (por túnel SSH) para **escanear el QR**
+   con el celular del número de soporte. Verificá los flags del contenedor contra la versión de OpenWA que uses.
+3. El webhook ya apunta a `http://consola:8080/hooks/whatsapp/<token>`. Si OpenWA corre en otro lado, publicá esa URL.
+4. Para que la consola conteste (confirmación «abrimos el caso #N»), poné `ITIER_WA_API_URL=http://openwa:8080`.
+   Es de mejor esfuerzo: si la respuesta falla, el ticket igual se crea.
+
+Cada mensaje de un número conocido abre un ticket; los siguientes (hasta 24 h) se suman al mismo. Los grupos, mensajes
+propios, estados y adjuntos se ignoran. Hay un tope de mensajes por remitente y hora (`ITIER_CANAL_LIMITE_HORA`).
+
 ## Túnel a Zabbix (una sola vez; sirve para todos los clientes)
 
 Los `zabbix-proxy` de los clientes llegan al server por el Cloudflare Tunnel de

@@ -68,7 +68,10 @@ def detalle(request: Request, slug: str, user: dict = Depends(require_permiso("c
     cfg = request.app.state.cfg
     bundle = onboarding.bundle_env(cfg, cli)
     usuarios = security.listar_usuarios_cliente(conn, cli["id"])
-    return render(request, "clientes_detalle.html", cli=cli, bundle=bundle, usuarios=usuarios)
+    from ..services import canales
+    return render(request, "clientes_detalle.html", cli=cli, bundle=bundle, usuarios=usuarios,
+                  dominios=canales.dominios_de(conn, cli["id"]), contactos=canales.contactos_de(conn, cli["id"]),
+                  soporte_email=cfg.soporte_email, wa_numero=cfg.wa_numero)
 
 
 @router.post("/clientes/{slug}/portal-usuarios")

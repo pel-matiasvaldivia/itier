@@ -41,19 +41,20 @@
 
     {% if tickets %}
     <table class="l-table" id="l-lista">
-      <thead><tr><th>#</th><th>Asunto</th><th>Cliente</th><th>Estado</th><th>Prioridad</th><th>Fecha</th></tr></thead>
+      <thead><tr><th>#</th><th>Asunto</th><th>Cliente</th><th>Vía</th><th>Estado</th><th>Prioridad</th><th>Fecha</th></tr></thead>
       <tbody>
         {% for t in tickets %}
         <tr data-q="{{ (t.id|string ~ ' ' ~ t.name ~ ' ' ~ t.cliente)|lower }}">
           <td class="tight"><a class="l-id" href="/tickets/{{ t.id }}">#{{ t.id }}</a></td>
           <td><a class="l-link" href="/tickets/{{ t.id }}">{{ t.name }}</a></td>
           <td>{{ t.cliente or '—' }}</td>
+          <td class="small">{{ {'whatsapp': '💬 WhatsApp', 'email': '✉️ Correo'}.get(t.canal, 'Consola') }}</td>
           <td>{{ estado_pill(t) }}</td>
           <td>{{ prio_pill(t) }}</td>
           <td class="muted small nowrap">{{ t.date or '—' }}</td>
         </tr>
         {% endfor %}
-        <tr id="l-vacio" hidden><td colspan="6" class="l-empty">Ningún ticket coincide con la búsqueda.</td></tr>
+        <tr id="l-vacio" hidden><td colspan="7" class="l-empty">Ningún ticket coincide con la búsqueda.</td></tr>
       </tbody>
     </table>
     {% else %}

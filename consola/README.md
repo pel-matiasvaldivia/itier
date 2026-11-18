@@ -189,6 +189,13 @@ consola/
 ```
 
 
+## Canales de entrada (correo y WhatsApp)
+
+Los pedidos de soporte por correo (buzón IMAP) y WhatsApp (webhook de OpenWA, `/hooks/whatsapp/<token>`) pasan por
+`services/canales.py`: se identifica al cliente por persona o por dominio registrado, se abre el ticket en su entidad de GLPI
+(o se suma como seguimiento) y lo no reconocido queda en la **Bandeja** (`/bandeja`, PM/administrador). Alta y operación:
+`deploy/vps/README.md` → «Canales de entrada». WhatsApp vía OpenWA es una API no oficial: ver la advertencia allí.
+
 ## Soporte remoto (MeshCentral)
 
 `ITIER_MESH_URL`, `ITIER_MESH_USER`, `ITIER_MESH_PASSWORD` (cuenta de servicio **sin 2FA**). Al dar de alta o reprovisionar un

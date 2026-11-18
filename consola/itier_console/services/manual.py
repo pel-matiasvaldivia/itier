@@ -20,7 +20,7 @@ MISION = {
 
 RESPONSABILIDADES = {
     "tecnico": [
-        "Atender y actualizar los tickets que se te asignan, dentro de los tiempos acordados con cada cliente.",
+        "Atender y actualizar los tickets que se te asignan, dentro de los tiempos acordados con cada cliente; si hay un ticket nuevo sin técnico, tomarlo con «Tomar este caso».",
         "Revisar todos los días la pantalla Equipos: discos con más del 90 % de uso, antivirus apagado o ausente y equipos sin conexión; "
         "resolverlo o abrir un ticket.",
         "Conectarte de forma remota solo con un motivo registrado en el ticket y, si hay una persona usando el equipo, avisándole antes.",
@@ -33,6 +33,7 @@ RESPONSABILIDADES = {
         "Desplegar los agentes en los equipos de cada cliente y confirmar que reporten (inventario y soporte remoto en línea).",
         "Definir con el cliente la criticidad de sus activos y los rangos de red que se descubren.",
         "Hacer seguimiento de los tickets y de las alertas pendientes, y asignarlos a los técnicos.",
+        "Atender la Bandeja: los pedidos por correo o WhatsApp que no se asociaron solos a un cliente; cargar los dominios y las personas de cada cliente para que la próxima vez entren directo.",
         "Revisar la auditoría con regularidad y detectar usos indebidos.",
         "Ser el vínculo con el cliente: comunicar incidentes, entregar el instalador y acompañar la puesta en marcha.",
         "Escalar al Administrador lo que requiera cambios de plataforma, usuarios o permisos.",
