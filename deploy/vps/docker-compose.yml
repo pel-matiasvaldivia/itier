@@ -166,31 +166,28 @@ services:
     ports:
       - "${WEB_BIND:-0.0.0.0}:${MESH_PORT:-8886}:4430"
 
-  # ── WhatsApp de soporte (OPCIONAL): OpenWA ────────────────────────────────
+  # ── WhatsApp de soporte: OpenWA v5 (imagen propia, deploy/openwa) ──────────────
   # Forma parte del stack: `docker compose pull && docker compose up -d` lo baja y lo levanta.
   # Requiere ITIER_WA_API_KEY e ITIER_WA_HOOK_TOKEN en el .env (ver .env.example).
-  # Después hay que escanear el QR una vez (README → «WhatsApp de soporte»).
+  # Después hay que escanear el QR una vez (pantalla Canales de la consola).
   # Usa un número DEDICADO (no tu WhatsApp personal): es una API no oficial y WhatsApp
-  # puede bloquear el número. Ver deploy/vps/README.md → «WhatsApp de soporte».
-  # Los flags de OpenWA cambian entre versiones: contrastalos con su documentación.
+  # puede bloquear el número. Ver deploy/vps/README.md → «Canales de entrada».
   openwa:
     <<: *comun
-    image: ${OPENWA_IMAGE:-openwa/wa-automate:latest}
-    command: >
-      --port 8080 --api-key ${ITIER_WA_API_KEY:?definí ITIER_WA_API_KEY en el .env}
-      --session-data-path /sessions
-      --webhook http://consola:8080/hooks/whatsapp/${ITIER_WA_HOOK_TOKEN:?definí ITIER_WA_HOOK_TOKEN en el .env}
-      --session-id itier-soporte
+    image: ${OPENWA_IMAGE:-ghcr.io/pel-matiasvaldivia/itier-openwa:latest}
+    init: true
+    shm_size: 1gb
     environment:
+      WA_API_KEY: ${ITIER_WA_API_KEY:?definí ITIER_WA_API_KEY en el .env}
+      WA_SESSION_ID: itier-soporte
+      # Cada mensaje entrante se entrega a la consola (el token va en la URL).
+      ITIER_WEBHOOK_URL: http://consola:8080/hooks/whatsapp/${ITIER_WA_HOOK_TOKEN:?definí ITIER_WA_HOOK_TOKEN en el .env}
       TZ: ${TZ:-America/Argentina/Buenos_Aires}
-      # La imagen instala la librería al arrancar y `latest` (v5) ya NO trae bin/server.js, que es lo que
-      # ejecuta el entrypoint de la imagen (falla con MODULE_NOT_FOUND). Se fija la última 4.x que sí lo trae.
-      W_A_V: ${OPENWA_LIB_VERSION:-4.76.0}
     volumes:
       - openwa_data:/sessions
     networks: [interna, publica]
     ports:
-      # La pantalla con el QR para vincular el número. Dejala solo en loopback.
+      # API/health de OpenWA. Dejala solo en loopback: el QR se escanea desde la consola.
       - "127.0.0.1:${OPENWA_PORT:-8002}:8080"
 
   # ── Eventos y métricas: servidor Zabbix ───────────────────────────────────

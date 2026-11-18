@@ -612,6 +612,10 @@ for nombre, payload in (("grupo", _wa("hola", de="123-456@g.us", mid="g1", isGro
     check(f"webhook: ignora mensajes de tipo {nombre}", anon.post(hook, json=payload).json()["estado"] == "ignorado")
 r = anon.post(hook, json=_wa("Hola, necesito ayuda", de="5491122223333@c.us", mid="d1"))
 check("webhook: número desconocido → Bandeja", r.json()["estado"] == "sin_cliente")
+_v5 = {"webhookId": "w", "sessionId": "itier-soporte", "event": "message.received", "timestamp": 1,
+       "payload": {"message": {"id": "v5-1", "from": "5491155551234@c.us", "body": "Consulta por el formato v5"}}}
+check("webhook: el sobre de OpenWA v5 (payload.message) se entiende", anon.post(hook, json=_v5).json()["estado"] in ("ticket", "seguimiento"))
+check("webhook: otros eventos de v5 se ignoran", anon.post(hook, json={"event": "session.state.changed", "payload": {"state": "READY"}}).json()["estado"] == "ignorado")
 check("webhook: JSON inválido → 400", anon.post(hook, content=b"no es json").status_code == 400)
 
 band = c.get("/bandeja")

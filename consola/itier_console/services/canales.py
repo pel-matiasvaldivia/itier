@@ -365,18 +365,15 @@ def _confirmar_desconocido(cfg, conn, canal, remitente) -> None:
 
 
 def responder_whatsapp(cfg, numero: str, texto: str) -> None:
-    """Respuesta por la API de OpenWA (Easy API). Opcional: sin ITIER_WA_API_URL no hace nada.
+    """Respuesta por la API de OpenWA v5: POST /api/messages/sendText {to, content} con X-API-Key.
 
-    La forma exacta (`/sendText` con {args:{to, content}}) es la de OpenWA v4 y puede variar
-    entre versiones: por eso es de mejor esfuerzo y nunca frena la creación del ticket.
+    Opcional (sin ITIER_WA_API_URL no hace nada) y de mejor esfuerzo: nunca frena la creación del ticket.
     """
     if not cfg.wa_api_url or cfg.demo:
         return
-    headers = {}
-    if cfg.wa_api_key:
-        headers = {"api_key": cfg.wa_api_key, "X-API-Key": cfg.wa_api_key}
-    r = httpx.post(f"{cfg.wa_api_url}/sendText", headers=headers, timeout=10,
-                   json={"args": {"to": f"{numero}@c.us", "content": texto}})
+    headers = {"X-API-Key": cfg.wa_api_key, "api_key": cfg.wa_api_key} if cfg.wa_api_key else {}
+    r = httpx.post(f"{cfg.wa_api_url}/api/messages/sendText", headers=headers, timeout=10,
+                   json={"to": f"{numero}@c.us", "content": texto})
     r.raise_for_status()
 
 
@@ -393,6 +390,8 @@ def parsear_whatsapp(body: dict) -> dict | None:
     m = m or (body.get("payload") if isinstance(body.get("payload"), dict) else None)
     if m is None and "from" in body:
         m = body
+    if isinstance(m, dict) and isinstance(m.get("message"), dict):   # v5: {"payload": {"message": {...}}}
+        m = m["message"]
     if not isinstance(m, dict):
         return None
     if m.get("isGroupMsg") or m.get("fromMe") or m.get("isStatus"):

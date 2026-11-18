@@ -33,7 +33,7 @@ from itier_console.config import Config  # noqa: E402
 
 fails = []
 captured = []
-WA_ESTADO = "UNPAIRED"
+WA_ESTADO = {"status": "ok", "connected": False, "session": {"state": "STARTING", "ready": False}, "qr": None}
 TICKET_EMPTY = False  # cuando True, GET /Ticket simula el 400 de rango vacío
 
 
@@ -75,10 +75,8 @@ def handler(request: httpx.Request) -> httpx.Response:
         if request.method == "POST":
             return httpx.Response(201, json={"id": 42})
         return httpx.Response(200, json=[{"id": 0, "name": "Root"}])
-    if p == "/getConnectionState":
-        return httpx.Response(200, json={"success": True, "response": WA_ESTADO})
-    if p == "/qr":
-        return httpx.Response(200, content=b"\x89PNG-fake", headers={"content-type": "image/png"})
+    if p == "/health":
+        return httpx.Response(200, json=WA_ESTADO)
     if "/ITILFollowup" in p:
         return httpx.Response(201, json={"id": 9})
     if "/Ticket_User" in p:
@@ -526,11 +524,15 @@ check("GLPI: agregar_seguimiento hace POST /ITILFollowup sobre el ticket",
 from itier_console.services import whatsapp as wa_svc  # noqa: E402
 import dataclasses as _dc  # noqa: E402
 _cw = _dc.replace(cfg, wa_api_url="http://openwa:8080", wa_api_key="k")
+check("WhatsApp: arrancando → «iniciando», sin QR", wa_svc.estado(_cw)["estado"] == "iniciando")
+WA_ESTADO = {"connected": False, "session": {"state": "WAITING_FOR_QR", "ready": False}, "qr": "2@AbCdEfGhIjKlMnOp,xyz=,abc=,def="}
 _e = wa_svc.estado(_cw)
-check("WhatsApp: sesión sin vincular devuelve el QR", _e["estado"] == "esperando_qr" and _e["qr"].startswith("data:image/png;base64,"), _e)
-WA_ESTADO = "CONNECTED"
-check("WhatsApp: sesión conectada no pide QR", wa_svc.estado(_cw)["estado"] == "conectado" and wa_svc.estado(_cw)["qr"] is None)
-check("WhatsApp: la API key viaja en los encabezados", any(x["headers"].get("api_key") == "k" for x in captured if x["path"] == "/getConnectionState"))
+check("WhatsApp: con el texto del QR dibuja la imagen", _e["estado"] == "esperando_qr" and _e["qr"].startswith("data:image/svg+xml"), _e)
+WA_ESTADO = {"connected": False, "session": {"state": "WAITING_FOR_QR"}, "qr": {"dataUrl": "data:image/png;base64,AAAA"}}
+check("WhatsApp: acepta una imagen ya hecha dentro de un objeto", wa_svc.estado(_cw)["qr"] == "data:image/png;base64,AAAA")
+WA_ESTADO = {"connected": True, "session": {"state": "READY", "ready": True}, "qr": None}
+check("WhatsApp: sesión lista → «conectado», sin QR", wa_svc.estado(_cw)["estado"] == "conectado" and wa_svc.estado(_cw)["qr"] is None)
+check("WhatsApp: la API key viaja como X-API-Key", any(x["headers"].get("x-api-key") == "k" for x in captured if x["path"] == "/health"))
 check("WhatsApp: sin URL queda «no configurado»", wa_svc.estado(_dc.replace(cfg, wa_api_url=None))["estado"] == "no_configurado")
 httpx.Client = _real_Client  # type: ignore[assignment]
 print("\nRESULTADO:", "TODO OK" if not fails else f"{len(fails)} FALLAS: {fails}")

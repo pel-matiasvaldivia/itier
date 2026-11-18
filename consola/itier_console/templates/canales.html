@@ -84,7 +84,7 @@
   <script>
   (function () {
     var rot = {conectado: ["ok", "✅ Vinculado y recibiendo mensajes"], esperando_qr: ["warn", "📱 Esperando que escanees el QR"],
-               sin_conexion: ["bad", "Sin conexión con OpenWA"], no_configurado: ["off", "Sin configurar"]};
+               iniciando: ["info", "⏳ Iniciando WhatsApp…"], sin_conexion: ["bad", "Sin conexión con OpenWA"], no_configurado: ["off", "Sin configurar"]};
     function ver() {
       fetch("/canales/whatsapp/estado", {credentials: "same-origin"}).then(function (r) { return r.json(); }).then(function (d) {
         var e = rot[d.estado] || ["off", d.estado];

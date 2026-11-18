@@ -1,0 +1,72 @@
+name: build-openwa
+
+# Construye y publica la imagen de OpenWA de iTier a GHCR (capa fina sobre la
+# imagen oficial con la librería v5 fijada en deploy/openwa/Dockerfile). El VPS
+# solo hace `pull`. En pull requests solo construye, no publica.
+
+on:
+  push:
+    branches: ['main', 'master', 'claude/**']
+    tags: ['v*.*.*']
+    paths:
+      - 'deploy/openwa/**'
+      - '.github/workflows/build-openwa.yml'
+  pull_request:
+    paths:
+      - 'deploy/openwa/**'
+      - '.github/workflows/build-openwa.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: build-openwa-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  IMAGE: ghcr.io/${{ github.repository_owner }}/itier-openwa
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login a GHCR
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Etiquetas y metadatos
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=semver,pattern={{version}}
+            type=sha
+            # `latest` también desde la rama de trabajo: es una capa fina con la
+            # versión fijada, no un latest "flotante" del upstream.
+            type=raw,value=latest
+
+      - name: Construir (y publicar si no es PR)
+        uses: docker/build-push-action@v6
+        with:
+          context: deploy/openwa
+          file: deploy/openwa/Dockerfile
+          platforms: linux/amd64
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
