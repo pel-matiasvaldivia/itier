@@ -1106,6 +1106,31 @@ check("canales: si Exchange rechaza a la aplicación, el error dice qué revisar
 c.post("/canales/correo", data={"soporte_email": "soporte@pymesenlinea.com.ar", "imap_auth": "password", "imap_host": "imap.otro.com", "imap_port": "993",
        "imap_user": "soporte@pymesenlinea.com.ar", "imap_password": "", "imap_folder": "INBOX", "imap_tls": "ssl", "imap_poll_s": "60", "csrf": csrf_de(c.get("/canales").text)})
 
+# Correo saliente: Reply-To al buzón de soporte y no procesar lo propio
+import smtplib as _smtp  # noqa: E402
+_msgs = []
+class _SM:
+    def __init__(s, *a, **k): pass
+    def __enter__(s): return s
+    def __exit__(s, *a): pass
+    def login(s, *a): pass
+    def starttls(s, **k): pass
+    def send_message(s, m): _msgs.append(m)
+_sm0 = (_smtp.SMTP, _smtp.SMTP_SSL)
+_smtp.SMTP = _smtp.SMTP_SSL = _SM
+import dataclasses as _dcl  # noqa: E402
+_cs = _dcl.replace(app.state.cfg, smtp_host="smtp.x", smtp_from="no-reply@pymesenlinea.com.ar", soporte_email="soporte@pymesenlinea.com.ar", smtp_tls="ssl")
+_co.enviar(_cs, "cli@x.com", "Hola", "cuerpo")
+_cs2 = _dcl.replace(_cs, smtp_from="Soporte <soporte@pymesenlinea.com.ar>")
+_co.enviar(_cs2, "cli@x.com", "Hola", "cuerpo")
+_smtp.SMTP, _smtp.SMTP_SSL = _sm0
+check("correo: si envía desde otra dirección, las respuestas van al buzón de soporte (Reply-To)", _msgs[0]["Reply-To"] == "soporte@pymesenlinea.com.ar")
+check("correo: si envía desde la propia casilla de soporte no agrega Reply-To", _msgs[1]["Reply-To"] is None)
+_cr = _dcl.replace(_cs, imap_user="soporte@pymesenlinea.com.ar")
+check("correo: ignora lo enviado desde las direcciones propias (sin bucles)",
+      _cn.procesar_email(_cr, _conn, _mail("Soporte <no-reply@pymesenlinea.com.ar>", "Re: [#1] x", "eco", "loop1"))["estado"] == "ignorado"
+      and _cn.procesar_email(_cr, _conn, _mail("soporte@pymesenlinea.com.ar", "Re: [#1] x", "eco", "loop2"))["estado"] == "ignorado")
+
 # RBAC: la Bandeja es de PM/admin
 check("RBAC: el técnico no entra a la Bandeja", ttec.get("/bandeja").url.path != "/bandeja")
 check("RBAC: el PM sí", tpm.get("/bandeja").url.path == "/bandeja")

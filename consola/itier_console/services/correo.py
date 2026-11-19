@@ -52,6 +52,9 @@ def enviar(cfg, destinatario: str, asunto: str, cuerpo: str, html: str | None = 
         raise ServiceError("El envío de correo no está configurado (ITIER_SMTP_HOST / ITIER_SMTP_FROM).")
     msg = EmailMessage()
     msg["From"], msg["To"], msg["Subject"] = cfg.smtp_from, destinatario, asunto
+    # Las respuestas de la gente tienen que llegar al buzón de soporte (que la consola lee) aunque el envío salga de otra dirección.
+    if getattr(cfg, "soporte_email", None) and cfg.soporte_email.lower() not in cfg.smtp_from.lower():
+        msg["Reply-To"] = cfg.soporte_email
     msg.set_content(cuerpo)
     if html:
         msg.add_alternative(html, subtype="html")

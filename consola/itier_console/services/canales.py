@@ -542,8 +542,9 @@ def procesar_email(cfg, conn, raw: bytes) -> dict:
     p = parsear_email(raw)
     if not p["remitente"] or p["automatico"]:
         return {"estado": "ignorado"}
-    if cfg.imap_user and p["remitente"] == cfg.imap_user.lower():
-        return {"estado": "ignorado"}              # nunca procesar lo que mandamos nosotros
+    propios = {x.lower() for x in (cfg.imap_user, cfg.soporte_email, normalizar_email(parseaddr(cfg.smtp_from or "")[1])) if x}
+    if p["remitente"] in propios:
+        return {"estado": "ignorado"}              # nunca procesar lo que mandamos nosotros (evita bucles)
     if not p["cuerpo"] and not p["asunto"]:
         return {"estado": "ignorado"}
     return registrar_entrante(cfg, conn, canal="email", remitente=p["remitente"], nombre=p["nombre"],
