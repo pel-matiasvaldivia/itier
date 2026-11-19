@@ -219,7 +219,20 @@ def cambiar_clave_post(
     security.cambiar_password(conn, u["uid"], nueva)
     request.session["must_change"] = False
     audit.registrar(conn, user["username"], "clave.cambiada", {})
-    flash(request, "Contraseña actualizada.", "ok")
+    # Los operadores tienen la misma clave en GLPI, Zabbix y MeshCentral: se actualiza también allá.
+    from .services import usuarios as usuarios_svc
+    try:
+        estados = usuarios_svc.propagar_clave(conn, request.app.state.cfg, u["uid"], nueva)
+    except Exception:  # noqa: BLE001 — el cambio en la consola ya está hecho; no se corta por un sistema caído
+        estados = {"consola": "error"}
+    nombres = {"glpi": "GLPI", "zbx": "Zabbix", "mesh": "MeshCentral"}
+    fallos = [f"{nombres.get(k, k)}" for k, v in estados.items() if v.startswith("error")]
+    oks = [nombres[k] for k, v in estados.items() if v == "ok"]
+    if fallos:
+        flash(request, "Contraseña actualizada en la consola" + (f" y {', '.join(oks)}" if oks else "") +
+              f", pero NO se pudo actualizar en {', '.join(fallos)}: avisá a un administrador (puede usar «Reiniciar clave»).", "error")
+    else:
+        flash(request, "Contraseña actualizada" + (f" también en {', '.join(oks)}" if oks else "") + ".", "ok")
     return RedirectResponse(_destino_post_login(request), status_code=303)
 
 

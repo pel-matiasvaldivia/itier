@@ -80,10 +80,10 @@ FUNCIONES = [
 PROCEDIMIENTOS = [
     ("tablero", "Primer ingreso y seguridad", [
         "Entrá a la consola con el usuario y la clave temporal que recibiste.",
-        "La consola te pide cambiar la clave: elegí una larga y única (la clave temporal se usó en cuatro sistemas, no la reutilices).",
+        "La consola te pide cambiar la clave: elegí una larga y única. El cambio se aplica también en GLPI, Zabbix y MeshCentral: queda la misma en los cuatro (si algún sistema falla, la consola te avisa cuál y se lo pedís al Administrador).",
         "Escaneá el código QR con una app de autenticación (Google Authenticator, Microsoft Authenticator o similar) y escribí el código de 6 dígitos: el 2FA es obligatorio.",
-        "Ingresá también a MeshCentral con el mismo usuario y clave temporal: te pide cambiarla. Activá el 2FA ahí.",
-        "En GLPI, entrá con el mismo usuario y cambiá la clave desde «Mi configuración». Activá el 2FA si está disponible.",
+        "Ingresá también a MeshCentral con el mismo usuario y tu clave nueva y activá el 2FA ahí. Activá el 2FA en GLPI si está disponible.",
+        "Para cambiar la clave más adelante hacelo siempre desde la consola (no desde GLPI, Zabbix o Mesh): así se mantiene igual en los cuatro sistemas.",
         "Si olvidás la clave o perdés el teléfono con el 2FA, pedile al Administrador «Reiniciar clave».",
     ]),
     ("tickets", "Atender un ticket", [

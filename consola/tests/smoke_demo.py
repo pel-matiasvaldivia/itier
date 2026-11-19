@@ -944,6 +944,39 @@ check("gws: PM y técnico no configuran la cuenta de servicio", tpm.get("/gws/ap
 r = c.post("/clientes/canal-sa/gws/desconectar", data={"csrf": csrf_de(c.get("/clientes/canal-sa").text)})
 check("gws: desconectar el dominio", "Dominio desconectado" in r.text and "Conectar dominio" in r.text)
 
+# Cambiar la clave propia se propaga a GLPI, Zabbix y MeshCentral
+from itier_console.adapters import glpi as _gl, zabbix as _zb, mesh as _ms  # noqa: E402
+_llamadas = []
+_orig = (_gl.GLPIClient.fijar_password_usuario, _zb.ZabbixClient.fijar_password_usuario, _ms.MeshClient.eliminar_usuario, _ms.MeshClient.asegurar_usuario)
+_gl.GLPIClient.fijar_password_usuario = lambda self, uid, pw: _llamadas.append(("glpi", uid, pw))
+_zb.ZabbixClient.fijar_password_usuario = lambda self, uid, pw: _llamadas.append(("zbx", uid, pw))
+_ms.MeshClient.eliminar_usuario = lambda self, u: _llamadas.append(("mesh-del", u))
+_ms.MeshClient.asegurar_usuario = lambda self, u, pw, em, rol, g, reset_next_login=True: (_llamadas.append(("mesh-add", u, pw, reset_next_login)), "creado")[1]
+_rs = c.post("/usuarios", data={"username": "tecsync", "email": "tecsync@pymesenlinea.com.ar", "nombre": "Tec Sync", "rol": "tecnico", "csrf": csrf_de(c.get("/usuarios").text)})
+_cs = re.search(r"Clave:\s+([^\s<]+)", _rs.text).group(1)
+_llamadas.clear()
+_tsy, _rsy = _login_operador("tecsync", _cs)
+_ids = _conn.execute("SELECT glpi_user_id, zbx_user_id FROM users WHERE username='tecsync'").fetchone()
+check("clave propia: al cambiarla por primera vez se actualiza en GLPI y Zabbix con los ids de la cuenta",
+      ("glpi", _ids["glpi_user_id"], "Clave-Propia-123") in _llamadas and ("zbx", _ids["zbx_user_id"], "Clave-Propia-123") in _llamadas, _llamadas)
+check("clave propia: en Mesh se recrea la cuenta con la clave nueva y sin pedir otro cambio",
+      ("mesh-del", "tecsync") in _llamadas and ("mesh-add", "tecsync", "Clave-Propia-123", False) in _llamadas, _llamadas)
+check("clave propia: el mensaje confirma los cuatro sistemas", "también en GLPI, Zabbix, MeshCentral" in _rsy.text, _rsy.text[-400:])
+check("clave propia: la auditoría registra la propagación sin la clave", "usuario.clave_propagada" in c.get("/auditoria").text and "Clave-Propia-123" not in c.get("/auditoria").text)
+_llamadas.clear()
+_r2 = _tsy.post("/cambiar-clave", data={"actual": "Clave-Propia-123", "nueva": "Otra-Clave-456", "repetir": "Otra-Clave-456", "csrf": csrf_de(_tsy.get("/cambiar-clave").text)})
+check("clave propia: un cambio voluntario también se propaga", ("glpi", _ids["glpi_user_id"], "Otra-Clave-456") in _llamadas and ("zbx", _ids["zbx_user_id"], "Otra-Clave-456") in _llamadas)
+def _falla(self, uid, pw): raise _AdErr("GLPI", "caído")
+from itier_console.adapters import AdapterError as _AdErr  # noqa: E402
+_gl.GLPIClient.fijar_password_usuario = _falla
+_llamadas.clear()
+_r3 = _tsy.post("/cambiar-clave", data={"actual": "Otra-Clave-456", "nueva": "Tercera-Clave-789", "repetir": "Tercera-Clave-789", "csrf": csrf_de(_tsy.get("/cambiar-clave").text)})
+check("clave propia: si un sistema falla, se avisa cuál y la clave de la consola igual cambió",
+      "NO se pudo actualizar en GLPI" in _r3.text and ("zbx", _ids["zbx_user_id"], "Tercera-Clave-789") in _llamadas
+      and _tsy.post("/cambiar-clave", data={"actual": "Tercera-Clave-789", "nueva": "Cuarta-Clave-000", "repetir": "Cuarta-Clave-000", "csrf": csrf_de(_tsy.get("/cambiar-clave").text)}).status_code == 200, _r3.text[-300:])
+_gl.GLPIClient.fijar_password_usuario, _zb.ZabbixClient.fijar_password_usuario, _ms.MeshClient.eliminar_usuario, _ms.MeshClient.asegurar_usuario = _orig
+check("clave propia: un usuario del portal no toca los otros sistemas", _hs is not None and __import__("itier_console.services.usuarios", fromlist=["x"]).propagar_clave(_conn, app.state.cfg, 999999, "x") == {})
+
 # Responder y cerrar tickets
 from itier_console.services import tickets as _ts  # noqa: E402
 check("tickets: texto plano desde HTML de GLPI", _ts.texto_plano("&lt;p&gt;Hola &amp;amp; chau&lt;/p&gt;&lt;p&gt;linea 2&lt;/p&gt;") == "Hola & chau\nlinea 2")

@@ -151,6 +151,49 @@ def reiniciar_clave(conn: sqlite3.Connection, cfg, actor: str, uid: int) -> tupl
     return clave, estados
 
 
+def propagar_clave(conn: sqlite3.Connection, cfg, uid: int, nueva: str) -> dict[str, str]:
+    """Cuando una persona cambia su propia clave en la consola, se la lleva a las cuentas que ya tiene en GLPI,
+    Zabbix y MeshCentral (así sigue siendo la misma en los cuatro). Solo toca los sistemas donde la cuenta existe.
+    En Mesh la API no permite fijar la clave de otro usuario: se recrea la cuenta (sin pedir otro cambio)."""
+    try:
+        u = _fila(conn, uid)
+    except ServiceError:
+        return {}                                   # usuario del portal u otro que no está en los demás sistemas
+    estados: dict[str, str] = {}
+    if cfg.glpi_configurado and u.get("glpi_user_id"):
+        try:
+            with glpi_mod.cliente(cfg) as g:
+                g.fijar_password_usuario(u["glpi_user_id"], nueva)
+            estados["glpi"] = "ok"
+        except AdapterError as e:
+            estados["glpi"] = f"error: {e.detalle}"[:300]
+    if cfg.zbx_configurado and u.get("zbx_user_id"):
+        try:
+            with zbx_mod.cliente(cfg) as z:
+                z.fijar_password_usuario(u["zbx_user_id"], nueva)
+            estados["zbx"] = "ok"
+        except AdapterError as e:
+            estados["zbx"] = f"error: {e.detalle}"[:300]
+    sync_mesh = (u.get("sync_mesh") or "")
+    if cfg.mesh_enabled and sync_mesh and sync_mesh != "no configurado" and not sync_mesh.startswith("error"):
+        try:
+            with mesh_mod.cliente(cfg) as m:
+                try:
+                    m.eliminar_usuario(u["username"])
+                except AdapterError:
+                    pass                            # si ya no existía, el alta lo crea
+                m.asegurar_usuario(u["username"], nueva, u.get("email") or "", u["rol"], cfg.mesh_support_group, reset_next_login=False)
+            estados["mesh"] = "ok"
+        except AdapterError as e:
+            estados["mesh"] = f"error: {e.detalle}"[:300]
+    for sistema, col in (("glpi", "sync_glpi"), ("zbx", "sync_zbx"), ("mesh", "sync_mesh")):
+        if sistema in estados:
+            conn.execute(f"UPDATE users SET {col}=? WHERE id=?", (estados[sistema] if estados[sistema] != "ok" else "ok", uid))
+    conn.commit()
+    audit.registrar(conn, u["username"], "usuario.clave_propagada", {"sync": estados})
+    return estados
+
+
 def cambiar_rol(conn: sqlite3.Connection, cfg, actor: str, uid: int, rol: str) -> dict[str, str]:
     u = _fila(conn, uid)
     if not rbac.rol_valido(rol):

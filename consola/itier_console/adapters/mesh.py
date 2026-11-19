@@ -178,14 +178,15 @@ class MeshClient:
             self._pedir({"action": "removeuserfromusergroup", "ugrpid": ugrp,
                          "userid": f"user/{dominio}/{username.lower()}"}, "removeuserfromusergroup")
 
-    def asegurar_usuario(self, username: str, password: str, email: str, rol: str, grupo_soporte: str) -> str:
+    def asegurar_usuario(self, username: str, password: str, email: str, rol: str, grupo_soporte: str,
+                         reset_next_login: bool = True) -> str:
         """Crea la cuenta (con cambio de clave obligatorio en el primer login de Mesh) y la suma al
         grupo de soporte. → 'creado' | 'existente' (si ya estaba: NO se puede fijar su clave por API)."""
         if self._cfg.demo:
             return "creado"
         try:
             self._pedir({"action": "adduser", "username": username, "pass": password, "email": email,
-                         "emailVerified": True, "resetNextLogin": True,
+                         "emailVerified": True, "resetNextLogin": reset_next_login,
                          "siteadmin": self.DERECHOS_SITIO[rol]}, "adduser")
             estado = "creado"
         except AdapterError as e:

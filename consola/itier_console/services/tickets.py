@@ -64,9 +64,14 @@ def texto_plano(contenido: str) -> str:
     import html
     import re
     t = html.unescape(html.unescape(contenido or ""))
+    if re.search(r"<[a-zA-Z/][^>]*>", t):             # es HTML: los saltos de línea del código no cuentan, solo las etiquetas
+        t = re.sub(r"[\r\n]+", " ", t)
     t = re.sub(r"(?i)<br\s*/?>|</p>|</div>|</li>", "\n", t)
     t = re.sub(r"(?s)<[^>]+>", "", t)
-    return re.sub(r"\n{3,}", "\n\n", html.unescape(t)).strip()
+    t = html.unescape(t).replace("\xa0", " ")
+    t = re.sub(r"[ \t]+\n", "\n", t)
+    t = re.sub(r"\n[ \t]+", "\n", t)
+    return re.sub(r"\n{3,}", "\n\n", t).strip()
 
 
 def conversacion(cfg, ticket_id: int) -> list[dict]:

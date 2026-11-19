@@ -189,6 +189,12 @@ consola/
 ```
 
 
+## Clave única del operador
+
+Cuando un operador cambia su clave en la consola (el cambio forzado del primer ingreso o uno voluntario), la consola la lleva a su cuenta de GLPI y de
+Zabbix, y recrea la de MeshCentral (su API no permite fijar la clave de otro usuario). Si un sistema falla se avisa cuál. Cambiarla directamente en
+GLPI, Zabbix o Mesh no se refleja en los demás.
+
 ## Canales de entrada (correo y WhatsApp)
 
 Los pedidos de soporte por correo (buzón IMAP) y WhatsApp (webhook de OpenWA, `/hooks/whatsapp/<token>`) pasan por
