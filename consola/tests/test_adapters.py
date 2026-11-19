@@ -174,7 +174,15 @@ def handler(request: httpx.Request) -> httpx.Response:
         if request.method == "POST":
             return httpx.Response(201, json={"id": 5})
         return httpx.Response(200, json=[{"id": 1, "tickets_id": 77, "actiontime": 5400, "users_id_tech": 7, "date": "2026-11-05 10:00:00", "content": "x"}])
+    if "/ITILSolution" in p:
+        return httpx.Response(201, json={"id": 3})
+    if request.method == "PUT" and p.endswith("/Ticket/77"):
+        return httpx.Response(200, json=[{"77": True}])
     if "/ITILFollowup" in p:
+        if request.method == "GET":
+            return httpx.Response(200, json=[
+                {"id": 2, "content": "&lt;p&gt;Segundo&lt;/p&gt;", "users_id": 7, "date_creation": "2026-11-19 10:05:00", "is_private": 1},
+                {"id": 1, "content": "Primero", "users_id": 0, "date_creation": "2026-11-19 10:00:00", "is_private": 0}])
         return httpx.Response(201, json={"id": 9})
     if "/Ticket_User" in p:
         if request.method == "POST":
@@ -637,13 +645,36 @@ check("GLPI: registrar_tarea crea una TicketTask con el tiempo en segundos",
       len(_p) == 1 and _p[0]["body"]["input"]["tickets_id"] == 77 and _p[0]["body"]["input"]["actiontime"] == 1800
       and _p[0]["body"]["input"]["users_id_tech"] == 7, _p)
 check("GLPI: listar_tareas devuelve el tiempo y quién lo hizo", _tareas == [{"tickets_id": 77, "actiontime": 5400, "users_id_tech": 7, "date": "2026-11-05 10:00:00", "content": "x"}], _tareas)
+# conversación, respuestas y cambios de estado
+_n7 = len(captured)
+with glpi_mod.cliente(cfg) as g:
+    g.agregar_seguimiento(77, "Ya lo revisamos", privado=True, users_id=7)
+    _conv = g.seguimientos(77)
+    g.cambiar_estado(77, "pendiente")
+    g.cambiar_estado(77, "resolver", "Se cambió el tóner")
+    g.cambiar_estado(77, "cerrar")
+_c7 = captured[_n7:]
+_fu = next(x for x in _c7 if x["method"] == "POST" and x["path"].endswith("/ITILFollowup"))
+check("GLPI: la respuesta de un técnico lleva is_private y su users_id", _fu["body"]["input"] == {"itemtype": "Ticket", "items_id": 77, "content": "Ya lo revisamos", "is_private": 1, "users_id": 7}, _fu)
+check("GLPI: la conversación sale ordenada con autor, fecha y privacidad", [x["id"] for x in _conv] == [1, 2] and _conv[1]["privado"] is True and _conv[1]["fecha"] == "2026-11-19 10:05", _conv)
+_puts = [x for x in _c7 if x["method"] == "PUT"]
+check("GLPI: en espera y cerrar son PUT del estado (4 y 6)", [x["body"]["input"]["status"] for x in _puts] == [4, 6], _puts)
+_sol = next(x for x in _c7 if x["path"].endswith("/ITILSolution"))
+check("GLPI: resolver crea la solución (GLPI pasa el ticket a Resuelto)", _sol["body"]["input"] == {"itemtype": "Ticket", "items_id": 77, "content": "Se cambió el tóner"}, _sol)
+try:
+    with glpi_mod.cliente(cfg) as g:
+        g.cambiar_estado(77, "inventado")
+    _ok = False
+except Exception:  # noqa: BLE001
+    _ok = True
+check("GLPI: una acción de estado desconocida se rechaza", _ok)
 # seguimiento de ticket (respuesta del solicitante por correo/WhatsApp)
 _n2 = len(captured)
 with glpi_mod.cliente(cfg) as g:
     g.agregar_seguimiento(1042, "Ya volvió, gracias")
 _f = [x for x in captured[_n2:] if x["path"].endswith("/ITILFollowup")]
 check("GLPI: agregar_seguimiento hace POST /ITILFollowup sobre el ticket",
-      len(_f) == 1 and _f[0]["method"] == "POST" and _f[0]["body"]["input"] == {"itemtype": "Ticket", "items_id": 1042, "content": "Ya volvió, gracias"}, _f)
+      len(_f) == 1 and _f[0]["method"] == "POST" and _f[0]["body"]["input"] == {"itemtype": "Ticket", "items_id": 1042, "content": "Ya volvió, gracias", "is_private": 0}, _f)
 # WhatsApp (OpenWA): estado y QR
 from itier_console.services import whatsapp as wa_svc  # noqa: E402
 import dataclasses as _dc  # noqa: E402

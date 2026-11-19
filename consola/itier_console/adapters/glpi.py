@@ -46,6 +46,11 @@ _DEMO_TICKETS_EXTRA: dict[int, dict] = {}
 # Tareas con tiempo registrado (demo): {tickets_id, actiontime (segundos), users_id_tech, date, content}.
 _DEMO_TAREAS: list[dict] = []
 
+# Conversación, estado y solución de los tickets en demo (memoria del proceso).
+_DEMO_SEG: dict[int, list[dict]] = {}
+_DEMO_ESTADOS: dict[int, int] = {}
+_DEMO_SOLUCIONES: dict[int, str] = {}
+
 # Técnico asignado por ticket (demo).
 _DEMO_TECNICOS: dict[int, str] = {1042: "María Técnica", 1041: "", 1038: "Juan Soporte"}
 
@@ -513,7 +518,7 @@ class GLPIClient:
 
     def listar_tickets(self, entity_id: int | None = None, limit: int = 100) -> list[dict]:
         if self.demo:
-            t = list(_DEMO_TICKETS_EXTRA.values()) + list(_DEMO_TICKETS)
+            t = [{**x, "status": _DEMO_ESTADOS.get(x["id"], x["status"])} for x in list(_DEMO_TICKETS_EXTRA.values()) + list(_DEMO_TICKETS)]
             if entity_id is not None:
                 t = [x for x in t if x["entities_id"] == entity_id]
             return t
@@ -580,10 +585,10 @@ class GLPIClient:
     def ver_ticket(self, ticket_id: int) -> dict:
         if self.demo:
             if ticket_id in _DEMO_TICKETS_EXTRA:
-                return dict(_DEMO_TICKETS_EXTRA[ticket_id])
+                return {**_DEMO_TICKETS_EXTRA[ticket_id], "status": _DEMO_ESTADOS.get(ticket_id, _DEMO_TICKETS_EXTRA[ticket_id]["status"])}
             for t in _DEMO_TICKETS:
                 if t["id"] == ticket_id:
-                    return {**t, "content": "Detalle de ejemplo (modo demo)."}
+                    return {**t, "status": _DEMO_ESTADOS.get(ticket_id, t["status"]), "content": "Detalle de ejemplo (modo demo)."}
             raise AdapterError("GLPI", f"ticket {ticket_id} no encontrado (demo)")
         return self._get(f"/Ticket/{ticket_id}")
 
@@ -607,14 +612,49 @@ class GLPIClient:
             raise AdapterError("GLPI", f"crear_ticket sin id en respuesta: {resp}")
         return int(nuevo)
 
-    def agregar_seguimiento(self, ticket_id: int, contenido: str) -> None:
-        """Suma un seguimiento (respuesta del solicitante) a un ticket existente."""
+    def agregar_seguimiento(self, ticket_id: int, contenido: str, privado: bool = False, users_id: int | None = None) -> None:
+        """Suma un seguimiento al ticket: la respuesta del solicitante (canales) o de un técnico (privado = nota interna)."""
         if self.demo:
-            t = _DEMO_TICKETS_EXTRA.get(ticket_id)
-            if t is not None:
-                t.setdefault("seguimientos", []).append(contenido)
+            _DEMO_SEG.setdefault(ticket_id, []).append({
+                "id": len(_DEMO_SEG.get(ticket_id, [])) + 1, "content": contenido, "autor": f"usuario {users_id}" if users_id else "solicitante",
+                "fecha": datetime.now().strftime("%Y-%m-%d %H:%M"), "privado": privado})
             return
-        self._post("/ITILFollowup", {"input": {"itemtype": "Ticket", "items_id": ticket_id, "content": contenido}})
+        entrada = {"itemtype": "Ticket", "items_id": ticket_id, "content": contenido, "is_private": 1 if privado else 0}
+        if users_id:
+            entrada["users_id"] = users_id
+        self._post("/ITILFollowup", {"input": entrada})
+
+    def seguimientos(self, ticket_id: int) -> list[dict]:
+        """Conversación del ticket (seguimientos), del más viejo al más nuevo."""
+        if self.demo:
+            return list(_DEMO_SEG.get(ticket_id, []))
+        try:
+            datos = self._get(f"/Ticket/{ticket_id}/ITILFollowup")
+        except AdapterError:
+            return []
+        salida = []
+        for r in datos if isinstance(datos, list) else []:
+            uid = int(r.get("users_id") or 0)
+            salida.append({"id": r.get("id"), "content": r.get("content") or "", "autor": self._nombre_usuario(uid) if uid else "",
+                           "fecha": str(r.get("date_creation") or r.get("date") or "")[:16], "privado": bool(int(r.get("is_private") or 0))})
+        salida.sort(key=lambda x: (x["fecha"], x["id"] or 0))
+        return salida
+
+    def cambiar_estado(self, ticket_id: int, accion: str, solucion: str = "") -> None:
+        """accion: en_curso | pendiente | resolver (requiere solución) | cerrar | reabrir."""
+        if accion not in ("en_curso", "pendiente", "resolver", "cerrar", "reabrir"):
+            raise AdapterError("GLPI", f"acción de estado desconocida: {accion}")
+        destino = {"en_curso": 2, "pendiente": 4, "resolver": 5, "cerrar": 6, "reabrir": 2}[accion]
+        if self.demo:
+            _DEMO_ESTADOS[ticket_id] = destino
+            if accion == "resolver":
+                _DEMO_SOLUCIONES[ticket_id] = solucion
+            return
+        if accion == "resolver":
+            # La solución es un objeto aparte: al agregarla GLPI pasa el ticket a «Resuelto» por sí mismo.
+            self._post("/ITILSolution", {"input": {"itemtype": "Ticket", "items_id": ticket_id, "content": solucion}})
+            return
+        self._put(f"/Ticket/{ticket_id}", {"input": {"id": ticket_id, "status": destino}})
 
     def listar_tareas(self, limit: int = 3000) -> list[dict]:
         """Tareas de tickets con su tiempo (`actiontime` en segundos) y quién las hizo."""

@@ -335,6 +335,31 @@ def origenes(conn) -> dict[int, str]:
     return {r["ticket_id"]: r["canal"] for r in conn.execute("SELECT ticket_id, canal FROM ticket_origen")}
 
 
+def responder_solicitante(cfg, conn, ticket_id: int, texto: str, titulo: str = "") -> str:
+    """Manda la respuesta de un técnico al solicitante por el canal por el que escribió (WhatsApp o correo).
+    Devuelve una descripción de lo hecho; levanta ServiceError si no se puede."""
+    o = conn.execute("SELECT canal, remitente FROM ticket_origen WHERE ticket_id = ?", (ticket_id,)).fetchone()
+    if not o:
+        raise ServiceError("Este ticket no vino por WhatsApp ni por correo: no hay a quién enviarle la respuesta.")
+    if o["canal"] == "whatsapp":
+        if not cfg.wa_api_url:
+            raise ServiceError("Falta la URL de la API de OpenWA (pantalla Canales) para responder por WhatsApp.")
+        try:
+            responder_whatsapp(cfg, o["remitente"], texto)
+        except Exception as e:  # noqa: BLE001
+            raise ServiceError(f"No se pudo enviar por WhatsApp: {e}") from e
+        return "WhatsApp"
+    if not correo_svc.configurado(cfg):
+        raise ServiceError("El envío de correo (SMTP) no está configurado.")
+    base = _RE_HILO.sub("", _RE_PREFIJO.sub("", titulo or "")).strip() or "Consulta de soporte"
+    try:
+        correo_svc.enviar(cfg, o["remitente"], f"Re: [#{ticket_id}] {base}",
+                          f"{texto}\n\n—\nPara responder, contestá este correo sin cambiar el asunto.")
+    except Exception as e:  # noqa: BLE001
+        raise ServiceError(f"No se pudo enviar el correo: {getattr(e, 'mensaje', None) or e}") from e
+    return "correo"
+
+
 # --------------------------------------------------------------------------- respuestas al remitente
 
 def _confirmar(cfg, canal, remitente, asunto, ticket_id, accion) -> None:

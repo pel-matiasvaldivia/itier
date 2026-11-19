@@ -21,10 +21,57 @@
         {% if t.date %}<span class="l-pill off">🕒 {{ t.date }}</span>{% endif %}
         {% if origen %}<span class="l-pill off">{{ '💬 WhatsApp' if origen.canal == 'whatsapp' else '✉️ Correo' }} · {{ origen.remitente }}</span>{% endif %}
       </div>
-      {% if t.content %}<div class="d-body">{{ t.content }}</div>{% else %}<p class="muted">Sin descripción.</p>{% endif %}
+      {% if t.content %}<div class="d-body" style="white-space:pre-wrap">{{ t.content }}</div>{% else %}<p class="muted">Sin descripción.</p>{% endif %}
+    </section>
+
+    <section class="u-card" id="conversacion">
+      <h2>💬 Conversación</h2>
+      {% for x in conversacion %}
+      <div class="d-body" style="margin:.5rem 0;{{ 'border-left-color:#f59e0b;background:#fffbeb;' if x.privado else '' }}">
+        <div class="muted small" style="margin-bottom:.25rem"><b>{{ x.autor or 'Solicitante' }}</b> · {{ x.fecha }}{% if x.privado %} · <span class="l-pill warn">🔒 Nota interna</span>{% endif %}</div>
+        <div style="white-space:pre-wrap">{{ x.content }}</div>
+      </div>
+      {% else %}<p class="muted small">Todavía no hay respuestas.</p>{% endfor %}
+      {% if t.status|int < 6 %}
+      <form method="post" action="/tickets/{{ t.id }}/responder" class="form" style="margin-top:1rem">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <label>Responder <textarea name="texto" rows="4" maxlength="5000" required placeholder="Escribí la respuesta o lo que hiciste…" style="width:100%"></textarea></label>
+        <label class="small" style="display:flex;gap:.5rem;align-items:center"><input type="checkbox" name="privado" value="1"> 🔒 Nota interna (el cliente no la ve ni se le envía)</label>
+        {% if origen %}<label class="small" style="display:flex;gap:.5rem;align-items:center"><input type="checkbox" name="enviar" value="1" checked>
+          Enviar también al solicitante por {{ 'WhatsApp' if origen.canal == 'whatsapp' else 'correo' }} ({{ origen.remitente if not origen.remitente.startswith('lid:') else 'ID interno' }})</label>{% endif %}
+        <button class="u-btn" type="submit">Enviar respuesta</button>
+      </form>
+      {% else %}<p class="muted small">El ticket está cerrado. Reabrilo para seguir respondiendo.</p>{% endif %}
     </section>
 
     <div>
+    <section class="u-card">
+      <h2>🚦 Estado del caso</h2>
+      {% set s = t.status|int %}
+      <p class="small" style="margin:.1rem 0 .6rem">Ahora: <b>{{ t.estado_label }}</b></p>
+      {% if s in (1, 2, 3, 4) %}
+      <div class="d-meta" style="gap:.5rem">
+        {% if s != 2 %}<form method="post" action="/tickets/{{ t.id }}/estado" class="inline"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="accion" value="en_curso"><button class="u-b" type="submit">▶ En curso</button></form>{% endif %}
+        {% if s != 4 %}<form method="post" action="/tickets/{{ t.id }}/estado" class="inline"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="accion" value="pendiente"><button class="u-b" type="submit">⏸ En espera</button></form>{% endif %}
+      </div>
+      <form method="post" action="/tickets/{{ t.id }}/estado" class="form" style="margin-top:.8rem">
+        <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="accion" value="resolver">
+        <label>✅ Resolver: ¿qué se hizo?
+          <textarea name="solucion" rows="3" maxlength="5000" required placeholder="Describí la solución…" style="width:100%"></textarea></label>
+        {% if origen %}<label class="small" style="display:flex;gap:.5rem;align-items:center"><input type="checkbox" name="enviar" value="1" checked> Avisar al solicitante por {{ 'WhatsApp' if origen.canal == 'whatsapp' else 'correo' }}</label>{% endif %}
+        <button class="u-btn" type="submit" style="background:#059669">Marcar como resuelto</button>
+      </form>
+      {% elif s == 5 %}
+      <p class="muted small">La solución quedó registrada. Si el cliente confirma, cerralo; si sigue el problema, reabrilo.</p>
+      <div class="d-meta" style="gap:.5rem">
+        <form method="post" action="/tickets/{{ t.id }}/estado" class="inline"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="accion" value="cerrar"><button class="u-btn" type="submit">🔒 Cerrar</button></form>
+        <form method="post" action="/tickets/{{ t.id }}/estado" class="inline"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="accion" value="reabrir"><button class="u-b" type="submit">↩ Reabrir</button></form>
+      </div>
+      {% else %}
+      <p class="muted small">El ticket está cerrado.</p>
+      <form method="post" action="/tickets/{{ t.id }}/estado" class="inline"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="accion" value="reabrir"><button class="u-b" type="submit">↩ Reabrir</button></form>
+      {% endif %}
+    </section>
     <section class="u-card">
       <h2>👤 Asignar</h2>
       {% if puedo_tomar %}

@@ -107,7 +107,12 @@ def detalle(request: Request, ticket_id: int, user: dict = Depends(require_permi
         tiempos = horas_svc.tiempo_de_ticket(cfg, ticket_id)
     except AdapterError:
         tiempos = []
-    return render(request, "tickets_detalle.html", t=t, cliente=cliente, tecnicos=tecnicos, tiempos=tiempos,
+    try:
+        conversacion = svc.conversacion(cfg, ticket_id)
+    except AdapterError:
+        conversacion = []
+    t["content"] = svc.texto_plano(t.get("content", ""))
+    return render(request, "tickets_detalle.html", t=t, cliente=cliente, tecnicos=tecnicos, tiempos=tiempos, conversacion=conversacion,
                   total_min=sum(x["minutos"] for x in tiempos),
                   puedo_tomar=bool(mi and mi["glpi_user_id"]), origen=dict(origen) if origen else None)
 
@@ -177,3 +182,79 @@ def registrar_tiempo(request: Request, ticket_id: int, minutos: int = Form(...),
     audit.registrar(conn, user["user"], "ticket.tiempo", {"ticket_id": ticket_id, "minutos": int(minutos)})
     flash(request, f"Registraste {int(minutos)} min en el ticket #{ticket_id}.", "ok")
     return RedirectResponse(f"/tickets/{ticket_id}", status_code=303)
+
+
+@router.post("/tickets/{ticket_id}/responder")
+def responder(request: Request, ticket_id: int, texto: str = Form(""), privado: str = Form(""), enviar: str = Form(""),
+              csrf: str = Form(""), user: dict = Depends(require_permiso("tickets")), conn: sqlite3.Connection = Depends(get_db)):
+    """Agrega una respuesta (o nota interna) al ticket y, si vino por WhatsApp/correo, se la manda al solicitante."""
+    from ..services import ServiceError, ajustes, canales
+    volver = RedirectResponse(f"/tickets/{ticket_id}", status_code=303)
+    if not security.verificar_csrf(request.session, csrf):
+        flash(request, "Sesión expirada, reintentá.", "error")
+        return volver
+    texto = texto.strip()
+    if not texto:
+        flash(request, "Escribí la respuesta.", "error")
+        return volver
+    if len(texto) > 5000:
+        flash(request, "La respuesta es demasiado larga (máximo 5000 caracteres).", "error")
+        return volver
+    cfg = ajustes.efectiva(conn, request.app.state.cfg)
+    r = conn.execute("SELECT glpi_user_id FROM users WHERE id = ?", (user["uid"],)).fetchone()
+    es_privado = bool(privado)
+    try:
+        svc.responder(cfg, ticket_id, texto, es_privado, int(r["glpi_user_id"]) if r and r["glpi_user_id"] else None)
+    except AdapterError as e:
+        flash(request, f"No se pudo guardar la respuesta: {e.detalle}", "error")
+        return volver
+    audit.registrar(conn, user["user"], "ticket.nota" if es_privado else "ticket.respuesta", {"ticket_id": ticket_id})
+    extra = ""
+    if enviar and not es_privado:
+        try:
+            titulo = svc.ver(cfg, ticket_id).get("name", "")
+            via = canales.responder_solicitante(cfg, conn, ticket_id, texto, titulo)
+            audit.registrar(conn, user["user"], "ticket.respuesta_enviada", {"ticket_id": ticket_id, "canal": via})
+            extra = f" y se envió al solicitante por {via}"
+        except (ServiceError, AdapterError) as e:
+            flash(request, f"La respuesta quedó en el ticket, pero no se pudo enviar al solicitante: {getattr(e, 'mensaje', None) or getattr(e, 'detalle', e)}", "error")
+            return volver
+    flash(request, ("Nota interna agregada" if es_privado else "Respuesta agregada") + extra + ".", "ok")
+    return volver
+
+
+@router.post("/tickets/{ticket_id}/estado")
+def cambiar_estado(request: Request, ticket_id: int, accion: str = Form(""), solucion: str = Form(""), csrf: str = Form(""),
+                   enviar: str = Form(""), user: dict = Depends(require_permiso("tickets")), conn: sqlite3.Connection = Depends(get_db)):
+    """Cambia el estado del ticket: en curso, en espera, resolver (con solución), cerrar o reabrir."""
+    from ..services import ServiceError, ajustes, canales
+    volver = RedirectResponse(f"/tickets/{ticket_id}", status_code=303)
+    if not security.verificar_csrf(request.session, csrf):
+        flash(request, "Sesión expirada, reintentá.", "error")
+        return volver
+    mensajes = {"en_curso": "El ticket quedó en curso.", "pendiente": "El ticket quedó en espera.", "resolver": "Ticket marcado como resuelto.",
+                "cerrar": "Ticket cerrado.", "reabrir": "Ticket reabierto."}
+    if accion not in mensajes:
+        flash(request, "Acción inválida.", "error")
+        return volver
+    solucion = solucion.strip()
+    if accion == "resolver" and len(solucion) < 3:
+        flash(request, "Para resolver el ticket indicá qué se hizo (la solución).", "error")
+        return volver
+    cfg = ajustes.efectiva(conn, request.app.state.cfg)
+    try:
+        svc.cambiar_estado(cfg, ticket_id, accion, solucion[:5000])
+    except AdapterError as e:
+        flash(request, f"No se pudo cambiar el estado: {e.detalle}", "error")
+        return volver
+    audit.registrar(conn, user["user"], f"ticket.{accion}", {"ticket_id": ticket_id})
+    extra = ""
+    if accion == "resolver" and enviar:
+        try:
+            titulo = svc.ver(cfg, ticket_id).get("name", "")
+            via = canales.responder_solicitante(cfg, conn, ticket_id, f"Resolvimos tu consulta #{ticket_id}: {solucion}\n\nSi todavía hay algo pendiente, respondé por acá.", titulo)
+            extra = f" Se avisó al solicitante por {via}."
+        except (ServiceError, AdapterError):
+            extra = " (No se pudo avisar al solicitante.)"
+    flash(request, mensajes[accion] + extra, "ok")
+    return volver

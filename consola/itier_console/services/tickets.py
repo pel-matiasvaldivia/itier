@@ -57,3 +57,31 @@ def asignar(cfg, ticket_id: int, users_id: int, reemplazar: bool = False) -> Non
 def seguimiento(cfg, ticket_id: int, contenido: str) -> None:
     with glpi_mod.cliente(cfg) as g:
         g.agregar_seguimiento(ticket_id, contenido)
+
+
+def texto_plano(contenido: str) -> str:
+    """GLPI guarda el texto enriquecido como HTML (a veces escapado): se muestra como texto plano."""
+    import html
+    import re
+    t = html.unescape(html.unescape(contenido or ""))
+    t = re.sub(r"(?i)<br\s*/?>|</p>|</div>|</li>", "\n", t)
+    t = re.sub(r"(?s)<[^>]+>", "", t)
+    return re.sub(r"\n{3,}", "\n\n", html.unescape(t)).strip()
+
+
+def conversacion(cfg, ticket_id: int) -> list[dict]:
+    with glpi_mod.cliente(cfg) as g:
+        segs = g.seguimientos(ticket_id)
+    for x in segs:
+        x["content"] = texto_plano(x["content"])
+    return segs
+
+
+def responder(cfg, ticket_id: int, texto: str, privado: bool, users_id: int | None) -> None:
+    with glpi_mod.cliente(cfg) as g:
+        g.agregar_seguimiento(ticket_id, texto, privado=privado, users_id=users_id)
+
+
+def cambiar_estado(cfg, ticket_id: int, accion: str, solucion: str = "") -> None:
+    with glpi_mod.cliente(cfg) as g:
+        g.cambiar_estado(ticket_id, accion, solucion)

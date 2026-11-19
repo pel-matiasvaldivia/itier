@@ -944,6 +944,34 @@ check("gws: PM y técnico no configuran la cuenta de servicio", tpm.get("/gws/ap
 r = c.post("/clientes/canal-sa/gws/desconectar", data={"csrf": csrf_de(c.get("/clientes/canal-sa").text)})
 check("gws: desconectar el dominio", "Dominio desconectado" in r.text and "Conectar dominio" in r.text)
 
+# Responder y cerrar tickets
+from itier_console.services import tickets as _ts  # noqa: E402
+check("tickets: texto plano desde HTML de GLPI", _ts.texto_plano("&lt;p&gt;Hola &amp;amp; chau&lt;/p&gt;&lt;p&gt;linea 2&lt;/p&gt;") == "Hola & chau\nlinea 2")
+_tp = c.get(f"/tickets/{t1}")
+check("tickets: el detalle tiene conversación, responder y estado del caso", all(x in _tp.text for x in ("💬 Conversación", "Enviar respuesta", "🚦 Estado del caso", "Marcar como resuelto")))
+check("tickets: ofrece enviar por WhatsApp al solicitante (vino por ahí)", "Enviar también al solicitante por WhatsApp" in _tp.text)
+r = c.post(f"/tickets/{t1}/responder", data={"texto": "Ya revisamos la impresora, pasá por recepción.", "enviar": "1", "csrf": csrf_de(_tp.text)})
+check("tickets: responder agrega el mensaje y lo envía por WhatsApp", "Respuesta agregada y se envió al solicitante por WhatsApp" in r.text and "Ya revisamos la impresora" in r.text, r.text[:400])
+r = c.post(f"/tickets/{t1}/responder", data={"texto": "Revisar el cable antes de ir", "privado": "1", "csrf": csrf_de(r.text)})
+check("tickets: la nota interna queda marcada y no se envía", "Nota interna agregada." in r.text and "🔒 Nota interna" in r.text)
+check("tickets: respuesta vacía rechazada", "Escribí la respuesta" in c.post(f"/tickets/{t1}/responder", data={"texto": "  ", "csrf": csrf_de(r.text)}).text)
+check("tickets: CSRF inválido no agrega nada", "Sesión expirada" in c.post(f"/tickets/{t1}/responder", data={"texto": "x", "csrf": "falso"}).text)
+r2 = c.post(f"/tickets/{t2}/responder", data={"texto": "Te lo resolvemos hoy", "enviar": "1", "csrf": csrf_de(c.get(f"/tickets/{t2}").text)})
+check("tickets: si no se puede enviar por correo, la respuesta igual queda en el ticket y avisa", "no se pudo enviar al solicitante" in r2.text and "Te lo resolvemos hoy" in r2.text)
+r = c.post(f"/tickets/{t1}/estado", data={"accion": "pendiente", "csrf": csrf_de(c.get(f"/tickets/{t1}").text)})
+check("tickets: pasar a en espera", "quedó en espera" in r.text and "En espera" in r.text)
+check("tickets: resolver exige la solución", "indicá qué se hizo" in c.post(f"/tickets/{t1}/estado", data={"accion": "resolver", "solucion": "", "csrf": csrf_de(r.text)}).text)
+r = c.post(f"/tickets/{t1}/estado", data={"accion": "resolver", "solucion": "Se cambió el tóner", "enviar": "1", "csrf": csrf_de(r.text)})
+check("tickets: resolver deja el ticket en Resuelto y avisa al solicitante", "marcado como resuelto" in r.text and "Se avisó al solicitante por WhatsApp" in r.text and "Cerrar" in r.text and "Reabrir" in r.text, r.text[:500])
+r = c.post(f"/tickets/{t1}/estado", data={"accion": "cerrar", "csrf": csrf_de(r.text)})
+check("tickets: cerrar oculta el formulario de respuesta", "Ticket cerrado" in r.text and "Enviar respuesta" not in r.text and "El ticket está cerrado" in r.text)
+r = c.post(f"/tickets/{t1}/estado", data={"accion": "reabrir", "csrf": csrf_de(r.text)})
+check("tickets: reabrir vuelve a En curso con el formulario de respuesta", "Ticket reabierto" in r.text and "Enviar respuesta" in r.text and "En curso" in r.text)
+check("tickets: acción de estado inválida rechazada", "Acción inválida" in c.post(f"/tickets/{t1}/estado", data={"accion": "borrar", "csrf": csrf_de(r.text)}).text)
+check("tickets: el técnico también puede responder y resolver", "Respuesta agregada" in ttec.post(f"/tickets/{t1}/responder", data={"texto": "Listo", "csrf": csrf_de(ttec.get(f"/tickets/{t1}").text)}).text)
+_au = c.get("/auditoria").text
+check("tickets: la auditoría registra respuestas y cambios de estado", all(a in _au for a in ("ticket.respuesta", "ticket.nota", "ticket.pendiente", "ticket.resolver", "ticket.cerrar", "ticket.reabrir", "ticket.respuesta_enviada")))
+
 # RBAC: la Bandeja es de PM/admin
 check("RBAC: el técnico no entra a la Bandeja", ttec.get("/bandeja").url.path != "/bandeja")
 check("RBAC: el PM sí", tpm.get("/bandeja").url.path == "/bandeja")
