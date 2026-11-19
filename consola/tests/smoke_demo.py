@@ -296,6 +296,14 @@ rr = c.get("/equipos/prueba-srl/NODO-DEMO%40abc%24123/remoto?n=PC-VENTAS-01")
 check("remoto: embebe MeshCentral en un iframe dentro del panel",
       rr.status_code == 200 and "<iframe" in rr.text and "gotonode=NODO-DEMO@abc$123" in rr.text.replace("&amp;", "&")
       and "viewmode=11" in rr.text, rr.text[-300:])
+check("remoto: pestañas Escritorio, Terminal y Archivos", all(x in rr.text for x in ("🖥 Escritorio", "⌨️ Terminal", "📁 Archivos")) and "modo=terminal" in rr.text)
+_rt_ = c.get("/equipos/prueba-srl/NODO-DEMO%40abc%24123/remoto?n=PC-VENTAS-01&modo=terminal")
+check("remoto: la pestaña Terminal embebe viewmode=12 y marca la pestaña activa", "viewmode=12" in _rt_.text and "viewmode=11" not in _rt_.text.split("<iframe")[1].split(">")[0] and 'class="on" href' in _rt_.text)
+_ra_ = c.get("/equipos/prueba-srl/NODO-DEMO%40abc%24123/remoto?n=PC-VENTAS-01&modo=archivos")
+check("remoto: la pestaña Archivos embebe viewmode=13", "viewmode=13" in _ra_.text.split("<iframe")[1].split(">")[0])
+check("remoto: un modo inventado cae en el escritorio", "viewmode=11" in c.get("/equipos/prueba-srl/NODO-DEMO%40abc%24123/remoto?n=PC&modo=hack%22").text.split("<iframe")[1].split(">")[0])
+_aud = c.get("/auditoria").text
+check("remoto: la auditoría distingue qué vista se abrió (terminal/archivos)", "terminal" in _aud and "archivos" in _aud and "equipo.remoto.abierto" in _aud)
 check("remoto: nodo con caracteres raros se rechaza", "<iframe" not in c.get("/equipos/prueba-srl/a%22%3E%3Cscript/remoto").text)
 check("remoto: exige sesión de operador", pub.get("/equipos", follow_redirects=False).status_code == 303
       and pub.get("/equipos/prueba-srl/NODO-DEMO%40abc/remoto", follow_redirects=False).status_code == 303)

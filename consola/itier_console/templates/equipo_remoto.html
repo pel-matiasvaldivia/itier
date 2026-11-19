@@ -4,7 +4,7 @@
   <div class="l-head">
     <div>
       <h1>🖥 {{ nombre }}</h1>
-      <p class="u-sub">{{ cli.nombre }} · conexión remota con MeshCentral, sin salir del panel.</p>
+      <p class="u-sub">{{ cli.nombre }} · escritorio, terminal y archivos con MeshCentral, sin salir del panel.</p>
     </div>
     <div class="acciones">
       <a class="u-b" href="/equipos" style="text-decoration:none">← Volver a equipos</a>
@@ -12,14 +12,18 @@
   </div>
   <div class="l-remote" id="remoto">
     <div class="l-remote-bar">
-      <span class="l-pill ok"><i></i>Sesión remota</span>
-      <span class="muted small">Tocá <strong>Conectar</strong> dentro de la pantalla. La primera vez iniciá sesión en Mesh con tu usuario de técnico. Registrá en el ticket el motivo.</span>
+      <nav class="l-tabs" aria-label="Vista del equipo">
+        <a class="{{ 'on' if modo == 'escritorio' else '' }}" href="{{ base }}&modo=escritorio">🖥 Escritorio</a>
+        <a class="{{ 'on' if modo == 'terminal' else '' }}" href="{{ base }}&modo=terminal">⌨️ Terminal</a>
+        <a class="{{ 'on' if modo == 'archivos' else '' }}" href="{{ base }}&modo=archivos">📁 Archivos</a>
+      </nav>
+      <span class="muted small">Tocá <strong>Conectar</strong> dentro de la vista. La primera vez iniciá sesión en Mesh con tu usuario de técnico. Registrá en el ticket el motivo.</span>
       <span style="margin-left:auto;display:flex;gap:.45rem">
         <button class="u-b" type="button" id="btn-full">⛶ Pantalla completa</button>
         <a class="u-b" href="{{ src }}" target="_blank" rel="noopener" style="text-decoration:none">↗ Otra pestaña</a>
       </span>
     </div>
-    <iframe id="marco" src="{{ src }}" title="Conexión remota a {{ nombre }}" allow="clipboard-read; clipboard-write; fullscreen"></iframe>
+    <iframe id="marco" src="{{ src }}" title="{{ {'escritorio': 'Escritorio', 'terminal': 'Terminal', 'archivos': 'Archivos'}[modo] }} de {{ nombre }}" allow="clipboard-read; clipboard-write; fullscreen"></iframe>
   </div>
   <script>
     (function () {

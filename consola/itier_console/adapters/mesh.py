@@ -248,6 +248,11 @@ def nodo_valido(nodeid: str) -> bool:
 HIDE_SOLO_PANTALLA = 1 | 2 | 4 | 8 | 16 | 32
 
 
-def url_remoto(cfg, nodeid: str) -> str:
-    """Enlace al escritorio remoto del equipo (viewmode=11) en MeshCentral, sin su marco: solo la pantalla remota."""
-    return f"{cfg.mesh_url}/?viewmode=11&gotonode={quote(nodeid, safe='@$')}&hide={HIDE_SOLO_PANTALLA}"
+# Vistas del equipo en MeshCentral (parámetro viewmode): escritorio remoto, terminal y administrador de archivos.
+MODOS_REMOTO = {"escritorio": 11, "terminal": 12, "archivos": 13}
+
+
+def url_remoto(cfg, nodeid: str, modo: str = "escritorio") -> str:
+    """Enlace a una vista del equipo en MeshCentral (escritorio, terminal o archivos), sin su marco: solo esa vista."""
+    vm = MODOS_REMOTO.get(modo, MODOS_REMOTO["escritorio"])
+    return f"{cfg.mesh_url}/?viewmode={vm}&gotonode={quote(nodeid, safe='@$')}&hide={HIDE_SOLO_PANTALLA}"

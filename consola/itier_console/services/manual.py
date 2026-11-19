@@ -103,11 +103,12 @@ PROCEDIMIENTOS = [
     ]),
     ("equipos.remoto", "Conexión remota a un equipo", [
         "En Equipos, ubicá el equipo en línea y tocá «Conectar»: se abre MeshCentral dentro de la consola.",
+        "Arriba tenés tres pestañas: «Escritorio» (ver y controlar la pantalla), «Terminal» (consola de comandos) y «Archivos» (explorar y transferir). Tocá «Conectar» dentro de la vista.",
         "La primera vez iniciá sesión en MeshCentral con tu usuario; la sesión queda guardada.",
         "Si hay alguien usando el equipo, avisale antes de conectarte y explicale qué vas a hacer.",
         "Trabajá solo en lo que dice el ticket. No copies archivos del cliente a tu equipo salvo que sea imprescindible y lo autorice.",
         "Al terminar, cerrá la sesión remota y registrá en el ticket qué hiciste.",
-        "Cada apertura de conexión queda en la auditoría con tu usuario y el equipo.",
+        "Cada apertura de conexión queda en la auditoría con tu usuario, el equipo y la vista (escritorio, terminal o archivos). Usá la terminal y los archivos solo para lo que pide el ticket.",
         "Si no ves un equipo en MeshCentral, avisá al PM: tu usuario debe pertenecer al grupo SOPORTE.",
     ]),
     ("clientes.editar", "Dar de alta un cliente", [

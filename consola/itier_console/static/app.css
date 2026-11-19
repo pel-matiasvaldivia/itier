@@ -312,6 +312,13 @@ body.auth{background:linear-gradient(135deg,#eef2ff,#e0f2fe);min-height:100vh}
 .l-remote iframe{height:calc(100vh - 210px);min-height:520px}
 .l-remote:fullscreen{display:flex;flex-direction:column;background:#0f172a;border:0;border-radius:0}
 .l-remote:fullscreen iframe{height:auto;flex:1;min-height:0}
+.l-tabs{display:flex;gap:.3rem;background:#e8edf5;padding:.25rem;border-radius:.7rem}
+.l-tabs a{padding:.4rem .85rem;border-radius:.5rem;font-size:.85rem;font-weight:600;color:#475569;text-decoration:none;white-space:nowrap}
+.l-tabs a:hover{background:#fff;color:#1e293b}
+.l-tabs a.on{background:#4f46e5;color:#fff;box-shadow:0 1px 3px rgba(79,70,229,.35)}
+.l-remote:fullscreen .l-tabs{background:#1e293b}
+.l-remote:fullscreen .l-tabs a{color:#cbd5e1}
+.l-remote:fullscreen .l-tabs a:hover{background:#334155;color:#fff}
 .l-remote:fullscreen .l-remote-bar{background:#0f172a;border-color:#1e293b;color:#cbd5e1}
 
 /* ── Refinamiento global: las pantallas que usan los componentes base toman el nuevo estilo ──── */

@@ -11,6 +11,7 @@ rato: cada pantalla consulta varios sistemas.
 from __future__ import annotations
 
 import sqlite3
+from urllib.parse import quote
 import time
 
 from fastapi import APIRouter, Depends, Request
@@ -72,7 +73,7 @@ def lista(request: Request, cliente: str = "", alertas: str = "", actualizar: st
 
 
 @router.get("/equipos/{slug}/{nodo}/remoto", response_class=HTMLResponse)
-def remoto(request: Request, slug: str, nodo: str, n: str = "", user: dict = Depends(require_permiso("equipos.remoto")),
+def remoto(request: Request, slug: str, nodo: str, n: str = "", modo: str = "escritorio", user: dict = Depends(require_permiso("equipos.remoto")),
            conn: sqlite3.Connection = Depends(get_db)):
     cfg = request.app.state.cfg
     cli = onboarding.obtener_cliente_por_slug(conn, slug)
@@ -80,6 +81,9 @@ def remoto(request: Request, slug: str, nodo: str, n: str = "", user: dict = Dep
         flash(request, "No se puede abrir la conexión remota de ese equipo.", "error")
         return RedirectResponse("/equipos", status_code=303)
     nombre = (n or "equipo")[:64]
-    audit.registrar(conn, user["user"], "equipo.remoto.abierto", {"cliente": cli["nombre"], "equipo": nombre})
-    return render(request, "equipo_remoto.html", cli=cli, nombre=nombre, src=mesh_mod.url_remoto(cfg, nodo),
+    modo = modo if modo in mesh_mod.MODOS_REMOTO else "escritorio"
+    # Cada vista se abre con su propio enlace, así queda en la auditoría quién abrió terminal o archivos de qué equipo.
+    audit.registrar(conn, user["user"], "equipo.remoto.abierto", {"cliente": cli["nombre"], "equipo": nombre, "vista": modo})
+    return render(request, "equipo_remoto.html", cli=cli, nombre=nombre, src=mesh_mod.url_remoto(cfg, nodo, modo),
+                  modo=modo, base=f"/equipos/{slug}/{nodo}/remoto?n={quote(nombre)}",
                   mesh_url=cfg.mesh_url)

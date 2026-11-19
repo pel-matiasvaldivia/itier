@@ -495,6 +495,10 @@ check("mesh: lista equipos con su estado (ignora mensajes ajenos)",
 check("mesh: enlace remoto (viewmode 11, gotonode con id corto)",
       mesh_mod.url_remoto(cfg_mesh, "NODO1@xxxxx").endswith("/?viewmode=11&gotonode=NODO1@xxxxx&hide=63") and mesh_mod.nodo_valido("NODO1@xxxxx")
       and not mesh_mod.nodo_valido('a"><script>'))
+check("mesh: enlaces a terminal (viewmode 12) y archivos (viewmode 13); un modo desconocido cae en el escritorio",
+      mesh_mod.url_remoto(cfg_mesh, "NODO1@xxxxx", "terminal").endswith("/?viewmode=12&gotonode=NODO1@xxxxx&hide=63")
+      and mesh_mod.url_remoto(cfg_mesh, "NODO1@xxxxx", "archivos").endswith("/?viewmode=13&gotonode=NODO1@xxxxx&hide=63")
+      and "viewmode=11" in mesh_mod.url_remoto(cfg_mesh, "NODO1@xxxxx", "inventado"))
 with mesh_mod.cliente(cfg_mesh) as mc2:
     antes = _mesh_visto["acciones"].count("createmesh")
     check("mesh: si el grupo existe no lo crea de nuevo", mc2.asegurar_grupo("itier-x") == "NUEVO@$id"
