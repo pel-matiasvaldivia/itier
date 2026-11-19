@@ -188,7 +188,8 @@ def _flash_ok(request, texto):
 def correo_guardar(
     request: Request, soporte_email: str = Form(""), imap_host: str = Form(""), imap_port: int = Form(993),
     imap_user: str = Form(""), imap_password: str = Form(""), imap_folder: str = Form("INBOX"),
-    imap_tls: str = Form("ssl"), imap_poll_s: int = Form(60), probar: str = Form(""), csrf: str = Form(""),
+    imap_tls: str = Form("ssl"), imap_poll_s: int = Form(60), imap_auth: str = Form("password"), imap_ms_tenant: str = Form(""),
+    imap_ms_client_id: str = Form(""), imap_ms_secret: str = Form(""), probar: str = Form(""), csrf: str = Form(""),
     user: dict = Depends(require_permiso("canales")), conn: sqlite3.Connection = Depends(get_db),
 ):
     from .. import audit
@@ -206,13 +207,18 @@ def correo_guardar(
         flash(request, "La casilla de soporte no es un correo válido.", "error")
         return RedirectResponse("/canales", status_code=303)
     vals = {"soporte_email": soporte_email, "imap_host": imap_host, "imap_port": imap_port, "imap_user": imap_user,
-            "imap_folder": imap_folder or "INBOX", "imap_tls": imap_tls, "imap_poll_s": imap_poll_s}
+            "imap_folder": imap_folder or "INBOX", "imap_tls": imap_tls, "imap_poll_s": imap_poll_s,
+            "imap_auth": imap_auth if imap_auth in ("password", "oauth2_ms") else "password",
+            "imap_ms_tenant": imap_ms_tenant.strip(), "imap_ms_client_id": imap_ms_client_id.strip()}
+    if imap_ms_secret.strip():
+        vals["imap_ms_secret"] = imap_ms_secret.strip()
     if imap_password.strip():                        # vacío = conservar la guardada
         vals["imap_password"] = imap_password
     ajustes.guardar(conn, cfg, user["user"], vals)
     audit.registrar(conn, user["user"], "canal.correo_configurado",
                     {"host": imap_host, "usuario": imap_user, "puerto": imap_port, "tls": imap_tls,
-                     "clave_cambiada": bool(imap_password.strip())})
+                     "clave_cambiada": bool(imap_password.strip()), "auth": vals["imap_auth"],
+                     "secreto_ms_cambiado": bool(imap_ms_secret.strip())})
     if probar:
         try:
             return _flash_ok(request, "Guardado. " + svc.probar_imap(ajustes.efectiva(conn, cfg)))
@@ -228,7 +234,7 @@ def correo_borrar_clave(request: Request, csrf: str = Form(""), user: dict = Dep
     from .. import audit
     from ..services import ajustes
     if security.verificar_csrf(request.session, csrf):
-        ajustes.guardar(conn, request.app.state.cfg, user["user"], {"imap_password": ""})
+        ajustes.guardar(conn, request.app.state.cfg, user["user"], {"imap_password": "", "imap_ms_secret": ""})
         audit.registrar(conn, user["user"], "canal.correo_clave_borrada", {})
         flash(request, "Contraseña del buzón borrada: la lectura de correo queda apagada.", "ok")
     return RedirectResponse("/canales", status_code=303)

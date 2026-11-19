@@ -551,6 +551,27 @@ def procesar_email(cfg, conn, raw: bytes) -> dict:
                               sospechoso=p["sospechoso"])
 
 
+def _token_imap_ms(cfg) -> str:
+    """Token de aplicación (client credentials) para IMAP de Exchange Online. Levanta ServiceError con el motivo."""
+    try:
+        r = httpx.post(f"https://login.microsoftonline.com/{cfg.imap_ms_tenant}/oauth2/v2.0/token", timeout=20, data={
+            "grant_type": "client_credentials", "client_id": cfg.imap_ms_client_id, "client_secret": cfg.imap_ms_secret,
+            "scope": "https://outlook.office365.com/.default"})
+    except httpx.HTTPError as e:
+        raise ServiceError(f"No se pudo hablar con Microsoft para obtener el token ({e.__class__.__name__}).") from e
+    if r.status_code != 200:
+        try:
+            det = (r.json().get("error_description") or r.json().get("error") or "").splitlines()[0][:200]
+        except ValueError:
+            det = r.text[:200]
+        if "AADSTS7000215" in det or "AADSTS7000222" in det:
+            det = "El secreto de la aplicación es inválido o venció. " + det
+        elif "AADSTS700016" in det:
+            det = "La aplicación no existe en ese tenant (revisá el ID de aplicación y el ID de directorio). " + det
+        raise ServiceError(f"Microsoft rechazó la autenticación de la aplicación: {det}")
+    return r.json()["access_token"]
+
+
 def _conectar_imap(cfg):
     if cfg.imap_tls == "ssl":
         imap = imaplib.IMAP4_SSL(cfg.imap_host, cfg.imap_port, timeout=30)
@@ -558,7 +579,12 @@ def _conectar_imap(cfg):
         imap = imaplib.IMAP4(cfg.imap_host, cfg.imap_port, timeout=30)
         if cfg.imap_tls == "starttls":
             imap.starttls()
-    imap.login(cfg.imap_user, cfg.imap_password)
+    if cfg.imap_auth == "oauth2_ms":
+        # Microsoft 365 ya no admite IMAP con contraseña: autenticación de aplicación (XOAUTH2) sobre el buzón.
+        token = _token_imap_ms(cfg)
+        imap.authenticate("XOAUTH2", lambda _: f"user={cfg.imap_user}\x01auth=Bearer {token}\x01\x01".encode())
+    else:
+        imap.login(cfg.imap_user, cfg.imap_password)
     return imap
 
 
@@ -592,10 +618,13 @@ def sondear_buzon(cfg, conectar=None) -> int:
 def probar_imap(cfg) -> str:
     """Prueba usuario/clave y carpeta; devuelve un texto para mostrar o levanta ServiceError."""
     if not cfg.imap_configurado:
-        raise ServiceError("Completá servidor, usuario y contraseña.")
+        raise ServiceError("Completá servidor, usuario y " + ("los datos de la aplicación de Microsoft 365." if cfg.imap_auth == "oauth2_ms" else "contraseña."))
     try:
         imap = _conectar_imap(cfg)
     except imaplib.IMAP4.error as e:
+        if cfg.imap_auth == "oauth2_ms":
+            raise ServiceError("Exchange rechazó el acceso de la aplicación al buzón. Revisá: el permiso IMAP.AccessAsApp con consentimiento, el "
+                               "principal de servicio en Exchange y el permiso de acceso total (FullAccess) sobre el buzón. " + str(e)[:140]) from e
         raise ServiceError("El servidor rechazó el usuario o la contraseña (¿hace falta una contraseña de aplicación?): "
                            + str(e)[:120]) from e
     except (OSError, TimeoutError) as e:

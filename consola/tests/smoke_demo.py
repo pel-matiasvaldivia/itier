@@ -1064,6 +1064,48 @@ check("avisos: sin destinatarios devuelve lista vacía", _nt.destinatarios(_conn
 check("avisos: se reconocen los mensajes del cliente por su marca", _nt.es_del_cliente("Cliente · Ana:\nhola") and _nt.es_del_cliente("texto\n\n— Recibido por WhatsApp de X") and not _nt.es_del_cliente("Ya lo vimos"))
 _co.configurado, _co.enviar = _co_orig
 
+# Correo con Microsoft 365 (buzón compartido, OAuth2)
+_pg = c.get("/canales")
+check("canales: ofrece el método Microsoft 365 con los pasos para prepararlo", "Microsoft 365 (aplicación, para buzones compartidos)" in _pg.text and "IMAP.AccessAsApp" in _pg.text and "Add-MailboxPermission" in _pg.text)
+r = c.post("/canales/correo", data={"soporte_email": "soporte@pymesenlinea.com.ar", "imap_auth": "oauth2_ms", "imap_host": "outlook.office365.com", "imap_port": "993",
+          "imap_user": "soporte@pymesenlinea.com.ar", "imap_password": "", "imap_folder": "INBOX", "imap_tls": "ssl", "imap_poll_s": "60",
+          "imap_ms_tenant": "11111111-2222-3333-4444-555555555555", "imap_ms_client_id": "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee", "imap_ms_secret": "S3cr3t0~MS", "csrf": csrf_de(_pg.text)})
+_efm = _aj.efectiva(_conn, app.state.cfg)
+check("canales: se guarda el acceso Microsoft 365 y queda configurado", _efm.imap_auth == "oauth2_ms" and _efm.imap_configurado and _efm.imap_ms_client_id.startswith("aaaaaaaa") and "S3cr3t0~MS" not in r.text, r.text[-300:])
+_rm = _conn.execute("SELECT valor, secreto FROM ajustes WHERE clave='imap_ms_secret'").fetchone()
+check("canales: el secreto de la aplicación queda cifrado", _rm["secreto"] == 1 and "S3cr3t0~MS" not in _rm["valor"])
+check("canales: la auditoría no guarda el secreto", "S3cr3t0~MS" not in c.get("/auditoria").text)
+_incompleto = _aj.efectiva(_conn, app.state.cfg).__class__(**{**_efm.__dict__, "imap_ms_secret": None})
+check("canales: sin el secreto de la aplicación no se considera configurado", not _incompleto.imap_configurado)
+_visto = {}
+class _IM:
+    def __init__(s, *a, **k): pass
+    def authenticate(s, mec, cb): _visto["mec"], _visto["resp"] = mec, cb(None)
+    def select(s, f, readonly=False): return "OK", [b"1"]
+    def search(s, *a): return "OK", [b"1"]
+    def logout(s): pass
+_rs2, _rt2 = _imaplib.IMAP4_SSL, _cn._token_imap_ms
+_imaplib.IMAP4_SSL, _cn._token_imap_ms = _IM, (lambda cfg: "TOKEN-MS")
+try:
+    _txt = _cn.probar_imap(_efm)
+finally:
+    _imaplib.IMAP4_SSL, _cn._token_imap_ms = _rs2, _rt2
+check("canales: Microsoft 365 autentica por XOAUTH2 con el buzón y el token", _visto.get("mec") == "XOAUTH2"
+      and _visto["resp"] == b"user=soporte@pymesenlinea.com.ar\x01auth=Bearer TOKEN-MS\x01\x01" and "1 correo(s) sin leer" in _txt, _visto)
+class _IM2(_IM):
+    def authenticate(s, mec, cb): raise _imaplib.IMAP4.error("AUTHENTICATE failed.")
+_imaplib.IMAP4_SSL, _cn._token_imap_ms = _IM2, (lambda cfg: "TOKEN-MS")
+try:
+    _cn.probar_imap(_efm); _ok = False
+except Exception as _e:  # noqa: BLE001
+    _ok = "IMAP.AccessAsApp" in str(getattr(_e, "mensaje", _e)) and "FullAccess" in str(getattr(_e, "mensaje", _e))
+finally:
+    _imaplib.IMAP4_SSL, _cn._token_imap_ms = _rs2, _rt2
+check("canales: si Exchange rechaza a la aplicación, el error dice qué revisar", _ok)
+# volver al método clásico para no afectar otras pruebas
+c.post("/canales/correo", data={"soporte_email": "soporte@pymesenlinea.com.ar", "imap_auth": "password", "imap_host": "imap.otro.com", "imap_port": "993",
+       "imap_user": "soporte@pymesenlinea.com.ar", "imap_password": "", "imap_folder": "INBOX", "imap_tls": "ssl", "imap_poll_s": "60", "csrf": csrf_de(c.get("/canales").text)})
+
 # RBAC: la Bandeja es de PM/admin
 check("RBAC: el técnico no entra a la Bandeja", ttec.get("/bandeja").url.path != "/bandeja")
 check("RBAC: el PM sí", tpm.get("/bandeja").url.path == "/bandeja")

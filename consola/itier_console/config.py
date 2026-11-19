@@ -105,6 +105,10 @@ class Config:
     imap_folder: str = "INBOX"
     imap_tls: str = "ssl"                  # ssl | starttls | no
     imap_poll_s: int = 60
+    imap_auth: str = "password"            # password | oauth2_ms (Microsoft 365: app con permiso IMAP.AccessAsApp)
+    imap_ms_tenant: str | None = None
+    imap_ms_client_id: str | None = None
+    imap_ms_secret: str | None = None
     wa_hook_token: str | None = None       # secreto en la URL del webhook de OpenWA (/hooks/whatsapp/<token>)
     wa_api_url: str | None = None          # API de OpenWA (para responder: confirmaciones)
     wa_api_key: str | None = None
@@ -201,6 +205,10 @@ class Config:
             imap_folder=os.environ.get("ITIER_IMAP_FOLDER") or "INBOX",
             imap_tls=(os.environ.get("ITIER_IMAP_TLS") or "ssl").lower(),
             imap_poll_s=max(15, int(os.environ.get("ITIER_IMAP_POLL_S", "60"))),
+            imap_auth=(os.environ.get("ITIER_IMAP_AUTH") or "password").lower(),
+            imap_ms_tenant=(os.environ.get("ITIER_IMAP_MS_TENANT") or "").strip() or None,
+            imap_ms_client_id=(os.environ.get("ITIER_IMAP_MS_CLIENT_ID") or "").strip() or None,
+            imap_ms_secret=os.environ.get("ITIER_IMAP_MS_SECRET") or None,
             wa_hook_token=(os.environ.get("ITIER_WA_HOOK_TOKEN") or "").strip() or None,
             wa_api_url=(os.environ.get("ITIER_WA_API_URL") or "").rstrip("/") or None,
             wa_api_key=os.environ.get("ITIER_WA_API_KEY") or None,
@@ -236,6 +244,8 @@ class Config:
 
     @property
     def imap_configurado(self) -> bool:
+        if self.imap_auth == "oauth2_ms":
+            return bool(self.imap_host and self.imap_user and self.imap_ms_tenant and self.imap_ms_client_id and self.imap_ms_secret)
         return bool(self.imap_host and self.imap_user and self.imap_password)
 
     @property

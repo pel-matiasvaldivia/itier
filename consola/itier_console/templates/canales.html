@@ -17,6 +17,11 @@
         <input type="hidden" name="csrf" value="{{ csrf }}">
         <label>Casilla de soporte (la que ven los clientes)
           <input type="email" name="soporte_email" value="{{ ef.soporte_email or '' }}" placeholder="soporte@pymesenlinea.com.ar"></label>
+        <label>Método de acceso
+          <select name="imap_auth" id="imap-auth">
+            <option value="password" {{ 'selected' if ef.imap_auth != 'oauth2_ms' else '' }}>Usuario y contraseña (Gmail, hosting, servidor propio)</option>
+            <option value="oauth2_ms" {{ 'selected' if ef.imap_auth == 'oauth2_ms' else '' }}>Microsoft 365 (aplicación, para buzones compartidos)</option>
+          </select></label>
         <label>Servidor IMAP
           <input type="text" name="imap_host" value="{{ ef.imap_host or '' }}" placeholder="imap.gmail.com / outlook.office365.com / mail.tudominio.com"></label>
         <div class="d-meta" style="gap:.8rem">
@@ -28,11 +33,33 @@
               <option value="no" {{ 'selected' if ef.imap_tls == 'no' else '' }}>Sin cifrado</option>
             </select></label>
         </div>
-        <label>Usuario
+        <label><span id="lbl-user">{{ 'Buzón a leer (el buzón compartido)' if ef.imap_auth == 'oauth2_ms' else 'Usuario' }}</span>
           <input type="text" name="imap_user" value="{{ ef.imap_user or '' }}" autocomplete="off" placeholder="soporte@pymesenlinea.com.ar"></label>
-        <label>Contraseña
-          <input type="password" name="imap_password" autocomplete="new-password"
-                 placeholder="{{ '•••••••• (guardada: dejá vacío para conservarla)' if ef.imap_password else 'Contraseña o contraseña de aplicación' }}"></label>
+        <div id="auth-pass" {{ 'hidden' if ef.imap_auth == 'oauth2_ms' else '' }}>
+          <label>Contraseña
+            <input type="password" name="imap_password" autocomplete="new-password"
+                   placeholder="{{ '•••••••• (guardada: dejá vacío para conservarla)' if ef.imap_password else 'Contraseña o contraseña de aplicación' }}"></label>
+        </div>
+        <div id="auth-ms" {{ '' if ef.imap_auth == 'oauth2_ms' else 'hidden' }}>
+          <label>ID de directorio (tenant) de Microsoft 365
+            <input type="text" name="imap_ms_tenant" value="{{ ef.imap_ms_tenant or '' }}" placeholder="00000000-0000-0000-0000-000000000000 o pymesenlinea.onmicrosoft.com"></label>
+          <label>ID de aplicación (cliente)
+            <input type="text" name="imap_ms_client_id" value="{{ ef.imap_ms_client_id or '' }}" placeholder="00000000-0000-0000-0000-000000000000"></label>
+          <label>Secreto de la aplicación
+            <input type="password" name="imap_ms_secret" autocomplete="new-password"
+                   placeholder="{{ '•••••••• (guardado: dejá vacío para conservarlo)' if ef.imap_ms_secret else 'Valor del secreto' }}"></label>
+          <details class="small" style="margin:.4rem 0"><summary><b>Cómo prepararlo en Microsoft 365 (una vez)</b></summary>
+            <ol style="padding-left:1.1rem;line-height:1.55">
+              <li>Entra ID → Registros de aplicaciones → <b>Nuevo registro</b> (solo este directorio). Anotá el ID de aplicación y el ID de directorio.</li>
+              <li>Permisos de API → Agregar → <b>API que usa mi organización</b> → «Office 365 Exchange Online» → Permisos de aplicación → <code>IMAP.AccessAsApp</code> → <b>Conceder consentimiento de administrador</b>.</li>
+              <li>Certificados y secretos → nuevo secreto: pegá el <i>valor</i> acá (vence: anotá la fecha).</li>
+              <li>Aplicaciones empresariales → tu aplicación → copiá el <b>ID de objeto</b>.</li>
+              <li>En PowerShell de Exchange Online: <br><code>Connect-ExchangeOnline</code><br>
+                <code>New-ServicePrincipal -AppId &lt;ID de aplicación&gt; -ObjectId &lt;ID de objeto&gt;</code><br>
+                <code>Add-MailboxPermission -Identity soporte@pymesenlinea.com.ar -User &lt;ID de objeto&gt; -AccessRights FullAccess</code></li>
+              <li>Servidor: <code>outlook.office365.com</code>, puerto 993, SSL/TLS. Tarda unos minutos en tomar efecto.</li>
+            </ol></details>
+        </div>
         <div class="d-meta" style="gap:.8rem">
           <label style="flex:1">Carpeta <input type="text" name="imap_folder" value="{{ ef.imap_folder }}"></label>
           <label style="flex:1">Leer cada (segundos) <input type="number" name="imap_poll_s" value="{{ ef.imap_poll_s }}" min="15" max="3600"></label>
@@ -42,13 +69,13 @@
           <button class="u-b" type="submit">Solo guardar</button>
         </div>
       </form>
-      {% if ef.imap_password %}
+      {% if ef.imap_password or ef.imap_ms_secret %}
       <form method="post" action="/canales/correo/borrar-clave" class="inline" onsubmit="return confirm('¿Borrar la contraseña guardada? La lectura de correo se apaga.');">
-        <input type="hidden" name="csrf" value="{{ csrf }}"><button class="u-b danger" type="submit">Borrar contraseña guardada</button></form>
+        <input type="hidden" name="csrf" value="{{ csrf }}"><button class="u-b danger" type="submit">Borrar contraseña / secreto guardado</button></form>
       {% endif %}
       <p class="muted small" style="margin-top:.8rem">
         Estado: {% if ef.imap_configurado %}<span class="l-pill ok"><i></i>Configurado: lee {{ ef.imap_user }} @ {{ ef.imap_host }}</span>{% else %}<span class="l-pill off">Sin configurar</span>{% endif %}<br>
-        Gmail y Microsoft 365 piden una <b>contraseña de aplicación</b> (con 2FA activo) o IMAP habilitado. La contraseña se guarda cifrada y no se vuelve a mostrar.
+        Gmail pide una <b>contraseña de aplicación</b> (con 2FA activo). <b>Microsoft 365 ya no admite contraseña por IMAP</b>: usá el método «Microsoft 365» (también sirve para buzones compartidos). Las contraseñas y secretos se guardan cifrados y no se vuelven a mostrar.
         Para que la consola <b>conteste</b> al cliente (confirmación del caso) hace falta además el SMTP del servidor:
         {% if smtp_ok %}<span class="l-pill ok">configurado</span>{% else %}<span class="l-pill warn">no configurado (ITIER_SMTP_* en el .env)</span>{% endif %}
       </p>
@@ -81,6 +108,17 @@
     </section>
   </div>
 
+  <script>
+  (function () {
+    var sel = document.getElementById("imap-auth");
+    if (sel) sel.addEventListener("change", function () {
+      var ms = sel.value === "oauth2_ms";
+      document.getElementById("auth-ms").hidden = !ms; document.getElementById("auth-pass").hidden = ms;
+      document.getElementById("lbl-user").textContent = ms ? "Buzón a leer (el buzón compartido)" : "Usuario";
+      var h = document.querySelector('input[name="imap_host"]'); if (ms && !h.value) h.value = "outlook.office365.com";
+    });
+  })();
+  </script>
   <script>
   (function () {
     var rot = {conectado: ["ok", "✅ Vinculado y recibiendo mensajes"], esperando_qr: ["warn", "📱 Esperando que escanees el QR"],

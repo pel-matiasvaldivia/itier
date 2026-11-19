@@ -840,6 +840,29 @@ try:
 except Exception as _e:  # noqa: BLE001
     _ok = "Falta configurar la cuenta de servicio" in str(_e)
 check("GWS: sin cuenta de servicio avisa qué falta", _ok)
+# Token de aplicación para IMAP de Exchange Online (buzón compartido)
+from itier_console.services import canales as _cnl  # noqa: E402
+_ci = _dc.replace(cfg, imap_auth="oauth2_ms", imap_host="outlook.office365.com", imap_user="soporte@x.com", imap_ms_tenant="tenant-1", imap_ms_client_id="app", imap_ms_secret="sec")
+_real_post = httpx.post
+_form = {}
+def _post_falso(url, **k):
+    _form.update(k.get("data", {})); _form["url"] = url
+    return httpx.Response(200, json={"access_token": "tok-imap"})
+httpx.post = _post_falso
+try:
+    _t = _cnl._token_imap_ms(_ci)
+finally:
+    httpx.post = _real_post
+check("IMAP Microsoft 365: pide el token de aplicación con el scope de Exchange Online", _t == "tok-imap" and _form["scope"] == "https://outlook.office365.com/.default"
+      and _form["grant_type"] == "client_credentials" and _form["url"].endswith("/tenant-1/oauth2/v2.0/token") and _form["client_id"] == "app", _form)
+httpx.post = lambda url, **k: httpx.Response(400, json={"error": "invalid_client", "error_description": "AADSTS7000215: Invalid client secret provided.\r\nTrace ID: x"})
+try:
+    _cnl._token_imap_ms(_ci); _ok = False
+except Exception as _e:  # noqa: BLE001
+    _ok = "secreto de la aplicación es inválido o venció" in str(getattr(_e, "mensaje", _e)) and "Trace ID" not in str(getattr(_e, "mensaje", _e))
+finally:
+    httpx.post = _real_post
+check("IMAP Microsoft 365: un secreto vencido se explica", _ok)
 httpx.Client = _real_Client  # type: ignore[assignment]
 print("\nRESULTADO:", "TODO OK" if not fails else f"{len(fails)} FALLAS: {fails}")
 sys.exit(1 if fails else 0)

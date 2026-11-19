@@ -353,7 +353,19 @@ Después el técnico lo toma («Tomar este caso») o el PM lo asigna.
    para ellos se carga a cada persona.
 3. Si no coincide: queda en la Bandeja «sin cliente» y el PM lo asigna (con «Recordar a esta persona» la próxima vez entra directo).
 
-**Correo.** Creá una casilla (ej. `soporte@…`), completá `ITIER_IMAP_*` y `ITIER_SOPORTE_EMAIL`, y `docker compose up -d consola`.
+**Correo con Microsoft 365 (incluye buzones compartidos).** Microsoft ya no permite IMAP con usuario y contraseña, y un buzón compartido no tiene contraseña.
+En **Canales → Correo de soporte** elegí «Microsoft 365 (aplicación)»: la consola se autentica como aplicación (OAuth2/XOAUTH2) y lee el buzón. Preparación, una vez:
+1. Entra ID → Registros de aplicaciones → nuevo registro (solo tu directorio); anotá el **ID de aplicación** y el **ID de directorio**.
+2. Permisos de API → «Office 365 Exchange Online» → permisos de aplicación → `IMAP.AccessAsApp` → conceder consentimiento de administrador.
+3. Certificados y secretos → nuevo secreto (vence: anotá la fecha).
+4. Aplicaciones empresariales → tu app → copiá el **ID de objeto**; en PowerShell de Exchange Online:
+   `New-ServicePrincipal -AppId <ID de aplicación> -ObjectId <ID de objeto>` y
+   `Add-MailboxPermission -Identity soporte@tudominio -User <ID de objeto> -AccessRights FullAccess`.
+5. En la consola: servidor `outlook.office365.com`, puerto 993, buzón `soporte@tudominio` y los tres datos de la aplicación → «Guardar y probar conexión».
+Para **enviar** (confirmaciones y respuestas) la consola usa el SMTP configurado (`ITIER_SMTP_*`); en Microsoft 365 el envío como el buzón compartido necesita
+SMTP AUTH habilitado y permiso «Enviar como» para el usuario que autentica: si Microsoft lo bloquea, se puede pasar el envío a Microsoft Graph.
+
+**Correo (otros proveedores).** Creá una casilla (ej. `soporte@…`), completá `ITIER_IMAP_*` y `ITIER_SOPORTE_EMAIL`, y `docker compose up -d consola`.
 La consola lee los no leídos cada minuto. Responder al correo de confirmación (el asunto lleva `[#número]`) suma el mensaje
 al mismo ticket, pero solo si quien responde es del mismo cliente. Se ignoran autorrespuestas y `noreply`, y los correos que
 fallan SPF/DKIM/DMARC van a «Revisar» en lugar de abrir ticket (pueden ser suplantación). Para que el SMTP de salida confirme
