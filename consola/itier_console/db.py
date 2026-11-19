@@ -288,7 +288,7 @@ def _migrar(conn: sqlite3.Connection) -> None:
             conn.execute(f"ALTER TABLE activos ADD COLUMN {col} TEXT")
     kcols = {r["name"] for r in conn.execute("PRAGMA table_info(client_contactos)").fetchall()}
     if kcols:
-        for col, ddl in (("cargo", "TEXT"), ("area", "TEXT"), ("activo", "INTEGER NOT NULL DEFAULT 1")):
+        for col, ddl in (("cargo", "TEXT"), ("area", "TEXT"), ("activo", "INTEGER NOT NULL DEFAULT 1"), ("origen", "TEXT"), ("origen_id", "TEXT")):
             if col not in kcols:
                 conn.execute(f"ALTER TABLE client_contactos ADD COLUMN {col} {ddl}")
     if "facturacion_ars" not in ccols:

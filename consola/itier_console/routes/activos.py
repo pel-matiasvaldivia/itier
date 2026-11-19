@@ -224,7 +224,23 @@ def personas(request: Request, slug: str, user: dict = Depends(require_permiso("
     cli = _cli(request, conn, slug)
     if not cli:
         return _fuera()
-    return render(request, "personas.html", cli=cli, personas=svc.personas(conn, cli["id"], solo_activas=False))
+    return render(request, "personas.html", cli=cli, personas=svc.personas(conn, cli["id"], solo_activas=False), fuentes=svc.fuentes_conectadas(cli))
+
+
+@router.post("/clientes/{slug}/personas/sincronizar", response_class=HTMLResponse)
+def personas_sincronizar(request: Request, slug: str, csrf: str = Form(""), user: dict = Depends(require_permiso("activos")),
+                         conn: sqlite3.Connection = Depends(get_db)):
+    """Trae como personas a los usuarios con licencia activa de Microsoft 365 / Google Workspace del cliente."""
+    cli = _cli(request, conn, slug)
+    if not cli:
+        return _fuera()
+    if not _csrf(request, csrf):
+        return RedirectResponse(f"/clientes/{slug}/personas", status_code=303)
+    if not svc.fuentes_conectadas(cli):
+        flash(request, "Este cliente no tiene Microsoft 365 ni Google Workspace conectados (ficha del cliente).", "error")
+        return RedirectResponse(f"/clientes/{slug}/personas", status_code=303)
+    res = svc.sincronizar_usuarios(conn, request.app.state.cfg, cli, user["user"])
+    return render(request, "personas.html", cli=cli, personas=svc.personas(conn, cli["id"], solo_activas=False), fuentes=svc.fuentes_conectadas(cli), sync=res)
 
 
 @router.post("/clientes/{slug}/personas")

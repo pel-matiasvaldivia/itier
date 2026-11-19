@@ -1294,6 +1294,72 @@ check("agente: sin serie, cruza por nombre del equipo = etiqueta (sin distinguir
 check("agente: el técnico también puede sincronizar", "Sincronización con GLPI terminada" in ttec.post("/clientes/canal-sa/activos/sincronizar", data={"importar": "1", "csrf": csrf_de(ttec.get("/clientes/canal-sa/activos").text)}).text)
 check("agente: la auditoría registra sincronización y vínculos", all(x in c.get("/auditoria").text for x in ("activos.sincronizado", "activos.vinculado", "activos.desvinculado")))
 
+# Personas desde Microsoft 365 / Google Workspace (solo con licencia activa)
+from itier_console.adapters import m365 as _m3, gws as _gw  # noqa: E402
+pp = c.get("/clientes/canal-sa/personas")
+check("usuarios nube: sin nubes conectadas, la pantalla lo explica y no ofrece el botón", "Conectá Microsoft 365 o Google Workspace" in pp.text and "Sincronizar usuarios" not in pp.text)
+check("usuarios nube: sincronizar sin nubes conectadas se rechaza", "no tiene Microsoft 365 ni Google Workspace" in c.post("/clientes/canal-sa/personas/sincronizar", data={"csrf": csrf_de(pp.text)}).text)
+c.post("/clientes/canal-sa/m365/conectar", data={"tenant": "", "csrf": csrf_de(c.get("/clientes/canal-sa").text)})
+pp = c.get("/clientes/canal-sa/personas")
+check("usuarios nube: con Microsoft 365 conectado aparece el botón", "Sincronizar usuarios de Microsoft 365" in pp.text)
+# fixture: licenciados, sin licencia, bloqueado, invitado, buzón compartido
+_m3._DEMO_USERS.update({
+    "u-ok": {"id": "u-ok", "displayName": "Licenciada Activa", "givenName": "Lic", "surname": "Activa", "userPrincipalName": "lic@clientedemo.com.ar", "mail": "lic@clientedemo.com.ar",
+             "jobTitle": "Contadora", "department": "Finanzas", "accountEnabled": True, "userType": "Member", "assignedLicenses": [{"skuId": _m3._SKU_STD}]},
+    "u-bloq": {"id": "u-bloq", "displayName": "Bloqueado Con Licencia", "userPrincipalName": "bloq@clientedemo.com.ar", "mail": "bloq@clientedemo.com.ar",
+               "accountEnabled": False, "userType": "Member", "assignedLicenses": [{"skuId": _m3._SKU_STD}]},
+    "u-guest": {"id": "u-guest", "displayName": "Invitado Externo", "userPrincipalName": "ext_x#EXT#@clientedemo.com.ar", "mail": "ext@otraempresa.com",
+                "accountEnabled": True, "userType": "Guest", "assignedLicenses": [{"skuId": _m3._SKU_STD}]},
+    "u-shared": {"id": "u-shared", "displayName": "Soporte Compartido", "userPrincipalName": "compartido@clientedemo.com.ar", "mail": "compartido@clientedemo.com.ar",
+                 "accountEnabled": True, "userType": "Member", "assignedLicenses": []}})
+r = c.post("/clientes/canal-sa/personas/sincronizar", data={"csrf": csrf_de(pp.text)})
+check("usuarios nube: informa el total y cuántos tienen licencia activa", "Sincronización de usuarios terminada" in r.text and "Microsoft 365" in r.text and "con licencia activa" in r.text, r.text[r.text.find("Sincronización"):][:500])
+_p = {x["email"]: dict(x) for x in _conn.execute("SELECT * FROM client_contactos WHERE client_id=? AND email IS NOT NULL", (_cid_,))}
+check("usuarios nube: se traen los que tienen licencia activa con cargo y área", "lic@clientedemo.com.ar" in _p and _p["lic@clientedemo.com.ar"]["cargo"] == "Contadora" and _p["lic@clientedemo.com.ar"]["area"] == "Finanzas"
+      and _p["lic@clientedemo.com.ar"]["origen"] == "m365" and _p["ana@clientedemo.com.ar"]["origen"] == "m365" and "luis@clientedemo.com.ar" in _p)
+check("usuarios nube: NO se traen los bloqueados, los invitados, los buzones compartidos ni los sin licencia",
+      all(e not in _p for e in ("bloq@clientedemo.com.ar", "ext@otraempresa.com", "compartido@clientedemo.com.ar", "eva@clientedemo.com.ar")))
+check("usuarios nube: una persona ya cargada a mano (Ana) se completa sin duplicarse", sum(1 for x in _conn.execute("SELECT nombre FROM client_contactos WHERE client_id=? AND LOWER(email)='ana@canalsa.com.ar'", (_cid_,))) == 1)
+_n0 = _conn.execute("SELECT COUNT(*) n FROM client_contactos WHERE client_id=?", (_cid_,)).fetchone()["n"]
+r2 = c.post("/clientes/canal-sa/personas/sincronizar", data={"csrf": csrf_de(c.get("/clientes/canal-sa/personas").text)})
+check("usuarios nube: sincronizar de nuevo no duplica personas", _conn.execute("SELECT COUNT(*) n FROM client_contactos WHERE client_id=?", (_cid_,)).fetchone()["n"] == _n0 and "<b>0</b> persona(s) nueva(s)" in r2.text)
+check("usuarios nube: las personas traídas quedan marcadas con su origen en la pantalla", "Microsoft 365</span>" in r2.text and "Licenciada Activa" in r2.text)
+# una persona traída pierde la licencia → se desactiva; si tiene activos, se avisa
+_m3._DEMO_USERS["u-ok"]["assignedLicenses"] = []
+_lic_id = _conn.execute("SELECT id FROM client_contactos WHERE email='lic@clientedemo.com.ar'").fetchone()["id"]
+r3 = c.post("/clientes/canal-sa/personas/sincronizar", data={"csrf": csrf_de(r2.text)})
+check("usuarios nube: quien perdió la licencia se desactiva como persona", "1 desactivada(s)" in r3.text and _conn.execute("SELECT activo FROM client_contactos WHERE id=?", (_lic_id,)).fetchone()["activo"] == 0)
+_m3._DEMO_USERS["u-ok"]["assignedLicenses"] = [{"skuId": _m3._SKU_STD}]
+_ac.crear(_conn, _cid_, "admin", {"tipo": "notebook", "etiqueta": "NB-LIC"}, persona_id=None)
+r4 = c.post("/clientes/canal-sa/personas/sincronizar", data={"csrf": csrf_de(r3.text)})
+check("usuarios nube: si vuelve a tener licencia se reactiva", "reactivada" in r4.text and _conn.execute("SELECT activo FROM client_contactos WHERE id=?", (_lic_id,)).fetchone()["activo"] == 1)
+_ac.asignar(_conn, _cid_, _conn.execute("SELECT id FROM activos WHERE etiqueta='NB-LIC'").fetchone()["id"], "admin", _lic_id)
+_m3._DEMO_USERS["u-ok"]["assignedLicenses"] = []
+r5 = c.post("/clientes/canal-sa/personas/sincronizar", data={"csrf": csrf_de(r4.text)})
+check("usuarios nube: si pierde la licencia pero tiene activos, no se desactiva y se avisa", "siguen con activos asignados" in r5.text and "Licenciada Activa (1)" in r5.text
+      and _conn.execute("SELECT activo FROM client_contactos WHERE id=?", (_lic_id,)).fetchone()["activo"] == 1)
+_m3._DEMO_USERS["u-ok"]["assignedLicenses"] = [{"skuId": _m3._SKU_STD}]
+# conflicto con un contacto de otro cliente
+_ac.crear_persona(_conn, _oc, "admin", "Ya En Otro", "ya.otro@clientedemo.com.ar")
+_m3._DEMO_USERS["u-otro"] = {"id": "u-otro", "displayName": "Ya En Otro", "userPrincipalName": "ya.otro@clientedemo.com.ar", "mail": "ya.otro@clientedemo.com.ar", "accountEnabled": True, "userType": "Member", "assignedLicenses": [{"skuId": _m3._SKU_STD}]}
+r6 = c.post("/clientes/canal-sa/personas/sincronizar", data={"csrf": csrf_de(r5.text)})
+check("usuarios nube: un correo que ya es contacto de otro cliente no se trae y se informa", "ya.otro@clientedemo.com.ar" in r6.text and "otro cliente" in r6.text
+      and _conn.execute("SELECT client_id FROM client_contactos WHERE email='ya.otro@clientedemo.com.ar'").fetchone()["client_id"] == _oc)
+_m3._DEMO_USERS.pop("u-otro", None)
+# Google Workspace
+c.post("/clientes/canal-sa/gws/conectar", data={"admin": "admin@gdemo.com.ar", "csrf": csrf_de(c.get("/clientes/canal-sa").text)})
+pp = c.get("/clientes/canal-sa/personas")
+check("usuarios nube: con las dos nubes el botón las nombra", "Sincronizar usuarios de Microsoft 365 y Google Workspace" in pp.text)
+r7 = c.post("/clientes/canal-sa/personas/sincronizar", data={"csrf": csrf_de(pp.text)})
+_pg = {x["email"]: dict(x) for x in _conn.execute("SELECT * FROM client_contactos WHERE client_id=? AND origen='gws'", (_cid_,))}
+check("usuarios nube: Google trae a los usuarios no suspendidos y deja afuera a los suspendidos", "sofia@gdemo.com.ar" in _pg and "admin@gdemo.com.ar" in _pg and "raul@gdemo.com.ar" not in _pg and "Google Workspace" in r7.text)
+check("usuarios nube: el cargo y el área de Google se completan", _pg["sofia@gdemo.com.ar"]["cargo"] == "Ventas" and _pg["sofia@gdemo.com.ar"]["area"] == "Comercial")
+check("usuarios nube: las personas traídas también quedan reconocidas como contactos por correo", _cn.identificar_cliente(_conn, "email", "sofia@gdemo.com.ar") == (_cid_, "contacto"))
+check("usuarios nube: la auditoría registra la sincronización", "activos.usuarios_sincronizados" in c.get("/auditoria").text)
+check("usuarios nube: el técnico también puede sincronizar", "Sincronización de usuarios terminada" in ttec.post("/clientes/canal-sa/personas/sincronizar", data={"csrf": csrf_de(ttec.get("/clientes/canal-sa/personas").text)}).text)
+c.post("/clientes/canal-sa/m365/desconectar", data={"csrf": csrf_de(c.get("/clientes/canal-sa").text)})
+c.post("/clientes/canal-sa/gws/desconectar", data={"csrf": csrf_de(c.get("/clientes/canal-sa").text)})
+
 # RBAC: la Bandeja es de PM/admin
 check("RBAC: el técnico no entra a la Bandeja", ttec.get("/bandeja").url.path != "/bandeja")
 check("RBAC: el PM sí", tpm.get("/bandeja").url.path == "/bandeja")

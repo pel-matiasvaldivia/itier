@@ -526,3 +526,94 @@ def desvincular(conn, client_id: int, aid: int, actor: str) -> None:
     _historial(conn, aid, "editado", None, "Se quitó el vínculo con GLPI", actor)
     conn.commit()
     audit.registrar(conn, actor, "activos.desvinculado", {"client_id": client_id, "activo_id": aid})
+
+
+# ---------------------------------------------------------------- personas desde Microsoft 365 / Google Workspace
+# Se traen solo los usuarios con licencia ACTIVA: en Microsoft 365, con al menos una licencia asignada y la cuenta habilitada (así quedan afuera los buzones
+# compartidos, las salas y los usuarios bloqueados); en Google Workspace, cuentas ni suspendidas ni archivadas (Google no informa la licencia en el directorio).
+# Quienes ya no cumplen se desactivan como personas (si no tienen activos asignados). Los invitados externos no se traen.
+
+def _usuarios_origen(cfg, cli: dict) -> tuple[list[dict], list[dict], dict]:
+    """(licenciados, fuentes, errores): usuarios normalizados {origen, origen_id, email, nombre, cargo, area} de cada nube conectada al cliente."""
+    from ..adapters import AdapterError, gws as gws_mod, m365 as m365_mod
+    lic, fuentes, errores = [], [], {}
+    if cli.get("m365_tenant_id") and cli.get("m365_estado") == "conectado":
+        try:
+            todos = m365_mod.cliente(cfg, cli["m365_tenant_id"]).listar_usuarios()
+            act = [u for u in todos if u["licencias"] and u["habilitado"] and u["tipo"] != "Guest" and (u["correo"] or u["upn"])]
+            lic += [{"origen": "m365", "origen_id": u["id"], "email": (u["correo"] or u["upn"]).lower(), "nombre": u["nombre"] or u["upn"].split("@")[0],
+                     "cargo": u["cargo"], "area": u["departamento"]} for u in act]
+            fuentes.append({"origen": "m365", "nombre": "Microsoft 365", "total": len(todos), "con_licencia": len(act)})
+        except AdapterError as e:
+            errores["m365"] = e.detalle
+    if cli.get("gws_admin") and cli.get("gws_estado") == "conectado":
+        try:
+            todos = gws_mod.cliente(cfg, cli["gws_admin"]).listar_usuarios()
+            act = [u for u in todos if not u["suspendido"] and not u["archivado"] and u["email"]]
+            lic += [{"origen": "gws", "origen_id": u["id"], "email": u["email"].lower(), "nombre": u["nombre"] or u["email"].split("@")[0],
+                     "cargo": u["cargo"], "area": u["departamento"]} for u in act]
+            fuentes.append({"origen": "gws", "nombre": "Google Workspace", "total": len(todos), "con_licencia": len(act)})
+        except AdapterError as e:
+            errores["gws"] = e.detalle
+    return lic, fuentes, errores
+
+
+def fuentes_conectadas(cli: dict) -> list[str]:
+    f = []
+    if cli.get("m365_tenant_id") and cli.get("m365_estado") == "conectado":
+        f.append("Microsoft 365")
+    if cli.get("gws_admin") and cli.get("gws_estado") == "conectado":
+        f.append("Google Workspace")
+    return f
+
+
+def sincronizar_usuarios(conn, cfg, cli: dict, actor: str) -> dict:
+    """Trae como personas a los usuarios con licencia activa de las nubes conectadas. Devuelve el detalle de lo que hizo."""
+    cid = cli["id"]
+    lic, fuentes, errores = _usuarios_origen(cfg, cli)
+    res = {"fuentes": fuentes, "errores": errores, "creadas": [], "actualizadas": 0, "reactivadas": 0, "desactivadas": [], "con_activos": [], "conflictos": []}
+    if not fuentes:
+        return res
+    vistos: set[str] = set()
+    for u in lic:
+        if u["email"] in vistos:                                   # la misma persona en las dos nubes: se toma una sola vez
+            continue
+        vistos.add(u["email"])
+        p = conn.execute("SELECT * FROM client_contactos WHERE LOWER(email) = ?", (u["email"],)).fetchone()
+        if p and p["client_id"] != cid:
+            res["conflictos"].append((u["email"], "ya está cargado como contacto de otro cliente"))
+            continue
+        if p:
+            cambios, args = [], []
+            for campo, valor in (("nombre", u["nombre"]), ("cargo", u["cargo"]), ("area", u["area"])):
+                if valor and not p[campo]:
+                    cambios.append(f"{campo} = ?"); args.append(valor[:120])
+            if not p["origen"]:
+                cambios += ["origen = ?", "origen_id = ?"]; args += [u["origen"], u["origen_id"]]
+            if not p["activo"]:
+                cambios.append("activo = 1"); res["reactivadas"] += 1
+            if cambios:
+                conn.execute(f"UPDATE client_contactos SET {', '.join(cambios)} WHERE id = ?", (*args, p["id"]))
+                res["actualizadas"] += 1
+            continue
+        conn.execute("INSERT INTO client_contactos(client_id, nombre, email, whatsapp, cargo, area, activo, origen, origen_id, created_at, created_by) VALUES (?,?,?,?,?,?,1,?,?,?,?)",
+                     (cid, u["nombre"][:120], u["email"], None, _txt(u["cargo"], 80), _txt(u["area"], 80), u["origen"], u["origen_id"], ahora(), actor))
+        res["creadas"].append(u["nombre"])
+    # bajas: las personas que vinieron de una nube que respondió y ya no tienen licencia activa
+    for f in fuentes:
+        activos_ids = {u["origen_id"] for u in lic if u["origen"] == f["origen"]}
+        for p in conn.execute("SELECT * FROM client_contactos WHERE client_id = ? AND origen = ? AND activo = 1", (cid, f["origen"])).fetchall():
+            if p["origen_id"] in activos_ids:
+                continue
+            n = conn.execute("SELECT COUNT(*) n FROM activos WHERE persona_id = ? AND estado != 'de_baja'", (p["id"],)).fetchone()["n"]
+            nombre = p["nombre"] or p["email"]
+            if n:
+                res["con_activos"].append((nombre, n))
+            else:
+                conn.execute("UPDATE client_contactos SET activo = 0 WHERE id = ?", (p["id"],))
+                res["desactivadas"].append(nombre)
+    conn.commit()
+    audit.registrar(conn, actor, "activos.usuarios_sincronizados", {
+        "client_id": cid, "fuentes": [f["nombre"] for f in fuentes], "creadas": len(res["creadas"]), "actualizadas": res["actualizadas"],
+        "desactivadas": len(res["desactivadas"]), "con_activos": len(res["con_activos"]), "conflictos": len(res["conflictos"])})
+    return res

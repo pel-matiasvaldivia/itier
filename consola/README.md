@@ -196,6 +196,13 @@ Ficha del cliente → **Activos**: lista de notebooks, desktops, monitores, celu
 estado) queda en el historial del activo y en la auditoría. Estados: en uso, en stock, en reparación, de baja. Se puede **importar desde Excel/CSV**, exportar, y el cliente ve su lista
 (solo lectura) en el portal → **Mis activos**. Un activo solo se asigna a personas del mismo cliente. Es un registro propio de la consola, independiente del inventario automático de GLPI.
 
+### Personas desde Microsoft 365 / Google Workspace
+
+En Activos → Personas, «Sincronizar usuarios» trae como personas a los usuarios **con licencia activa** de las nubes conectadas al cliente: en Microsoft 365, cuentas habilitadas con al
+menos una licencia asignada (quedan afuera buzones compartidos, salas, invitados y bloqueados); en Google Workspace, cuentas no suspendidas ni archivadas (el directorio de Google no informa la licencia).
+Se completan cargo y área, no se duplican las ya cargadas (por correo) y se desactivan las que dejaron de cumplir —si tienen activos asignados no se desactivan y se avisa—. Las personas traídas
+con correo quedan también como contactos del cliente (sus correos a soporte abren tickets de ese cliente). Un correo ya cargado en otro cliente no se trae.
+
 ### Activos ↔ agente de GLPI
 
 El **GLPI Agent** corre en Windows, macOS y Linux: reporta notebooks y desktops (y servidores). **No existe agente de GLPI para iOS ni para Android actual**, así que los celulares y los

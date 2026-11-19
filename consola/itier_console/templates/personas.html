@@ -7,7 +7,26 @@
       <h1>Personas</h1>
       <p class="u-sub">Las personas de {{ cli.nombre }} a las que se asignan los activos. Son las mismas que pueden pedir soporte por correo o WhatsApp (se cargan en la ficha del cliente).</p>
     </div>
+    <div class="acciones">
+      {% if fuentes %}
+      <form method="post" action="/clientes/{{ cli.slug }}/personas/sincronizar" class="inline"><input type="hidden" name="csrf" value="{{ csrf }}">
+        <button class="u-btn" type="submit" title="Trae solo a los usuarios con licencia activa">🔄 Sincronizar usuarios de {{ fuentes|join(' y ') }}</button></form>
+      {% else %}<span class="muted small">Conectá Microsoft 365 o Google Workspace en la <a href="/clientes/{{ cli.slug }}">ficha del cliente</a> para traer sus usuarios.</span>{% endif %}
+    </div>
   </div>
+  {% if sync %}
+  <section class="u-cred">
+    <h2>🔄 Sincronización de usuarios terminada</h2>
+    {% for f in sync.fuentes %}<p class="u-sub" style="margin:.2rem 0"><b>{{ f.nombre }}</b>: {{ f.total }} usuario(s) en total, <b>{{ f.con_licencia }}</b> con licencia activa.</p>{% endfor %}
+    <p class="u-sub"><b>{{ sync.creadas|length }}</b> persona(s) nueva(s) · {{ sync.actualizadas }} actualizada(s){% if sync.reactivadas %} ({{ sync.reactivadas }} reactivada(s)){% endif %} · {{ sync.desactivadas|length }} desactivada(s) por haber perdido la licencia.</p>
+    {% if sync.creadas %}<p class="small muted">Nuevas: {{ sync.creadas|join(', ') }}.</p>{% endif %}
+    {% if sync.desactivadas %}<p class="small muted">Desactivadas: {{ sync.desactivadas|join(', ') }}.</p>{% endif %}
+    {% if sync.con_activos %}<div class="u-warn">Ya no tienen licencia activa pero siguen con activos asignados (devolvelos y volvé a sincronizar): {% for n, c in sync.con_activos %}{{ n }} ({{ c }}){{ ', ' if not loop.last }}{% endfor %}.</div>{% endif %}
+    {% if sync.conflictos %}<div class="u-warn">No se trajeron: {% for e, m in sync.conflictos %}{{ e }} ({{ m }}){{ '; ' if not loop.last }}{% endfor %}.</div>{% endif %}
+    {% for k, m in sync.errores.items() %}<div class="u-err">{{ 'Microsoft 365' if k == 'm365' else 'Google Workspace' }}: {{ m }}</div>{% endfor %}
+    <p class="small muted">Las personas traídas con correo también quedan como contactos del cliente: sus correos a soporte abren tickets de {{ cli.nombre }}.</p>
+  </section>
+  {% endif %}
   <div class="l-wrap">
     {% if personas %}
     <table class="l-table">
@@ -17,7 +36,7 @@
         <tr style="{{ 'opacity:.55' if not p.activo else '' }}">
             <td><input form="fp{{ p.id }}" type="text" name="nombre" value="{{ p.nombre or '' }}" required style="min-width:10rem"></td>
             <td><input form="fp{{ p.id }}" type="text" name="cargo" value="{{ p.cargo or '' }}" placeholder="Cargo" style="width:8rem"> <input form="fp{{ p.id }}" type="text" name="area" value="{{ p.area or '' }}" placeholder="Área" style="width:8rem"></td>
-            <td class="small">{% if p.email %}✉️ {{ p.email }}<br>{% endif %}{% if p.whatsapp %}💬 {{ 'ID interno' if p.whatsapp.startswith('lid:') else '+' ~ p.whatsapp }}{% endif %}{% if not p.email and not p.whatsapp %}<span class="muted">—</span>{% endif %}</td>
+            <td class="small">{% if p.origen %}<span class="l-pill info" title="Vino de la sincronización">{{ 'Microsoft 365' if p.origen == 'm365' else 'Google' }}</span><br>{% endif %}{% if p.email %}✉️ {{ p.email }}<br>{% endif %}{% if p.whatsapp %}💬 {{ 'ID interno' if p.whatsapp.startswith('lid:') else '+' ~ p.whatsapp }}{% endif %}{% if not p.email and not p.whatsapp %}<span class="muted">—</span>{% endif %}</td>
             <td><a href="/clientes/{{ cli.slug }}/activos?persona={{ p.id }}">{{ p.n_activos }}</a></td>
             <td class="tight" style="display:flex;gap:.4rem;align-items:center">
               <label class="small" style="display:flex;gap:.25rem;align-items:center"><input form="fp{{ p.id }}" type="checkbox" name="activa" value="1" {{ 'checked' if p.activo else '' }}> Activa</label>
