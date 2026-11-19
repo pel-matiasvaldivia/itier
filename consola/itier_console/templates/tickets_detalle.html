@@ -38,8 +38,9 @@
         <input type="hidden" name="csrf" value="{{ csrf }}">
         <label>Responder <textarea name="texto" rows="4" maxlength="5000" required placeholder="Escribí la respuesta o lo que hiciste…" style="width:100%"></textarea></label>
         <label class="small" style="display:flex;gap:.5rem;align-items:center"><input type="checkbox" name="privado" value="1"> 🔒 Nota interna (el cliente no la ve ni se le envía)</label>
-        {% if origen %}<label class="small" style="display:flex;gap:.5rem;align-items:center"><input type="checkbox" name="enviar" value="1" checked>
-          Enviar también al solicitante por {{ 'WhatsApp' if origen.canal == 'whatsapp' else 'correo' }} ({{ origen.remitente if not origen.remitente.startswith('lid:') else 'ID interno' }})</label>{% endif %}
+        {% if avisos %}<label class="small" style="display:flex;gap:.5rem;align-items:center"><input type="checkbox" name="enviar" value="1" checked>
+          Avisar al cliente: {{ avisos|map(attribute='etiqueta')|join(', ') }}</label>
+        {% else %}<p class="muted small" style="margin:.2rem 0">Nadie recibe aviso: cargá el correo de los usuarios del portal o contactos del cliente (ficha del cliente).</p>{% endif %}
         <button class="u-btn" type="submit">Enviar respuesta</button>
       </form>
       {% else %}<p class="muted small">El ticket está cerrado. Reabrilo para seguir respondiendo.</p>{% endif %}
@@ -60,7 +61,7 @@
         <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="accion" value="resolver">
         <label>✅ Resolver: ¿qué se hizo?
           <textarea name="solucion" rows="3" maxlength="5000" required placeholder="Describí la solución…" style="width:100%"></textarea></label>
-        {% if origen %}<label class="small" style="display:flex;gap:.5rem;align-items:center"><input type="checkbox" name="enviar" value="1" checked> Avisar al solicitante por {{ 'WhatsApp' if origen.canal == 'whatsapp' else 'correo' }}</label>{% endif %}
+        {% if avisos %}<label class="small" style="display:flex;gap:.5rem;align-items:center"><input type="checkbox" name="enviar" value="1" checked> Avisar al cliente: {{ avisos|map(attribute='etiqueta')|join(', ') }}</label>{% endif %}
         <button class="u-btn" type="submit" style="background:#059669">Marcar como resuelto</button>
       </form>
       {% elif s == 5 %}

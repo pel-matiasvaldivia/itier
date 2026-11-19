@@ -16,7 +16,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from .. import audit, security
 from ..adapters import AdapterError
 from ..deps import flash, get_db, render, require_cliente
-from ..services import agents, equipos as equipos_svc, onboarding
+from ..services import agents, canales as canales_svc, equipos as equipos_svc, notificaciones, onboarding
 from ..services import tickets as tickets_svc
 
 router = APIRouter(prefix="/portal")
@@ -112,6 +112,10 @@ def nuevo_post(
     except AdapterError as e:
         flash(request, f"No se pudo crear el ticket: {e.detalle}", "error")
         return RedirectResponse("/portal/tickets/nuevo", status_code=303)
+    # Se anota de dónde vino: a ese usuario se le avisa cuando soporte responde.
+    conn.execute("INSERT OR REPLACE INTO ticket_origen(ticket_id, client_id, canal, remitente, created_at) VALUES (?,?,?,?,?)",
+                 (tid, cli["id"], "portal", user["user"], canales_svc.ahora()))
+    conn.commit()
     audit.registrar(conn, f"portal:{user['user']}", "portal.ticket.creado",
                     {"cliente": cli["nombre"], "ticket_id": tid, "titulo": titulo.strip()})
     flash(request, f"Ticket #{tid} abierto. Te vamos avisando el avance.", "ok")
@@ -133,7 +137,67 @@ def ver(request: Request, ticket_id: int, user: dict = Depends(require_cliente),
     if entity is None or str(t.get("entities_id")) != str(entity):
         flash(request, "Ticket no encontrado.", "error")
         return RedirectResponse("/portal/tickets", status_code=303)
-    return render(request, "portal_ticket_detalle.html", cli=cli, t=t)
+    t["content"] = tickets_svc.texto_plano(t.get("content", ""))
+    try:
+        mensajes = [m for m in tickets_svc.conversacion(request.app.state.cfg, ticket_id) if not m["privado"]]
+    except AdapterError:
+        mensajes = []
+    for m in mensajes:
+        m["es_cliente"] = notificaciones.es_del_cliente(m["content"])
+        m["content"] = _limpiar_marca(m["content"])
+    return render(request, "portal_ticket_detalle.html", cli=cli, t=t, mensajes=mensajes)
+
+
+def _limpiar_marca(texto: str) -> str:
+    """Quita la marca técnica del mensaje del cliente («Cliente · Nombre:» o el pie de WhatsApp/correo)."""
+    t = texto.strip()
+    if t.startswith("Cliente ·") and "\n" in t:
+        t = t.split("\n", 1)[1].strip()
+    if "\n\n— Recibido por " in t:
+        t = t.split("\n\n— Recibido por ", 1)[0].strip()
+    return t
+
+
+@router.post("/tickets/{ticket_id}/responder")
+def responder(request: Request, ticket_id: int, texto: str = Form(""), csrf: str = Form(""), user: dict = Depends(require_cliente),
+              conn: sqlite3.Connection = Depends(get_db)):
+    """El cliente agrega información a un ticket suyo. Solo tickets de SU entidad."""
+    cli = _cliente(conn, user)
+    if not cli:
+        return render(request, "portal_sin_cliente.html")
+    volver = RedirectResponse(f"/portal/tickets/{ticket_id}", status_code=303)
+    if not security.verificar_csrf(request.session, csrf):
+        flash(request, "Sesión expirada, reintentá.", "error")
+        return volver
+    texto = texto.strip()
+    if not texto or len(texto) > 5000:
+        flash(request, "Escribí tu mensaje (hasta 5000 caracteres).", "error")
+        return volver
+    cfg = request.app.state.cfg
+    entity = _entity(cli)
+    try:
+        t = tickets_svc.ver(cfg, ticket_id)
+    except AdapterError:
+        flash(request, "Ticket no encontrado.", "error")
+        return RedirectResponse("/portal/tickets", status_code=303)
+    if entity is None or str(t.get("entities_id")) != str(entity):   # evita IDOR
+        flash(request, "Ticket no encontrado.", "error")
+        return RedirectResponse("/portal/tickets", status_code=303)
+    if int(t.get("status", 0) or 0) == 6:
+        flash(request, "El ticket está cerrado: abrí uno nuevo si el problema sigue.", "error")
+        return volver
+    quien = (conn.execute("SELECT nombre FROM users WHERE id = ?", (user["uid"],)).fetchone() or {"nombre": None})["nombre"] or user["user"]
+    try:
+        tickets_svc.responder(cfg, ticket_id, f"Cliente · {quien}:\n{texto}", False, None)
+        if int(t.get("status", 0) or 0) == 5:                      # respondió a un ticket «resuelto»: sigue el problema
+            tickets_svc.cambiar_estado(cfg, ticket_id, "reabrir")
+    except AdapterError as e:
+        flash(request, f"No se pudo enviar tu mensaje: {e.detalle}", "error")
+        return volver
+    audit.registrar(conn, f"portal:{user['user']}", "portal.ticket.respuesta", {"cliente": cli["nombre"], "ticket_id": ticket_id})
+    notificaciones.avisar_a_soporte(cfg, ticket_id, t.get("name", ""), cli["nombre"], quien, texto)
+    flash(request, "Tu mensaje fue enviado a soporte.", "ok")
+    return volver
 
 
 # ── Mis equipos ─────────────────────────────────────────────────────────────

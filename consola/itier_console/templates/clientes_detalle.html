@@ -47,11 +47,14 @@
         <p class="u-lead">Accesos para que el cliente entre a <code>/portal</code> (ve solo su empresa: sus tickets y equipos).</p>
         {% if usuarios %}
         <table class="tabla">
-          <thead><tr><th>Usuario</th><th>2FA</th><th>Último ingreso</th><th></th></tr></thead>
+          <thead><tr><th>Usuario</th><th>Correo (avisos)</th><th>2FA</th><th>Último ingreso</th><th></th></tr></thead>
           <tbody>
             {% for u in usuarios %}
             <tr>
               <td><strong>{{ u.username }}</strong></td>
+              <td>{% if puede('clientes.editar') %}<form method="post" action="/clientes/{{ cli.slug }}/portal-usuarios/{{ u.id }}/email" class="inline" style="display:flex;gap:.3rem">
+                <input type="hidden" name="csrf" value="{{ csrf }}"><input type="email" name="email" value="{{ u.email or '' }}" placeholder="correo@cliente.com" style="min-width:12rem">
+                <button class="u-b" type="submit" title="Guardar correo">💾</button></form>{% else %}{{ u.email or '—' }}{% endif %}</td>
               <td>{% if u.totp_confirmed %}<span class="l-pill ok"><i></i>activo</span>{% else %}<span class="l-pill warn"><i></i>pendiente</span>{% endif %}</td>
               <td class="muted">{{ u.last_login or '—' }}</td>
               <td class="acciones">
@@ -76,6 +79,9 @@
           <input type="hidden" name="csrf" value="{{ csrf }}">
           <label>Usuario
             <input type="text" name="username" placeholder="contacto@cliente" required>
+          </label>
+          <label>Correo <span class="muted small">(recibe los avisos de sus tickets)</span>
+            <input type="email" name="email" placeholder="persona@cliente.com">
           </label>
           <label>Contraseña temporal <span class="muted small">(mín. 10)</span>
             <input type="text" name="password" required>

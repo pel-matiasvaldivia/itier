@@ -112,7 +112,9 @@ def detalle(request: Request, ticket_id: int, user: dict = Depends(require_permi
     except AdapterError:
         conversacion = []
     t["content"] = svc.texto_plano(t.get("content", ""))
-    return render(request, "tickets_detalle.html", t=t, cliente=cliente, tecnicos=tecnicos, tiempos=tiempos, conversacion=conversacion,
+    from ..services import notificaciones
+    avisos = notificaciones.destinatarios(conn, ticket_id, cliente["id"] if cliente else None)
+    return render(request, "tickets_detalle.html", t=t, cliente=cliente, avisos=avisos, tecnicos=tecnicos, tiempos=tiempos, conversacion=conversacion,
                   total_min=sum(x["minutos"] for x in tiempos),
                   puedo_tomar=bool(mi and mi["glpi_user_id"]), origen=dict(origen) if origen else None)
 
@@ -188,7 +190,7 @@ def registrar_tiempo(request: Request, ticket_id: int, minutos: int = Form(...),
 def responder(request: Request, ticket_id: int, texto: str = Form(""), privado: str = Form(""), enviar: str = Form(""),
               csrf: str = Form(""), user: dict = Depends(require_permiso("tickets")), conn: sqlite3.Connection = Depends(get_db)):
     """Agrega una respuesta (o nota interna) al ticket y, si vino por WhatsApp/correo, se la manda al solicitante."""
-    from ..services import ServiceError, ajustes, canales
+    from ..services import ajustes
     volver = RedirectResponse(f"/tickets/{ticket_id}", status_code=303)
     if not security.verificar_csrf(request.session, csrf):
         flash(request, "Sesión expirada, reintentá.", "error")
@@ -211,13 +213,9 @@ def responder(request: Request, ticket_id: int, texto: str = Form(""), privado: 
     audit.registrar(conn, user["user"], "ticket.nota" if es_privado else "ticket.respuesta", {"ticket_id": ticket_id})
     extra = ""
     if enviar and not es_privado:
-        try:
-            titulo = svc.ver(cfg, ticket_id).get("name", "")
-            via = canales.responder_solicitante(cfg, conn, ticket_id, texto, titulo)
-            audit.registrar(conn, user["user"], "ticket.respuesta_enviada", {"ticket_id": ticket_id, "canal": via})
-            extra = f" y se envió al solicitante por {via}"
-        except (ServiceError, AdapterError) as e:
-            flash(request, f"La respuesta quedó en el ticket, pero no se pudo enviar al solicitante: {getattr(e, 'mensaje', None) or getattr(e, 'detalle', e)}", "error")
+        extra, error = _avisar(cfg, conn, ticket_id, texto, user["user"])
+        if error:
+            flash(request, f"La respuesta quedó en el ticket, pero {error}", "error")
             return volver
     flash(request, ("Nota interna agregada" if es_privado else "Respuesta agregada") + extra + ".", "ok")
     return volver
@@ -227,7 +225,7 @@ def responder(request: Request, ticket_id: int, texto: str = Form(""), privado: 
 def cambiar_estado(request: Request, ticket_id: int, accion: str = Form(""), solucion: str = Form(""), csrf: str = Form(""),
                    enviar: str = Form(""), user: dict = Depends(require_permiso("tickets")), conn: sqlite3.Connection = Depends(get_db)):
     """Cambia el estado del ticket: en curso, en espera, resolver (con solución), cerrar o reabrir."""
-    from ..services import ServiceError, ajustes, canales
+    from ..services import ajustes
     volver = RedirectResponse(f"/tickets/{ticket_id}", status_code=303)
     if not security.verificar_csrf(request.session, csrf):
         flash(request, "Sesión expirada, reintentá.", "error")
@@ -248,13 +246,31 @@ def cambiar_estado(request: Request, ticket_id: int, accion: str = Form(""), sol
         flash(request, f"No se pudo cambiar el estado: {e.detalle}", "error")
         return volver
     audit.registrar(conn, user["user"], f"ticket.{accion}", {"ticket_id": ticket_id})
-    extra = ""
+    msg = mensajes[accion].rstrip(".")
     if accion == "resolver" and enviar:
-        try:
-            titulo = svc.ver(cfg, ticket_id).get("name", "")
-            via = canales.responder_solicitante(cfg, conn, ticket_id, f"Resolvimos tu consulta #{ticket_id}: {solucion}\n\nSi todavía hay algo pendiente, respondé por acá.", titulo)
-            extra = f" Se avisó al solicitante por {via}."
-        except (ServiceError, AdapterError):
-            extra = " (No se pudo avisar al solicitante.)"
-    flash(request, mensajes[accion] + extra, "ok")
+        ex, error = _avisar(cfg, conn, ticket_id, f"Resolvimos tu consulta #{ticket_id}: {solucion}\n\nSi todavía hay algo pendiente, respondé por acá.", user["user"])
+        msg += ex
+        if error:
+            msg += f" (no se pudo avisar al cliente: {error})"
+    flash(request, msg + ".", "ok")
     return volver
+
+
+def _avisar(cfg, conn, ticket_id: int, texto: str, actor: str) -> tuple[str, str]:
+    """Avisa al cliente (por el canal que corresponda). → («y se avisó a …», «mensaje de error o vacío»)."""
+    from ..services import notificaciones
+    try:
+        t = svc.ver(cfg, ticket_id)
+    except AdapterError as e:
+        return "", f"no se pudo leer el ticket para avisar: {e.detalle}"
+    cli = next((c for c in onboarding.listar_clientes(conn) if str(c.get("glpi_entity_id")) == str(t.get("entities_id"))), None)
+    r = notificaciones.notificar(cfg, conn, ticket_id, cli["id"] if cli else None, t.get("name", ""), texto)
+    if r["sin_destino"]:
+        return "", ("no hay a quién avisar: cargá el correo de los usuarios del portal o de los contactos del cliente (ficha del cliente).")
+    if r["errores"] and not r["enviados"]:
+        return "", "no se pudo avisar al cliente: " + "; ".join(r["errores"])
+    audit.registrar(conn, actor, "ticket.cliente_avisado", {"ticket_id": ticket_id, "a": r["enviados"]})
+    msg = " y se avisó a " + ", ".join(r["enviados"])
+    if r["errores"]:
+        msg += " (falló: " + "; ".join(r["errores"]) + ")"
+    return msg, ""

@@ -9,7 +9,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 
 from .. import audit, security
 from ..deps import flash, get_db, render, require_permiso
-from ..services import ServiceError
+from ..services import ServiceError, correo
 from ..services import onboarding
 
 router = APIRouter()
@@ -81,6 +81,7 @@ def crear_usuario_portal(
     slug: str,
     username: str = Form(...),
     password: str = Form(...),
+    email: str = Form(""),
     csrf: str = Form(""),
     user: dict = Depends(require_permiso("clientes.editar")),
     conn: sqlite3.Connection = Depends(get_db),
@@ -102,8 +103,14 @@ def crear_usuario_portal(
     if security.obtener_usuario(conn, username):
         flash(request, f"El usuario «{username}» ya existe.", "error")
         return RedirectResponse(f"/clientes/{slug}", status_code=303)
-    security.crear_usuario(conn, username, password, must_change_pw=True, client_id=int(cli["id"]))
-    audit.registrar(conn, user["user"], "portal.usuario.alta", {"cliente": cli["nombre"], "username": username})
+    if email.strip():
+        try:
+            email = correo.validar_email(email)
+        except ServiceError as e:
+            flash(request, e.mensaje, "error")
+            return RedirectResponse(f"/clientes/{slug}", status_code=303)
+    security.crear_usuario(conn, username, password, must_change_pw=True, client_id=int(cli["id"]), email=email.strip() or None)
+    audit.registrar(conn, user["user"], "portal.usuario.alta", {"cliente": cli["nombre"], "username": username, "email": email.strip() or None})
     flash(request, f"Usuario de portal «{username}» creado. Pasale la clave; cambia clave y enrola 2FA al entrar.", "ok")
     return RedirectResponse(f"/clientes/{slug}", status_code=303)
 
@@ -180,3 +187,30 @@ def eliminar(
         return RedirectResponse(f"/clientes/{slug}", status_code=303)
     flash(request, f"Registro de «{cli['nombre']}» eliminado (GLPI/Zabbix no se tocaron).", "ok")
     return RedirectResponse("/clientes", status_code=303)
+
+
+@router.post("/clientes/{slug}/portal-usuarios/{uid}/email")
+def email_usuario_portal(request: Request, slug: str, uid: int, email: str = Form(""), csrf: str = Form(""),
+                         user: dict = Depends(require_permiso("clientes.editar")), conn: sqlite3.Connection = Depends(get_db)):
+    """Correo de un usuario del portal: ahí recibe los avisos cuando soporte responde sus tickets."""
+    cli = onboarding.obtener_cliente_por_slug(conn, slug)
+    if not cli:
+        flash(request, "Cliente no encontrado.", "error")
+        return RedirectResponse("/clientes", status_code=303)
+    if not security.verificar_csrf(request.session, csrf):
+        flash(request, "Sesión expirada, reintentá.", "error")
+        return RedirectResponse(f"/clientes/{slug}", status_code=303)
+    fila = conn.execute("SELECT username FROM users WHERE id = ? AND client_id = ?", (uid, cli["id"])).fetchone()
+    if not fila:
+        flash(request, "Usuario no encontrado.", "error")
+        return RedirectResponse(f"/clientes/{slug}", status_code=303)
+    try:
+        valor = correo.validar_email(email) if email.strip() else None
+    except ServiceError as e:
+        flash(request, e.mensaje, "error")
+        return RedirectResponse(f"/clientes/{slug}", status_code=303)
+    conn.execute("UPDATE users SET email = ? WHERE id = ?", (valor, uid))
+    conn.commit()
+    audit.registrar(conn, user["user"], "portal.usuario.correo", {"cliente": cli["nombre"], "username": fila["username"], "email": valor})
+    flash(request, f"Correo de «{fila['username']}» {'guardado' if valor else 'quitado'}.", "ok")
+    return RedirectResponse(f"/clientes/{slug}", status_code=303)

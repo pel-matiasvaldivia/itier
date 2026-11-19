@@ -13,7 +13,22 @@
       {% if t.tecnico %}<span class="badge">Lo atiende: {{ t.tecnico }}</span>{% endif %}
       {% if t.date %}<span class="muted">· {{ t.date }}</span>{% endif %}
     </p>
-    {% if t.content %}<div class="ticket-body">{{ t.content }}</div>{% endif %}
+    {% if t.content %}<div class="ticket-body" style="white-space:pre-wrap">{{ t.content }}</div>{% endif %}
   </div>
-  <p class="muted small">Si querés agregar información, abrí un ticket nuevo o escribinos; pronto vas a poder responder desde acá.</p>
+
+  <div class="card">
+    <h2>Conversación</h2>
+    {% for m in mensajes %}
+    <div class="ticket-body" style="margin:.6rem 0;white-space:pre-wrap;{{ 'background:#eef2ff;' if m.es_cliente else '' }}">
+      <div class="muted small" style="margin-bottom:.25rem"><b>{{ 'Vos' if m.es_cliente else 'Soporte' }}</b> · {{ m.fecha }}</div>{{ m.content }}</div>
+    {% else %}<p class="muted">Todavía no hay respuestas. Te avisamos por correo cuando soporte responda.</p>{% endfor %}
+    {% if t.status|int < 6 %}
+    <form method="post" action="/portal/tickets/{{ t.id }}/responder" class="form" style="margin-top:1rem">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <label>{{ 'Responder a soporte' if t.status|int != 5 else 'El problema sigue: contanos' }}
+        <textarea name="texto" rows="4" maxlength="5000" required placeholder="Escribí tu mensaje…" style="width:100%"></textarea></label>
+      <button class="btn primary" type="submit">Enviar</button>
+    </form>
+    {% else %}<p class="muted small">El ticket está cerrado. Si el problema sigue, abrí uno nuevo.</p>{% endif %}
+  </div>
 {% endblock %}

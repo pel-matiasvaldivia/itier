@@ -189,6 +189,13 @@ consola/
 ```
 
 
+## Respuestas y avisos al cliente
+
+El cliente ve en el portal la conversación de su ticket (sin las notas internas) y puede responder desde ahí; si el ticket estaba resuelto, lo reabre.
+Cuando soporte responde o resuelve, se avisa al cliente: a quien pidió el soporte por su canal (WhatsApp, correo, o el correo del usuario del portal que
+abrió el ticket); si no hay origen, a los usuarios del portal y contactos del cliente que tengan correo. Cuando el cliente responde, se avisa a la casilla de
+soporte (`ITIER_SOPORTE_EMAIL`). Los correos salen por el SMTP de la consola (`ITIER_SMTP_*`) e incluyen el enlace al portal (`ITIER_CONSOLE_PUBLIC_URL`).
+
 ## Clave única del operador
 
 Cuando un operador cambia su clave en la consola (el cambio forzado del primer ingreso o uno voluntario), la consola la lleva a su cuenta de GLPI y de
