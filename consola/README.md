@@ -196,6 +196,13 @@ Ficha del cliente → **Activos**: lista de notebooks, desktops, monitores, celu
 estado) queda en el historial del activo y en la auditoría. Estados: en uso, en stock, en reparación, de baja. Se puede **importar desde Excel/CSV**, exportar, y el cliente ve su lista
 (solo lectura) en el portal → **Mis activos**. Un activo solo se asigna a personas del mismo cliente. Es un registro propio de la consola, independiente del inventario automático de GLPI.
 
+### Activos ↔ agente de GLPI
+
+El **GLPI Agent** corre en Windows, macOS y Linux: reporta notebooks y desktops (y servidores). **No existe agente de GLPI para iOS ni para Android actual**, así que los celulares y los
+monitores se llevan a mano en la lista (para celulares la vía habitual es un MDM). En Activos, «Sincronizar con GLPI» cruza los activos con las computadoras del cliente en GLPI (por número
+de serie o, si no hay, por nombre = etiqueta), vincula las que coinciden y agrega a la lista las que faltan. Cada activo vinculado muestra si el agente está **reportando** (inventario ≤ 3 días),
+**atrasado** (≤ 14) o **sin reportar**, y hay un filtro de notebooks/desktops **sin agente** para detectar equipos sin gestionar. El vínculo se puede hacer o quitar a mano en el detalle.
+
 ## Respuestas y avisos al cliente
 
 El cliente ve en el portal la conversación de su ticket (sin las notas internas) y puede responder desde ahí; si el ticket estaba resuelto, lo reabre.

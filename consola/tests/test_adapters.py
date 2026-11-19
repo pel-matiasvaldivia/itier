@@ -225,10 +225,22 @@ def handler(request: httpx.Request) -> httpx.Response:
             {"id": 1, "items_id": 501, "itemtype": "Computer", "name": "Defender", "is_active": 0, "is_uptodate": 1}])
     if "/Computer/" in p and request.method == "PUT":
         return httpx.Response(200, json={"id": 501})
+    if p.endswith("/Manufacturer") and request.method == "GET":
+        return httpx.Response(200, json=[{"id": 1, "name": "Lenovo"}, {"id": 2, "name": "Dell"}])
+    if p.endswith("/ComputerModel") and request.method == "GET":
+        return httpx.Response(200, json=[{"id": 10, "name": "ThinkPad E14"}])
+    if p.endswith("/ComputerType") and request.method == "GET":
+        return httpx.Response(200, json=[{"id": 20, "name": "Laptop"}, {"id": 21, "name": "Desktop"}])
     if p.endswith("/Computer") and request.method == "GET":
         return httpx.Response(200, json=[
             {"id": 501, "name": "SRV-DC01", "entities_id": 2, "businesscriticities_id": 5},
-            {"id": 601, "name": "SRV-APP", "entities_id": 3, "businesscriticities_id": 0}])
+            {"id": 601, "name": "SRV-APP", "entities_id": 3, "businesscriticities_id": 0},
+            {"id": 701, "name": "NOTE-ANA", "entities_id": 9, "serial": " PF3ABC12 ", "manufacturers_id": 1, "computermodels_id": 10,
+             "computertypes_id": 20, "last_inventory_update": "2026-11-19 08:30:00", "date_mod": "2026-01-01 00:00:00", "contact": "ana", "is_dynamic": 1},
+            {"id": 702, "name": "PC-MANUAL", "entities_id": 9, "serial": "", "manufacturers_id": 2, "computermodels_id": 0, "computertypes_id": 21,
+             "date_mod": "2026-02-01 10:00:00", "is_dynamic": 0},
+            {"id": 703, "name": "PLANTILLA", "entities_id": 9, "is_template": 1},
+            {"id": 704, "name": "BORRADA", "entities_id": 9, "is_deleted": 1}])
     # ── Zabbix (api_jsonrpc.php) ──
     if p.endswith("/api_jsonrpc.php"):
         m = body.get("method")
@@ -668,6 +680,17 @@ try:
 except Exception:  # noqa: BLE001
     _ok = True
 check("GLPI: una acción de estado desconocida se rechaza", _ok)
+# equipos inventariados (para cruzar con la lista de activos)
+with glpi_mod.cliente(cfg) as g:
+    _eq = g.equipos_inventariados(9)
+_por = {e["nombre"]: e for e in _eq}
+check("GLPI: equipos inventariados de la entidad (sin plantillas ni borrados) con fabricante, modelo y tipo en texto",
+      sorted(_por) == ["NOTE-ANA", "PC-MANUAL"] and _por["NOTE-ANA"]["fabricante"] == "Lenovo" and _por["NOTE-ANA"]["modelo"] == "ThinkPad E14"
+      and _por["NOTE-ANA"]["tipo"] == "Laptop" and _por["NOTE-ANA"]["serie"] == "PF3ABC12", _eq)
+check("GLPI: el último inventario sale de last_inventory_update (o de date_mod) y marca si lo reportó el agente",
+      _por["NOTE-ANA"]["ultimo_inventario"] == "2026-11-19 08:30:00" and _por["NOTE-ANA"]["por_agente"] is True and _por["NOTE-ANA"]["usuario"] == "ana"
+      and _por["PC-MANUAL"]["ultimo_inventario"] == "2026-02-01 10:00:00" and _por["PC-MANUAL"]["por_agente"] is False)
+check("GLPI: una entidad vacía no devuelve equipos", glpi_mod.cliente(cfg).equipos_inventariados("") == [])
 # seguimiento de ticket (respuesta del solicitante por correo/WhatsApp)
 _n2 = len(captured)
 with glpi_mod.cliente(cfg) as g:

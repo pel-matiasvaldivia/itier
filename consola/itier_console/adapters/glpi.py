@@ -14,7 +14,7 @@ cliente) y opera tickets. En modo demo devuelve fixtures.
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any
 
 import httpx
@@ -45,6 +45,22 @@ _DEMO_TICKETS_EXTRA: dict[int, dict] = {}
 
 # Tareas con tiempo registrado (demo): {tickets_id, actiontime (segundos), users_id_tech, date, content}.
 _DEMO_TAREAS: list[dict] = []
+
+# Equipos que «reporta el agente» en demo (los mismos para cualquier entidad).
+def _hace(dias: int) -> str:
+    return (datetime.now() - timedelta(days=dias)).strftime("%Y-%m-%d %H:%M:%S")
+
+
+_DEMO_EQUIPOS_GLPI = [
+    {"id": "901", "nombre": "PC-VENTAS-01", "serie": "SER-V01", "fabricante": "Dell", "modelo": "OptiPlex 7090", "tipo": "Desktop",
+     "ultimo_inventario": _hace(0), "usuario": "ventas", "por_agente": True},
+    {"id": "902", "nombre": "NOTE-GERENCIA", "serie": "PF3ABC12", "fabricante": "Lenovo", "modelo": "ThinkPad E14", "tipo": "Laptop",
+     "ultimo_inventario": _hace(2), "usuario": "gerencia", "por_agente": True},
+    {"id": "903", "nombre": "NOTE-VIEJA", "serie": "OLD-777", "fabricante": "HP", "modelo": "ProBook 450", "tipo": "Notebook",
+     "ultimo_inventario": _hace(40), "usuario": "", "por_agente": True},
+    {"id": "904", "nombre": "SRV-DEMO", "serie": "SRVSER1", "fabricante": "Dell", "modelo": "PowerEdge T40", "tipo": "Server",
+     "ultimo_inventario": _hace(0), "usuario": "", "por_agente": True},
+]
 
 # Conversación, estado y solución de los tickets en demo (memoria del proceso).
 _DEMO_SEG: dict[int, list[dict]] = {}
@@ -363,6 +379,45 @@ class GLPIClient:
         return [{"itemtype": "Computer", "id": str(c.get("id")), "name": c.get("name"),
                  "criticidad": nombres.get(str(c.get("businesscriticities_id")), "")}
                 for c in comps]
+
+    def _nombres(self, itemtype: str) -> dict[str, str]:
+        """id → nombre de un listado auxiliar de GLPI (fabricantes, modelos, tipos). Cacheado."""
+        try:
+            datos = self._get_cacheado(f"/{itemtype}", params={"range": "0-2000"})
+        except AdapterError:
+            return {}
+        return {str(x.get("id")): (x.get("name") or "") for x in (datos if isinstance(datos, list) else []) if isinstance(x, dict)}
+
+    def equipos_inventariados(self, entity_id) -> list[dict]:
+        """Computadoras de una entidad con lo que sabe GLPI (agente o carga manual): para cruzarlas con la lista de activos.
+
+        → [{id, nombre, serie, fabricante, modelo, tipo, ultimo_inventario, usuario, por_agente}]
+        """
+        if self.demo:
+            return [dict(x) for x in _DEMO_EQUIPOS_GLPI]
+        if entity_id in (None, ""):
+            return []
+        try:
+            comps = self._get_cacheado("/Computer", params={"range": "0-2000"})
+        except AdapterError as e:
+            if "RANGE_EXCEED_TOTAL" in str(e):
+                return []
+            raise
+        if not isinstance(comps, list):
+            return []
+        fab, mod, tip = self._nombres("Manufacturer"), self._nombres("ComputerModel"), self._nombres("ComputerType")
+        salida = []
+        for c in comps:
+            if str(c.get("entities_id")) != str(entity_id) or int(c.get("is_template") or 0) or int(c.get("is_deleted") or 0):
+                continue
+            salida.append({
+                "id": str(c.get("id")), "nombre": c.get("name") or "", "serie": (c.get("serial") or "").strip(),
+                "fabricante": fab.get(str(c.get("manufacturers_id")), ""), "modelo": mod.get(str(c.get("computermodels_id")), ""),
+                "tipo": tip.get(str(c.get("computertypes_id")), ""),
+                "ultimo_inventario": str(c.get("last_inventory_update") or c.get("date_mod") or "")[:19],
+                "usuario": c.get("contact") or "", "por_agente": bool(int(c.get("is_dynamic") or 0)),
+            })
+        return salida
 
     # -- usuarios de plataforma (técnicos / PM / administradores) ---------------
 

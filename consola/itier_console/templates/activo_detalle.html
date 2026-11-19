@@ -52,6 +52,31 @@
         </form>{% endif %}
         {% endif %}
       </section>
+      {% if a.tipo in ('notebook', 'desktop', 'otro') or a.glpi_id %}
+      <section class="u-card">
+        <h2>🛰 Agente de GLPI</h2>
+        {% if a.glpi_id %}
+          {% set e = a.glpi %}
+          <p class="small" style="margin:.1rem 0"><span class="l-pill {{ {'al_dia': 'ok', 'atrasado': 'warn', 'sin_reportar': 'bad'}.get(a.agente, 'off') }}">{{ {'al_dia': 'Reportando', 'atrasado': 'Atrasado', 'sin_reportar': 'Sin reportar'}.get(a.agente, 'Vinculado') }}</span>
+            {% if a.agente_visto %}· último inventario <b>{{ a.agente_visto }}</b>{% endif %}</p>
+          {% if e %}<p class="small muted" style="margin:.4rem 0">En GLPI: <b>{{ e.nombre }}</b> · {{ e.fabricante }} {{ e.modelo }} · serie {{ e.serie or '—' }}{% if e.usuario %} · último usuario {{ e.usuario }}{% endif %}</p>
+          {% else %}<p class="small muted" style="margin:.4rem 0">{{ 'No se pudo leer GLPI ahora.' if glpi_error else 'El equipo ya no figura en GLPI.' }}</p>{% endif %}
+          <form method="post" action="/clientes/{{ cli.slug }}/activos/{{ a.id }}/desvincular" class="inline" onsubmit="return confirm('¿Quitar el vínculo con GLPI?');">
+            <input type="hidden" name="csrf" value="{{ csrf }}"><button class="u-b" type="submit">Quitar vínculo</button></form>
+        {% else %}
+          <p class="muted small">No coincide con ningún equipo del inventario. Si ya tiene el agente instalado, vinculalo a mano (o sincronizá desde la lista: cruza por número de serie).</p>
+          {% if libres_glpi %}
+          <form method="post" action="/clientes/{{ cli.slug }}/activos/{{ a.id }}/vincular" class="form">
+            <input type="hidden" name="csrf" value="{{ csrf }}">
+            <label>Equipo de GLPI
+              <select name="glpi_id" required><option value="">Elegí…</option>
+                {% for e in libres_glpi %}<option value="{{ e.id }}">{{ e.nombre }} · {{ e.fabricante }} {{ e.modelo }}{% if e.serie %} · {{ e.serie }}{% endif %}</option>{% endfor %}</select></label>
+            <button class="u-b" type="submit">Vincular</button>
+          </form>
+          {% else %}<p class="muted small">No hay equipos de GLPI sin vincular{% if glpi_error %} (no se pudo leer GLPI){% endif %}.</p>{% endif %}
+        {% endif %}
+      </section>
+      {% endif %}
       <section class="u-card">
         <h2>🔧 Estado</h2>
         <form method="post" action="/clientes/{{ cli.slug }}/activos/{{ a.id }}/estado" class="form">

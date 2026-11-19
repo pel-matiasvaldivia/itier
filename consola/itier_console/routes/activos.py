@@ -38,14 +38,23 @@ def _vuelta(slug, aid=None) -> RedirectResponse:
     return RedirectResponse(f"/clientes/{slug}/activos" + (f"/{aid}" if aid else ""), status_code=303)
 
 
+def _lista(request, conn, cli, f, **extra):
+    """Pantalla de la lista, con el cruce contra los equipos que reporta el agente de GLPI."""
+    activos = svc.listar(conn, cli["id"], f["tipo"], f["estado"], f["persona"], f["q"])
+    equipos, error = svc.equipos_glpi(request.app.state.cfg, cli)
+    svc.vista_agente(activos, equipos)
+    return render(request, "activos_lista.html", cli=cli, activos=activos, resumen=svc.resumen(conn, cli["id"]), personas=svc.personas(conn, cli["id"]),
+                  TIPOS=svc.TIPOS, ESTADOS=svc.ESTADOS, f=f, glpi_ok=bool(request.app.state.cfg.glpi_configurado and cli.get("glpi_entity_id")),
+                  glpi_error=error, pendientes_glpi=len(svc.pendientes_glpi(conn, cli["id"], equipos)), **extra)
+
+
 @router.get("/clientes/{slug}/activos", response_class=HTMLResponse)
 def lista(request: Request, slug: str, tipo: str = "", estado: str = "", persona: str = "", q: str = "",
           user: dict = Depends(require_permiso("activos")), conn: sqlite3.Connection = Depends(get_db)):
     cli = _cli(request, conn, slug)
     if not cli:
         return _fuera()
-    return render(request, "activos_lista.html", cli=cli, activos=svc.listar(conn, cli["id"], tipo, estado, persona, q), resumen=svc.resumen(conn, cli["id"]),
-                  personas=svc.personas(conn, cli["id"]), TIPOS=svc.TIPOS, ESTADOS=svc.ESTADOS, f={"tipo": tipo, "estado": estado, "persona": persona, "q": q})
+    return _lista(request, conn, cli, {"tipo": tipo, "estado": estado, "persona": persona, "q": q})
 
 
 @router.get("/clientes/{slug}/activos/nuevo", response_class=HTMLResponse)
@@ -103,8 +112,22 @@ async def importar(request: Request, slug: str, archivo: UploadFile = File(...),
     except ServiceError as e:
         flash(request, e.mensaje, "error")
         return _vuelta(slug)
-    return render(request, "activos_lista.html", cli=cli, activos=svc.listar(conn, cli["id"]), resumen=svc.resumen(conn, cli["id"]),
-                  personas=svc.personas(conn, cli["id"]), TIPOS=svc.TIPOS, ESTADOS=svc.ESTADOS, f={"tipo": "", "estado": "", "persona": "", "q": ""}, importacion=res)
+    return _lista(request, conn, cli, {"tipo": "", "estado": "", "persona": "", "q": ""}, importacion=res)
+
+
+@router.post("/clientes/{slug}/activos/sincronizar", response_class=HTMLResponse)
+def sincronizar(request: Request, slug: str, importar: str = Form(""), csrf: str = Form(""), user: dict = Depends(require_permiso("activos")),
+                conn: sqlite3.Connection = Depends(get_db)):
+    cli = _cli(request, conn, slug)
+    if not cli:
+        return _fuera()
+    if not _csrf(request, csrf):
+        return _vuelta(slug)
+    res = svc.sincronizar(conn, request.app.state.cfg, cli, user["user"], importar=bool(importar))
+    if res["error"]:
+        flash(request, f"No se pudo leer el inventario de GLPI: {res['error']}", "error")
+        return _vuelta(slug)
+    return _lista(request, conn, cli, {"tipo": "", "estado": "", "persona": "", "q": ""}, sincronizacion=res)
 
 
 @router.get("/clientes/{slug}/activos/{aid}", response_class=HTMLResponse)
@@ -117,8 +140,10 @@ def detalle(request: Request, slug: str, aid: int, user: dict = Depends(require_
     except ServiceError as e:
         flash(request, e.mensaje, "error")
         return _vuelta(slug)
+    equipos, error = svc.equipos_glpi(request.app.state.cfg, cli)
+    svc.vista_agente([a], equipos)
     return render(request, "activo_detalle.html", cli=cli, a=a, hist=svc.historial(conn, aid), personas=svc.personas(conn, cli["id"]), ESTADOS=svc.ESTADOS,
-                  v=a, TIPOS=svc.TIPOS)
+                  v=a, TIPOS=svc.TIPOS, libres_glpi=svc.pendientes_glpi(conn, cli["id"], equipos), glpi_error=error)
 
 
 @router.post("/clientes/{slug}/activos/{aid}/editar", response_class=HTMLResponse)
@@ -169,6 +194,21 @@ def devolver(request: Request, slug: str, aid: int, nota: str = Form(""), csrf: 
 def estado(request: Request, slug: str, aid: int, estado: str = Form(""), nota: str = Form(""), csrf: str = Form(""),
            user: dict = Depends(require_permiso("activos")), conn: sqlite3.Connection = Depends(get_db)):
     return _simple(request, slug, aid, csrf, conn, lambda cli: svc.cambiar_estado(conn, cli["id"], aid, user["user"], estado, nota), "Estado actualizado.", user)
+
+
+@router.post("/clientes/{slug}/activos/{aid}/vincular")
+def vincular(request: Request, slug: str, aid: int, glpi_id: str = Form(""), csrf: str = Form(""),
+             user: dict = Depends(require_permiso("activos")), conn: sqlite3.Connection = Depends(get_db)):
+    def hacer(cli):
+        equipos, _ = svc.equipos_glpi(request.app.state.cfg, cli)
+        svc.vincular(conn, cli["id"], aid, user["user"], glpi_id, equipos)
+    return _simple(request, slug, aid, csrf, conn, hacer, "Activo vinculado con el equipo de GLPI.", user)
+
+
+@router.post("/clientes/{slug}/activos/{aid}/desvincular")
+def desvincular(request: Request, slug: str, aid: int, csrf: str = Form(""), user: dict = Depends(require_permiso("activos")),
+                conn: sqlite3.Connection = Depends(get_db)):
+    return _simple(request, slug, aid, csrf, conn, lambda cli: svc.desvincular(conn, cli["id"], aid, user["user"]), "Vínculo con GLPI quitado.", user)
 
 
 @router.post("/clientes/{slug}/activos/{aid}/eliminar")

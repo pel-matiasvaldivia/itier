@@ -1,5 +1,13 @@
 {% extends "base.html" %}
 {% block titulo %}Activos · {{ cli.nombre }} · Consola de iTier{% endblock %}
+{% macro agente(a) -%}
+  {%- if a.glpi_id -%}
+    <span class="l-pill {{ {'al_dia': 'ok', 'atrasado': 'warn', 'sin_reportar': 'bad'}.get(a.agente, 'off') }}" title="Último inventario del agente de GLPI">{{ {'al_dia': 'Reportando', 'atrasado': 'Atrasado', 'sin_reportar': 'Sin reportar'}.get(a.agente, 'Vinculado') }}</span>
+    {%- if a.agente_visto %}<br><span class="muted small">{{ a.agente_visto }}</span>{% endif -%}
+  {%- elif a.tipo in ('notebook', 'desktop') and a.estado != 'de_baja' -%}<span class="l-pill off" title="No coincide con ningún equipo del inventario de GLPI">Sin agente</span>
+  {%- elif a.tipo == 'celular' -%}<span class="muted small">Manual</span>
+  {%- else -%}<span class="muted">—</span>{%- endif -%}
+{%- endmacro %}
 {% macro gar(a) -%}
   {%- if a.garantia == 'vigente' -%}<span class="l-pill ok">Vigente</span>{%- elif a.garantia == 'por_vencer' -%}<span class="l-pill warn">Por vencer</span>{%- elif a.garantia == 'vencida' -%}<span class="l-pill bad">Vencida</span>{%- else -%}<span class="muted">—</span>{%- endif -%}
 {%- endmacro %}
@@ -11,6 +19,7 @@
       <p class="u-sub">Notebooks, desktops, monitores y celulares de {{ cli.nombre }}, y a quién están asignados.</p>
     </div>
     <div class="acciones" style="display:flex;gap:.5rem;flex-wrap:wrap">
+      {% if glpi_ok %}<form method="post" action="/clientes/{{ cli.slug }}/activos/sincronizar" class="inline"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="importar" value="1"><button class="u-b" type="submit" title="Vincula los activos con los equipos que reporta el agente de GLPI y agrega los que faltan">🔄 Sincronizar con GLPI</button></form>{% endif %}
       <a class="u-b" href="/clientes/{{ cli.slug }}/personas" style="text-decoration:none">👥 Personas</a>
       <a class="u-b" href="/clientes/{{ cli.slug }}/activos/exportar.csv" style="text-decoration:none">⬇ Exportar CSV</a>
       <a class="u-btn" href="/clientes/{{ cli.slug }}/activos/nuevo" style="text-decoration:none">+ Nuevo activo</a>
@@ -25,11 +34,25 @@
   </section>
   {% endif %}
 
+  {% if sincronizacion %}
+  <section class="u-cred">
+    <h2>🔄 Sincronización con GLPI terminada</h2>
+    <p class="u-sub"><b>{{ sincronizacion.vinculados }}</b> activo(s) vinculado(s) con su equipo · <b>{{ sincronizacion.importados }}</b> equipo(s) del agente agregado(s) a la lista · {{ sincronizacion.actualizados }} actualizado(s).</p>
+    {% if sincronizacion.sin_serie %}<div class="u-warn">{{ sincronizacion.sin_serie }} equipo(s) de GLPI no informan número de serie: se agregaron igual, pero conviene completarlo.</div>{% endif %}
+  </section>
+  {% endif %}
+  {% if glpi_error %}<div class="u-err">No se pudo leer el inventario de GLPI: {{ glpi_error }}</div>{% endif %}
+  {% if glpi_ok and pendientes_glpi and not sincronizacion %}
+  <div class="note"><strong>{{ pendientes_glpi }} equipo{{ 's' if pendientes_glpi != 1 }} del inventario de GLPI (agente) todavía no está{{ 'n' if pendientes_glpi != 1 }} en esta lista.</strong>
+    Sincronizá para vincularlos con los activos existentes y agregar los que faltan.</div>
+  {% endif %}
+
   <div class="u-stats">
     <div class="u-stat"><b>{{ resumen.total }}</b><span>Activos</span></div>
     <div class="u-stat"><b>{{ resumen.asignados }}</b><span>Asignados</span></div>
     <div class="u-stat"><b>{{ resumen.en_stock }}</b><span>En stock</span></div>
     <div class="u-stat {{ 'bad' if resumen.garantia else '' }}"><b>{{ resumen.garantia }}</b><span>Garantía por vencer / vencida</span></div>
+    {% if glpi_ok %}<div class="u-stat {{ 'warn' if resumen.sin_agente else '' }}"><b>{{ resumen.con_agente }}</b><span>Con agente · {{ resumen.sin_agente }} sin agente</span></div>{% endif %}
   </div>
 
   <div class="l-wrap">
@@ -43,6 +66,7 @@
           <option value="">Todos los estados</option>
           {% for k, n in ESTADOS.items() %}<option value="{{ k }}" {{ 'selected' if f.estado == k else '' }}>{{ n }}</option>{% endfor %}
           <option value="garantia" {{ 'selected' if f.estado == 'garantia' else '' }}>Garantía por vencer / vencida</option>
+          {% if glpi_ok %}<option value="sin_agente" {{ 'selected' if f.estado == 'sin_agente' else '' }}>Notebooks/desktops sin agente</option>{% endif %}
         </select>
         <select class="l-sel" name="persona" onchange="this.form.submit()" aria-label="Persona">
           <option value="">Todas las personas</option>
@@ -55,7 +79,7 @@
     </div>
     {% if activos %}
     <table class="l-table">
-      <thead><tr><th>Activo</th><th>Marca / modelo</th><th>Serie</th><th>Asignado a</th><th>Estado</th><th>Garantía</th></tr></thead>
+      <thead><tr><th>Activo</th><th>Marca / modelo</th><th>Serie</th><th>Asignado a</th><th>Estado</th>{% if glpi_ok %}<th>Agente GLPI</th>{% endif %}<th>Garantía</th></tr></thead>
       <tbody>
       {% for a in activos %}
         <tr>
@@ -64,6 +88,7 @@
           <td class="small">{{ a.serie or '—' }}{% if a.imei %}<br><span class="muted">IMEI {{ a.imei }}</span>{% endif %}</td>
           <td>{{ a.persona or '—' }}</td>
           <td><span class="l-pill {{ {'en_uso': 'info', 'en_stock': 'ok', 'en_reparacion': 'warn', 'de_baja': 'off'}[a.estado] }}">{{ a.estado_label }}</span></td>
+          {% if glpi_ok %}<td>{{ agente(a) }}</td>{% endif %}
           <td>{{ gar(a) }}{% if a.garantia_hasta %}<br><span class="muted small">{{ a.garantia_hasta }}</span>{% endif %}</td>
         </tr>
       {% endfor %}

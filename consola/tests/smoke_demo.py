@@ -1246,6 +1246,54 @@ _ps = _ac.crear_persona(_conn, _cid_, "admin", "Sin Activos")
 c.post(f"/clientes/canal-sa/personas/{_ps}/editar", data={"nombre": "Sin Activos", "cargo": "", "area": "", "csrf": csrf_de(c.get("/clientes/canal-sa/personas").text)})
 check("activos: una persona sin activos se desactiva y deja de ofrecerse para asignar", all(p["id"] != _ps for p in _ac.personas(_conn, _cid_)) and "Sin Activos" not in c.get("/clientes/canal-sa/activos/nuevo").text)
 
+# Activos ↔ equipos que reporta el agente de GLPI
+from datetime import datetime as _dtm, timedelta as _tdm  # noqa: E402
+check("agente: frescura del último inventario", _ac.frescura((_dtm.now() - _tdm(days=1)).isoformat(sep=" ")) == "al_dia" and _ac.frescura((_dtm.now() - _tdm(days=7)).isoformat(sep=" ")) == "atrasado"
+      and _ac.frescura((_dtm.now() - _tdm(days=40)).isoformat(sep=" ")) == "sin_reportar" and _ac.frescura("") is None and _ac.frescura("basura") is None)
+check("agente: el tipo de GLPI define notebook, desktop u otro", _ac._tipo_glpi("Laptop") == "notebook" and _ac._tipo_glpi("Notebook") == "notebook" and _ac._tipo_glpi("Server") == "otro" and _ac._tipo_glpi("Desktop") == "desktop" and _ac._tipo_glpi("") == "desktop")
+lg = c.get("/clientes/canal-sa/activos")
+check("agente: la lista avisa que hay equipos de GLPI que faltan y ofrece sincronizar", "del inventario de GLPI (agente) todavía no" in lg.text and "Sincronizar con GLPI" in lg.text and "Agente GLPI" in lg.text)
+check("agente: sin sincronizar, la notebook figura «Sin agente»", "Sin agente" in lg.text and "Manual" in lg.text)
+r = c.post("/clientes/canal-sa/activos/sincronizar", data={"importar": "1", "csrf": csrf_de(lg.text)})
+check("agente: sincronizar vincula por número de serie e importa los equipos que faltan", "Sincronización con GLPI terminada" in r.text and "<b>1</b> activo(s) vinculado(s)" in r.text and "<b>3</b> equipo(s) del agente" in r.text, r.text[r.text.find("Sincronización"):][:500])
+_g = {x["etiqueta"]: x for x in (dict(y) for y in _conn.execute("SELECT * FROM activos WHERE client_id=?", (_cid_,)))}
+check("agente: NB-001 quedó vinculada con el equipo de la serie PF3ABC12", _g["NB-001"]["glpi_id"] == "902" and _g["NB-001"]["glpi_visto"])
+check("agente: se importaron el desktop, la notebook vieja y el servidor con su marca, modelo y serie",
+      _g["PC-VENTAS-01"]["tipo"] == "desktop" and _g["PC-VENTAS-01"]["marca"] == "Dell" and _g["PC-VENTAS-01"]["serie"] == "SER-V01"
+      and _g["NOTE-VIEJA"]["tipo"] == "notebook" and _g["SRV-DEMO"]["tipo"] == "otro" and _g["SRV-DEMO"]["glpi_id"] == "904" and _g["PC-VENTAS-01"]["estado"] == "en_stock")
+check("agente: lo importado queda en el historial como importado de GLPI", "Importado del inventario de GLPI" in c.get(f"/clientes/canal-sa/activos/{_g['PC-VENTAS-01']['id']}").text)
+lg = c.get("/clientes/canal-sa/activos")
+check("agente: la lista muestra Reportando y Sin reportar (40 días)", "Reportando" in lg.text and "Sin reportar" in lg.text and "del inventario de GLPI (agente) todavía no" not in lg.text)
+r = c.post("/clientes/canal-sa/activos/sincronizar", data={"importar": "1", "csrf": csrf_de(lg.text)})
+check("agente: sincronizar de nuevo no duplica nada", "<b>0</b> activo(s) vinculado(s)" in r.text and "<b>0</b> equipo(s) del agente" in r.text)
+check("agente: el filtro «sin agente» lista las notebooks/desktops no vinculadas y no los monitores o celulares",
+      "NB-100" in c.get("/clientes/canal-sa/activos?estado=sin_agente").text and "NB-001" not in c.get("/clientes/canal-sa/activos?estado=sin_agente").text
+      and "MON-014" not in c.get("/clientes/canal-sa/activos?estado=sin_agente").text and "CEL-003" not in c.get("/clientes/canal-sa/activos?estado=sin_agente").text)
+_rs = _ac.resumen(_conn, _cid_)
+check("agente: el resumen cuenta con agente y sin agente", _rs["con_agente"] == 4 and _rs["sin_agente"] >= 1)
+dn = c.get(f"/clientes/canal-sa/activos/{_g['NB-001']['id']}")
+check("agente: el detalle muestra el equipo vinculado y su último inventario", "🛰 Agente de GLPI" in dn.text and "NOTE-GERENCIA" in dn.text and "Lenovo ThinkPad E14" in dn.text and "último inventario" in dn.text)
+_celid = _conn.execute("SELECT id FROM activos WHERE etiqueta='CEL-003'").fetchone()["id"]
+check("agente: el celular no ofrece vínculo con el agente", "🛰 Agente de GLPI" not in c.get(f"/clientes/canal-sa/activos/{_celid}").text)
+r = c.post(f"/clientes/canal-sa/activos/{_g['NB-001']['id']}/desvincular", data={"csrf": csrf_de(dn.text)})
+check("agente: quitar el vínculo", "Vínculo con GLPI quitado" in r.text and "Quitar vínculo" not in r.text and "Vincular" in r.text)
+check("agente: no se puede quitar un vínculo que no existe", "no está vinculado" in c.post(f"/clientes/canal-sa/activos/{_g['NB-001']['id']}/desvincular", data={"csrf": csrf_de(r.text)}).text)
+r = c.post(f"/clientes/canal-sa/activos/{_g['NB-001']['id']}/vincular", data={"glpi_id": "902", "csrf": csrf_de(r.text)})
+check("agente: vincular a mano con un equipo libre", "Activo vinculado con el equipo de GLPI" in r.text and _conn.execute("SELECT glpi_id FROM activos WHERE etiqueta='NB-001'").fetchone()["glpi_id"] == "902")
+_n100 = _conn.execute("SELECT id FROM activos WHERE etiqueta='NB-100'").fetchone()["id"]
+check("agente: un equipo ya vinculado a otro activo no se puede reusar", "ya está vinculado a otro activo" in c.post(f"/clientes/canal-sa/activos/{_n100}/vincular", data={"glpi_id": "902", "csrf": csrf_de(c.get(f"/clientes/canal-sa/activos/{_n100}").text)}).text)
+check("agente: un equipo que no es del cliente se rechaza", "no está en el inventario" in c.post(f"/clientes/canal-sa/activos/{_n100}/vincular", data={"glpi_id": "99999", "csrf": csrf_de(c.get(f"/clientes/canal-sa/activos/{_n100}").text)}).text)
+_cel = _conn.execute("SELECT id FROM activos WHERE etiqueta='CEL-003'").fetchone()["id"]
+check("agente: monitores y celulares no se vinculan", "Solo se vinculan" in c.post(f"/clientes/canal-sa/activos/{_cel}/vincular", data={"glpi_id": "901", "csrf": csrf_de(c.get(f"/clientes/canal-sa/activos/{_cel}").text)}).text)
+# cruce por nombre cuando no hay serie
+_oc_cli = onboarding_mod.obtener_cliente_por_slug(_conn, "otro-cliente") if False else dict(_conn.execute("SELECT * FROM clients WHERE slug='otro-cliente'").fetchone())
+_ac.crear(_conn, _oc, "admin", {"tipo": "desktop", "etiqueta": "pc-ventas-01"})
+_rn = _ac.sincronizar(_conn, app.state.cfg, _oc_cli, "admin")
+check("agente: sin serie, cruza por nombre del equipo = etiqueta (sin distinguir mayúsculas)", _rn["vinculados"] == 1 and _rn["importados"] == 3
+      and _conn.execute("SELECT glpi_id FROM activos WHERE client_id=? AND etiqueta='pc-ventas-01'", (_oc,)).fetchone()["glpi_id"] == "901", _rn)
+check("agente: el técnico también puede sincronizar", "Sincronización con GLPI terminada" in ttec.post("/clientes/canal-sa/activos/sincronizar", data={"importar": "1", "csrf": csrf_de(ttec.get("/clientes/canal-sa/activos").text)}).text)
+check("agente: la auditoría registra sincronización y vínculos", all(x in c.get("/auditoria").text for x in ("activos.sincronizado", "activos.vinculado", "activos.desvinculado")))
+
 # RBAC: la Bandeja es de PM/admin
 check("RBAC: el técnico no entra a la Bandeja", ttec.get("/bandeja").url.path != "/bandeja")
 check("RBAC: el PM sí", tpm.get("/bandeja").url.path == "/bandeja")

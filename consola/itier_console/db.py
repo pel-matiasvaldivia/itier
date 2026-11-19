@@ -178,6 +178,8 @@ CREATE TABLE IF NOT EXISTS activos (
     garantia_hasta TEXT,
     estado         TEXT    NOT NULL DEFAULT 'en_stock',   -- en_uso | en_stock | en_reparacion | de_baja
     persona_id     INTEGER,                  -- client_contactos.id
+    glpi_id        TEXT,                     -- id de la Computer en GLPI (equipo con agente) con la que está vinculado
+    glpi_visto     TEXT,                     -- último inventario del agente que informó GLPI
     notas          TEXT,
     created_at     TEXT    NOT NULL,
     created_by     TEXT,
@@ -280,6 +282,10 @@ def _migrar(conn: sqlite3.Connection) -> None:
     for col in ("gws_admin", "gws_estado", "gws_detalle", "gws_dominio", "gws_conectado_at"):
         if col not in ccols:
             conn.execute(f"ALTER TABLE clients ADD COLUMN {col} TEXT")
+    acols = {r["name"] for r in conn.execute("PRAGMA table_info(activos)").fetchall()}
+    for col in ("glpi_id", "glpi_visto"):
+        if acols and col not in acols:
+            conn.execute(f"ALTER TABLE activos ADD COLUMN {col} TEXT")
     kcols = {r["name"] for r in conn.execute("PRAGMA table_info(client_contactos)").fetchall()}
     if kcols:
         for col, ddl in (("cargo", "TEXT"), ("area", "TEXT"), ("activo", "INTEGER NOT NULL DEFAULT 1")):

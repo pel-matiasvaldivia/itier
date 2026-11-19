@@ -161,6 +161,8 @@ def listar(conn, client_id: int, tipo: str = "", estado: str = "", persona: str 
         sql += " AND a.tipo = ?"; args.append(tipo)
     if estado in ESTADOS:
         sql += " AND a.estado = ?"; args.append(estado)
+    elif estado == "sin_agente":
+        sql += " AND a.tipo IN ('notebook','desktop') AND a.glpi_id IS NULL AND a.estado != 'de_baja'"
     elif estado == "garantia":
         sql += " AND a.garantia_hasta IS NOT NULL AND a.garantia_hasta <= ? AND a.estado != 'de_baja'"; args.append((date.today() + timedelta(days=60)).isoformat())
     if persona.isdigit():
@@ -175,12 +177,14 @@ def listar(conn, client_id: int, tipo: str = "", estado: str = "", persona: str 
 
 
 def resumen(conn, client_id: int) -> dict:
-    todos = [dict(r) for r in conn.execute("SELECT tipo, estado, persona_id, garantia_hasta FROM activos WHERE client_id = ?", (client_id,))]
+    todos = [dict(r) for r in conn.execute("SELECT tipo, estado, persona_id, garantia_hasta, glpi_id FROM activos WHERE client_id = ?", (client_id,))]
     vivos = [a for a in todos if a["estado"] != "de_baja"]
     por_tipo = {t: sum(1 for a in vivos if a["tipo"] == t) for t in TIPOS}
     return {"total": len(vivos), "asignados": sum(1 for a in vivos if a["persona_id"]), "en_stock": sum(1 for a in vivos if a["estado"] == "en_stock"),
             "en_reparacion": sum(1 for a in vivos if a["estado"] == "en_reparacion"),
             "garantia": sum(1 for a in vivos if garantia_estado(a["garantia_hasta"]) in ("por_vencer", "vencida")),
+            "con_agente": sum(1 for a in vivos if a["glpi_id"]),
+            "sin_agente": sum(1 for a in vivos if a["tipo"] in ("notebook", "desktop") and not a["glpi_id"]),
             "por_tipo": {k: v for k, v in por_tipo.items() if v}, "bajas": len(todos) - len(vivos)}
 
 
@@ -389,3 +393,136 @@ def importar_csv(conn, client_id: int, actor: str, raw: bytes) -> dict:
             res["errores"].append((n, e.mensaje))
     audit.registrar(conn, actor, "activos.importado", {"client_id": client_id, "creados": res["creados"], "omitidos": res["omitidos"], "errores": len(res["errores"])})
     return res
+
+
+# ---------------------------------------------------------------- integración con el inventario de GLPI (agente)
+# El GLPI Agent corre en Windows, macOS y Linux: sirve para notebooks y desktops. Los celulares (Android/iOS) no tienen agente de GLPI:
+# se llevan a mano (o por un MDM). Los activos se cruzan con las computadoras de GLPI por número de serie (o, si falta, por nombre).
+
+def _norm(s: str | None) -> str:
+    return re.sub(r"[^a-z0-9]", "", (s or "").lower())
+
+
+def _tipo_glpi(texto: str | None) -> str:
+    t = (texto or "").lower()
+    if any(x in t for x in ("laptop", "notebook", "portable", "portátil", "portatil", "netbook")):
+        return "notebook"
+    if any(x in t for x in ("server", "servidor")):
+        return "otro"
+    return "desktop"
+
+
+def frescura(ultimo: str | None) -> str | None:
+    """Qué tan reciente es el último inventario del agente: al_dia (≤ 3 días) | atrasado (≤ 14) | sin_reportar | None."""
+    if not ultimo:
+        return None
+    try:
+        d = datetime.fromisoformat(ultimo.replace("T", " ")[:19])
+    except ValueError:
+        return None
+    dias = (datetime.now() - d).days
+    return "al_dia" if dias <= 3 else ("atrasado" if dias <= 14 else "sin_reportar")
+
+
+def equipos_glpi(cfg, cli: dict) -> tuple[list[dict], str | None]:
+    """(equipos que GLPI conoce del cliente, error). Nunca levanta: la lista de activos funciona aunque GLPI esté caído."""
+    from ..adapters import AdapterError, glpi as glpi_mod
+    if not cfg.glpi_configurado or not cli.get("glpi_entity_id"):
+        return [], None
+    try:
+        with glpi_mod.cliente(cfg) as g:
+            return g.equipos_inventariados(cli["glpi_entity_id"]), None
+    except AdapterError as e:
+        return [], e.detalle
+
+
+def vista_agente(activos: list[dict], equipos: list[dict]) -> None:
+    """Agrega a cada activo `glpi` (el equipo vinculado, si GLPI lo devolvió) y `agente` (frescura del inventario)."""
+    por_id = {e["id"]: e for e in equipos}
+    for a in activos:
+        e = por_id.get(str(a.get("glpi_id") or ""))
+        a["glpi"] = e
+        ultimo = (e or {}).get("ultimo_inventario") or a.get("glpi_visto")
+        a["agente"] = frescura(ultimo) if a.get("glpi_id") else None
+        a["agente_visto"] = (ultimo or "")[:16]
+
+
+def pendientes_glpi(conn, client_id: int, equipos: list[dict]) -> list[dict]:
+    vinculados = {r["glpi_id"] for r in conn.execute("SELECT glpi_id FROM activos WHERE client_id = ? AND glpi_id IS NOT NULL", (client_id,))}
+    return [e for e in equipos if e["id"] not in vinculados]
+
+
+def _set_vinculo(conn, aid: int, e: dict | None) -> None:
+    conn.execute("UPDATE activos SET glpi_id = ?, glpi_visto = ?, updated_at = ? WHERE id = ?",
+                 (e["id"] if e else None, (e or {}).get("ultimo_inventario") or None, ahora(), aid))
+
+
+def sincronizar(conn, cfg, cli: dict, actor: str, importar: bool = True) -> dict:
+    """Vincula los activos con los equipos de GLPI (serie, o nombre = etiqueta) y trae los equipos que faltan en la lista."""
+    equipos, error = equipos_glpi(cfg, cli)
+    res = {"vinculados": 0, "actualizados": 0, "importados": 0, "sin_serie": 0, "error": error}
+    if error:
+        return res
+    cid = cli["id"]
+    por_id = {e["id"]: e for e in equipos}
+    libres = [e for e in equipos if e["id"] not in {r["glpi_id"] for r in conn.execute("SELECT glpi_id FROM activos WHERE client_id = ? AND glpi_id IS NOT NULL", (cid,))}]
+    for a in [dict(r) for r in conn.execute("SELECT * FROM activos WHERE client_id = ? AND tipo IN ('notebook','desktop','otro') AND estado != 'de_baja'", (cid,))]:
+        if a["glpi_id"]:
+            e = por_id.get(a["glpi_id"])
+            if e and (e["ultimo_inventario"] or None) != a["glpi_visto"]:
+                _set_vinculo(conn, a["id"], e)
+                res["actualizados"] += 1
+            continue
+        ns = _norm(a["serie"])
+        elegido = next((e for e in libres if ns and _norm(e["serie"]) == ns), None) or \
+                  next((e for e in libres if a["etiqueta"] and e["nombre"] and e["nombre"].strip().lower() == a["etiqueta"].strip().lower()), None)
+        if elegido:
+            libres.remove(elegido)
+            _set_vinculo(conn, a["id"], elegido)
+            _historial(conn, a["id"], "editado", None, f"Vinculado con el equipo «{elegido['nombre']}» de GLPI", actor)
+            res["vinculados"] += 1
+    if importar:
+        for e in libres:
+            tipo = _tipo_glpi(e["tipo"])
+            etiqueta = e["nombre"] or f"GLPI-{e['id']}"
+            if conn.execute("SELECT 1 FROM activos WHERE client_id = ? AND etiqueta = ?", (cid, etiqueta)).fetchone():
+                etiqueta = f"{etiqueta}-{e['id']}"
+            serie = e["serie"] if e["serie"] and not conn.execute("SELECT 1 FROM activos WHERE client_id = ? AND tipo = ? AND serie = ?", (cid, tipo, e["serie"])).fetchone() else ""
+            if not e["serie"]:
+                res["sin_serie"] += 1
+            try:
+                aid = crear(conn, cid, actor, {"tipo": tipo, "etiqueta": etiqueta, "marca": e["fabricante"], "modelo": e["modelo"], "serie": serie,
+                                               "notas": "Importado del inventario de GLPI (agente)."})
+            except ServiceError:
+                continue
+            _set_vinculo(conn, aid, e)
+            conn.execute("UPDATE activo_historial SET detalle = 'Importado del inventario de GLPI' WHERE activo_id = ? AND accion = 'alta'", (aid,))
+            res["importados"] += 1
+    conn.commit()
+    audit.registrar(conn, actor, "activos.sincronizado", {"client_id": cid, **{k: v for k, v in res.items() if k != "error"}})
+    return res
+
+
+def vincular(conn, client_id: int, aid: int, actor: str, glpi_id: str, equipos: list[dict]) -> None:
+    a = _fila(conn, client_id, aid)
+    if a["tipo"] not in ("notebook", "desktop", "otro"):
+        raise ServiceError("Solo se vinculan notebooks, desktops u otros equipos con agente (los monitores y celulares no reportan a GLPI).")
+    e = next((x for x in equipos if x["id"] == str(glpi_id)), None)
+    if not e:
+        raise ServiceError("Ese equipo no está en el inventario de GLPI de este cliente.")
+    if conn.execute("SELECT 1 FROM activos WHERE client_id = ? AND glpi_id = ? AND id != ?", (client_id, e["id"], aid)).fetchone():
+        raise ServiceError("Ese equipo de GLPI ya está vinculado a otro activo.")
+    _set_vinculo(conn, aid, e)
+    _historial(conn, aid, "editado", None, f"Vinculado con el equipo «{e['nombre']}» de GLPI", actor)
+    conn.commit()
+    audit.registrar(conn, actor, "activos.vinculado", {"client_id": client_id, "activo_id": aid, "glpi_id": e["id"]})
+
+
+def desvincular(conn, client_id: int, aid: int, actor: str) -> None:
+    a = _fila(conn, client_id, aid)
+    if not a.get("glpi_id"):
+        raise ServiceError("El activo no está vinculado a GLPI.")
+    _set_vinculo(conn, aid, None)
+    _historial(conn, aid, "editado", None, "Se quitó el vínculo con GLPI", actor)
+    conn.commit()
+    audit.registrar(conn, actor, "activos.desvinculado", {"client_id": client_id, "activo_id": aid})
