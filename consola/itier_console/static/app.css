@@ -383,3 +383,66 @@ html.cargando,html.cargando *{cursor:progress!important}
 fieldset.subform{border:1px solid var(--line);border-radius:12px;padding:1rem 1.1rem;background:#f8fafc;margin:0}
 fieldset.subform legend{font-weight:700;font-size:.85rem;padding:0 .5rem;color:var(--indigo-d)}
 .card .form{max-width:none}
+
+/* ═══ Densidad y aprovechamiento del ancho (v4) ═══════════════════════════════════════════
+   Menos desplazamiento: contenido a todo el ancho, espaciados más compactos, tarjetas que se acomodan en columnas
+   (masonry) y nada que desborde la pantalla en 1280–1366 px. */
+html{font-size:15px}
+.topbar{position:sticky;top:0;z-index:40}
+.shell{min-height:calc(100vh - 53px)}
+.sidebar{width:172px;padding:.75rem .55rem;position:sticky;top:53px;align-self:flex-start;height:calc(100vh - 53px);overflow-y:auto}
+.sidebar a{padding:.45rem .65rem;font-size:.9rem}
+.content{flex:1;min-width:0;max-width:1800px;padding:.95rem 1.2rem 1.4rem}
+.l-head{margin-bottom:.8rem;gap:.8rem;flex-wrap:nowrap;align-items:flex-end}
+.l-head>div:first-child{min-width:0;flex:1 1 auto}
+.l-head h1,.page-head h1,.d-hero h1{font-size:1.4rem;margin:0}
+.l-head .acciones,.d-hero .acciones{display:flex;gap:.45rem;flex-wrap:wrap;justify-content:flex-end;flex:0 0 auto;margin-left:auto}
+.u-sub{margin:.1rem 0 0;font-size:.86rem}
+.u-card{padding:.95rem 1.05rem;margin-bottom:.85rem;min-width:0}
+.u-card h2{font-size:1rem;margin:0 0 .2rem}
+.u-card .u-lead{font-size:.86rem;margin:0 0 .65rem}
+.u-stats{gap:.65rem;margin-bottom:.85rem;grid-template-columns:repeat(auto-fit,minmax(130px,1fr))}
+.l-wrap{margin-bottom:.9rem;overflow-x:auto}
+.l-bar-top{padding:.7rem .95rem}
+.l-table{font-size:.88rem}
+.l-table th{padding:.5rem .85rem}
+.l-table td{padding:.5rem .85rem}
+.d-grid{gap:.65rem;margin-bottom:.85rem;grid-template-columns:repeat(auto-fit,minmax(200px,1fr))}
+.d-tabs{margin-bottom:.8rem}
+.d-hero{margin-bottom:.7rem}
+.d-meta{margin:.5rem 0 .7rem}
+.form{gap:.6rem;max-width:520px}
+.form input,.form select,.form textarea{padding:.48rem .7rem;font-size:.92rem;max-width:100%;min-width:0}
+.form label{font-size:.86rem}
+.note{padding:.6rem .85rem;margin-bottom:.8rem}
+/* Grillas: columnas que pueden encogerse (antes una tabla o un input ancho empujaba la columna derecha fuera de la pantalla) */
+.d-cols{grid-template-columns:minmax(0,1.55fr) minmax(0,1fr);gap:.95rem}
+.d-cols>*{min-width:0}
+.d-cols>div>.u-card:last-child{margin-bottom:0}
+@media (max-width:1100px){.d-cols{grid-template-columns:minmax(0,1fr)}}
+/* Tarjetas en columnas que se acomodan solas según el ancho (2 en 1366 px, 3 en pantallas anchas) */
+.masonry{column-width:400px;column-gap:.95rem}
+.masonry>.u-card,.masonry>section{break-inside:avoid;-webkit-column-break-inside:avoid;display:block;margin-bottom:.85rem}
+.u-card table,.l-wrap table{max-width:100%}
+.tabla input[type=email],.tabla input[type=text],.l-table input[type=text],.l-table input[type=email]{min-width:0;width:100%;max-width:100%}
+.l-table input[name=cargo],.l-table input[name=area]{width:48%}
+pre,code{overflow-wrap:anywhere}
+/* Estado de pantallas chicas */
+@media (max-width:900px){
+  .sidebar{position:static;height:auto;width:auto}
+  .l-head{flex-wrap:wrap}
+  .content{padding:.8rem}
+}
+.form.row{flex-wrap:wrap}
+.form.cols{max-width:none;display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));align-items:end;gap:.55rem}
+.form.cols>button{align-self:end}
+.u-card p{font-size:.9rem}
+.u-card .u-lead,.u-card .small,.u-card .muted.small{font-size:.84rem}
+.u-card .form>button,.u-card .form>.u-btn,.u-card .form>.u-b{align-self:flex-start}
+.u-card>a.u-btn{display:block;text-align:center}
+/* Formularios anchos en dos columnas (menos desplazamiento) */
+.form.cols2{max-width:none;display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:.6rem .9rem;align-items:end}
+.form.cols2>.d-meta:not(.span-all){display:contents}
+.form.cols2 #auth-pass:not([hidden]),.form.cols2 #auth-ms:not([hidden]){display:contents}
+.form.cols2 .span-all{grid-column:1/-1}
+.form.cols2>label>input,.form.cols2>label>select{width:100%}

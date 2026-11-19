@@ -40,8 +40,7 @@
       <b style="font-size:.98rem">{{ cli.created_at }}</b>{% if cli.notas %}<small title="{{ cli.notas }}">{{ cli.notas }}</small>{% else %}<small>Sin notas</small>{% endif %}</div>
   </div>
 
-  <div class="d-cols">
-    <div>
+  <div class="masonry">
       <section class="u-card">
         <h2>👥 Usuarios del portal</h2>
         <p class="u-lead">Accesos para que el cliente entre a <code>/portal</code> (ve solo su empresa: sus tickets y equipos).</p>
@@ -53,7 +52,7 @@
             <tr>
               <td><strong>{{ u.username }}</strong></td>
               <td>{% if puede('clientes.editar') %}<form method="post" action="/clientes/{{ cli.slug }}/portal-usuarios/{{ u.id }}/email" class="inline" style="display:flex;gap:.3rem">
-                <input type="hidden" name="csrf" value="{{ csrf }}"><input type="email" name="email" value="{{ u.email or '' }}" placeholder="correo@cliente.com" style="min-width:12rem">
+                <input type="hidden" name="csrf" value="{{ csrf }}"><input type="email" name="email" value="{{ u.email or '' }}" placeholder="correo@cliente.com">
                 <button class="u-b" type="submit" title="Guardar correo">💾</button></form>{% else %}{{ u.email or '—' }}{% endif %}</td>
               <td>{% if u.totp_confirmed %}<span class="l-pill ok"><i></i>activo</span>{% else %}<span class="l-pill warn"><i></i>pendiente</span>{% endif %}</td>
               <td class="muted">{{ u.last_login or '—' }}</td>
@@ -129,9 +128,7 @@
         </details>
         {% endif %}
       </section>
-    </div>
 
-    <div>
       {% if puede('activos') %}
       <section class="u-card">
         <h2>📦 Activos</h2>
@@ -205,7 +202,7 @@
         </div>
         {% else %}<p class="muted small">Ninguno: los correos de este cliente irán a la Bandeja.</p>{% endfor %}
         {% if puede('clientes.editar') %}
-        <form method="post" action="/clientes/{{ cli.slug }}/dominios" class="form">
+        <form method="post" action="/clientes/{{ cli.slug }}/dominios" class="form cols">
           <input type="hidden" name="csrf" value="{{ csrf }}">
           <label>Agregar dominio<input type="text" name="dominio" placeholder="cuyopack.com.ar" required></label>
           <button class="u-b" type="submit">Asociar dominio</button>
@@ -221,7 +218,7 @@
         </div>
         {% else %}<p class="muted small">Sin personas cargadas.</p>{% endfor %}
         {% if puede('clientes.editar') %}
-        <form method="post" action="/clientes/{{ cli.slug }}/contactos" class="form">
+        <form method="post" action="/clientes/{{ cli.slug }}/contactos" class="form cols">
           <input type="hidden" name="csrf" value="{{ csrf }}">
           <label>Nombre<input type="text" name="nombre" placeholder="Ronan Pérez"></label>
           <label>Correo<input type="email" name="email" placeholder="ronan@gmail.com"></label>
@@ -231,27 +228,26 @@
         <p class="muted small">Para correos públicos (Gmail, Hotmail…) y para WhatsApp hay que cargar a cada persona: un dominio público no se puede asociar.</p>
         {% endif %}
       </section>
-      {% if puede('clientes.editar') %}
+      {% if puede('clientes.editar') or puede('clientes.eliminar') %}
       <section class="u-card">
-        <h2>⚙️ Acciones</h2>
-        <form method="post" action="/clientes/{{ cli.slug }}/reintentar" class="inline">
-          <input type="hidden" name="csrf" value="{{ csrf }}">
-          <button class="u-btn" type="submit" style="width:100%">Reintentar aprovisionamiento</button>
-        </form>
-        <p class="muted small" style="margin-top:.7rem">Crea solo lo que falte en GLPI, Zabbix y MeshCentral (reusa la PSK). Es seguro repetirlo.</p>
+        <h2>⚙️ Mantenimiento</h2>
+        <div class="d-meta" style="gap:.5rem;margin:.5rem 0 .4rem">
+          {% if puede('clientes.editar') %}
+          <form method="post" action="/clientes/{{ cli.slug }}/reintentar" class="inline">
+            <input type="hidden" name="csrf" value="{{ csrf }}">
+            <button class="u-btn" type="submit">Reintentar aprovisionamiento</button>
+          </form>
+          {% endif %}
+          {% if puede('clientes.eliminar') %}
+          <form method="post" action="/clientes/{{ cli.slug }}/eliminar" class="inline"
+                onsubmit="return confirm('¿Eliminar el registro local de {{ cli.nombre }}? No borra la entidad/grupo/proxy en GLPI/Zabbix.');">
+            <input type="hidden" name="csrf" value="{{ csrf }}">
+            <button class="u-b danger" type="submit">🗑 Eliminar registro</button>
+          </form>
+          {% endif %}
+        </div>
+        <p class="muted small" style="margin:0">«Reintentar» crea solo lo que falte en GLPI, Zabbix y MeshCentral (es seguro repetirlo). «Eliminar» quita únicamente el registro de la consola; lo que haya quedado en GLPI, Zabbix o MeshCentral se borra allí.</p>
       </section>
       {% endif %}
-      {% if puede('clientes.eliminar') %}
-      <section class="u-card d-danger">
-        <h2>🗑 Zona de riesgo</h2>
-        <form method="post" action="/clientes/{{ cli.slug }}/eliminar" class="inline"
-              onsubmit="return confirm('¿Eliminar el registro local de {{ cli.nombre }}? No borra la entidad/grupo/proxy en GLPI/Zabbix.');">
-          <input type="hidden" name="csrf" value="{{ csrf }}">
-          <button class="u-b danger" type="submit" style="width:100%;padding:.6rem">Eliminar registro</button>
-        </form>
-        <p class="muted small" style="margin-top:.7rem">Quita únicamente el registro de la consola; lo que haya quedado en GLPI, Zabbix o MeshCentral se borra allí.</p>
-      </section>
-      {% endif %}
-    </div>
   </div>
 {% endblock %}

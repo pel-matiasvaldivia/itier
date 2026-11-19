@@ -34,7 +34,7 @@
       <tbody>
       {% for p in personas %}
         <tr style="{{ 'opacity:.55' if not p.activo else '' }}">
-            <td><input form="fp{{ p.id }}" type="text" name="nombre" value="{{ p.nombre or '' }}" required style="min-width:10rem"></td>
+            <td><input form="fp{{ p.id }}" type="text" name="nombre" value="{{ p.nombre or '' }}" required></td>
             <td><input form="fp{{ p.id }}" type="text" name="cargo" value="{{ p.cargo or '' }}" placeholder="Cargo" style="width:8rem"> <input form="fp{{ p.id }}" type="text" name="area" value="{{ p.area or '' }}" placeholder="Área" style="width:8rem"></td>
             <td class="small">{% if p.origen %}<span class="l-pill info" title="Vino de la sincronización">{{ 'Microsoft 365' if p.origen == 'm365' else 'Google' }}</span><br>{% endif %}{% if p.email %}✉️ {{ p.email }}<br>{% endif %}{% if p.whatsapp %}💬 {{ 'ID interno' if p.whatsapp.startswith('lid:') else '+' ~ p.whatsapp }}{% endif %}{% if not p.email and not p.whatsapp %}<span class="muted">—</span>{% endif %}</td>
             <td><a href="/clientes/{{ cli.slug }}/activos?persona={{ p.id }}">{{ p.n_activos }}</a></td>
