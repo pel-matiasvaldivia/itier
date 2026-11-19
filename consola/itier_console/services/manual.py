@@ -22,6 +22,7 @@ RESPONSABILIDADES = {
     "tecnico": [
         "Atender y actualizar los tickets que se te asignan, dentro de los tiempos acordados con cada cliente; si hay un ticket nuevo sin técnico, tomarlo con «Tomar este caso».",
         "En el ticket respondé en «Conversación» (con «Nota interna» para lo que el cliente no debe ver); dejá marcado «Avisar al cliente» para que le llegue por correo (o por WhatsApp si escribió por ahí) con el enlace a su ticket en el portal; si nadie tiene correo cargado, pedile al PM que lo cargue en la ficha del cliente. Al terminar, usá «Estado del caso» → «Marcar como resuelto» indicando qué hiciste; el PM o vos lo cierran cuando el cliente confirma.",
+        "Mantener al día los activos de cada cliente (ficha del cliente → Activos): altas, asignaciones y devoluciones cuando alguien recibe o entrega un equipo, y avisar al PM de las garantías por vencer.",
         "Gestionar los usuarios de Google Workspace de los clientes (ficha del cliente → Google Workspace): altas, reinicio de clave y suspensiones; los administradores del dominio se tratan desde la Admin console de Google.",
         "Gestionar los usuarios de Microsoft 365 de los clientes (ficha del cliente → Microsoft 365): altas, licencias, reinicio de clave y bloqueos; confirmá siempre la identidad de quien lo pide antes de reiniciar una clave.",
         "Registrar en cada ticket el tiempo que le dedicaste («Tiempo dedicado»): de ahí salen las horas por cliente y la rentabilidad de cada contrato.",

@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+{% block titulo %}Activos · {{ cli.nombre }} · Consola de iTier{% endblock %}
+{% macro gar(a) -%}
+  {%- if a.garantia == 'vigente' -%}<span class="l-pill ok">Vigente</span>{%- elif a.garantia == 'por_vencer' -%}<span class="l-pill warn">Por vencer</span>{%- elif a.garantia == 'vencida' -%}<span class="l-pill bad">Vencida</span>{%- else -%}<span class="muted">—</span>{%- endif -%}
+{%- endmacro %}
+{% block contenido %}
+  <div class="l-head">
+    <div>
+      <p class="u-sub" style="margin:0 0 .2rem"><a href="/clientes/{{ cli.slug }}">← {{ cli.nombre }}</a></p>
+      <h1>Activos</h1>
+      <p class="u-sub">Notebooks, desktops, monitores y celulares de {{ cli.nombre }}, y a quién están asignados.</p>
+    </div>
+    <div class="acciones" style="display:flex;gap:.5rem;flex-wrap:wrap">
+      <a class="u-b" href="/clientes/{{ cli.slug }}/personas" style="text-decoration:none">👥 Personas</a>
+      <a class="u-b" href="/clientes/{{ cli.slug }}/activos/exportar.csv" style="text-decoration:none">⬇ Exportar CSV</a>
+      <a class="u-btn" href="/clientes/{{ cli.slug }}/activos/nuevo" style="text-decoration:none">+ Nuevo activo</a>
+    </div>
+  </div>
+
+  {% if importacion %}
+  <section class="u-cred">
+    <h2>📥 Importación terminada</h2>
+    <p class="u-sub"><b>{{ importacion.creados }}</b> activo(s) cargado(s){% if importacion.omitidos %} · {{ importacion.omitidos }} omitido(s) por estar repetidos{% endif %}{% if importacion.personas_nuevas %} · {{ importacion.personas_nuevas }} persona(s) nueva(s) creada(s){% endif %}.</p>
+    {% if importacion.errores %}<div class="u-warn"><b>Filas con problemas:</b><br>{% for fila, motivo in importacion.errores %}Fila {{ fila }}: {{ motivo }}<br>{% endfor %}</div>{% endif %}
+  </section>
+  {% endif %}
+
+  <div class="u-stats">
+    <div class="u-stat"><b>{{ resumen.total }}</b><span>Activos</span></div>
+    <div class="u-stat"><b>{{ resumen.asignados }}</b><span>Asignados</span></div>
+    <div class="u-stat"><b>{{ resumen.en_stock }}</b><span>En stock</span></div>
+    <div class="u-stat {{ 'bad' if resumen.garantia else '' }}"><b>{{ resumen.garantia }}</b><span>Garantía por vencer / vencida</span></div>
+  </div>
+
+  <div class="l-wrap">
+    <div class="l-bar-top">
+      <form method="get" action="/clientes/{{ cli.slug }}/activos" class="l-filters" style="display:flex;gap:.5rem;flex-wrap:wrap">
+        <select class="l-sel" name="tipo" onchange="this.form.submit()" aria-label="Tipo">
+          <option value="">Todos los tipos</option>
+          {% for k, (n, i) in TIPOS.items() %}<option value="{{ k }}" {{ 'selected' if f.tipo == k else '' }}>{{ i }} {{ n }}{% if resumen.por_tipo.get(k) %} ({{ resumen.por_tipo[k] }}){% endif %}</option>{% endfor %}
+        </select>
+        <select class="l-sel" name="estado" onchange="this.form.submit()" aria-label="Estado">
+          <option value="">Todos los estados</option>
+          {% for k, n in ESTADOS.items() %}<option value="{{ k }}" {{ 'selected' if f.estado == k else '' }}>{{ n }}</option>{% endfor %}
+          <option value="garantia" {{ 'selected' if f.estado == 'garantia' else '' }}>Garantía por vencer / vencida</option>
+        </select>
+        <select class="l-sel" name="persona" onchange="this.form.submit()" aria-label="Persona">
+          <option value="">Todas las personas</option>
+          <option value="sin" {{ 'selected' if f.persona == 'sin' else '' }}>Sin asignar</option>
+          {% for p in personas %}<option value="{{ p.id }}" {{ 'selected' if f.persona == p.id|string else '' }}>{{ p.nombre or p.email }}</option>{% endfor %}
+        </select>
+        <input class="u-search" type="search" name="q" value="{{ f.q }}" placeholder="Buscar etiqueta, modelo, serie, IMEI, persona…" aria-label="Buscar">
+        <button class="u-b" type="submit">Buscar</button>
+      </form>
+    </div>
+    {% if activos %}
+    <table class="l-table">
+      <thead><tr><th>Activo</th><th>Marca / modelo</th><th>Serie</th><th>Asignado a</th><th>Estado</th><th>Garantía</th></tr></thead>
+      <tbody>
+      {% for a in activos %}
+        <tr>
+          <td><a class="l-link" href="/clientes/{{ cli.slug }}/activos/{{ a.id }}"><b>{{ a.tipo_icono }} {{ a.etiqueta or ('#' ~ a.id) }}</b></a><br><span class="muted small">{{ a.tipo_label }}</span></td>
+          <td class="small">{{ a.marca or '' }} {{ a.modelo or '' }}</td>
+          <td class="small">{{ a.serie or '—' }}{% if a.imei %}<br><span class="muted">IMEI {{ a.imei }}</span>{% endif %}</td>
+          <td>{{ a.persona or '—' }}</td>
+          <td><span class="l-pill {{ {'en_uso': 'info', 'en_stock': 'ok', 'en_reparacion': 'warn', 'de_baja': 'off'}[a.estado] }}">{{ a.estado_label }}</span></td>
+          <td>{{ gar(a) }}{% if a.garantia_hasta %}<br><span class="muted small">{{ a.garantia_hasta }}</span>{% endif %}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% else %}<div class="l-empty"><b>📦</b>Todavía no hay activos{% if f.tipo or f.estado or f.persona or f.q %} con ese filtro{% endif %}. Agregá el primero o importá una planilla.</div>{% endif %}
+  </div>
+
+  <section class="u-card" style="margin-top:1.4rem">
+    <h2>📥 Importar desde Excel / CSV</h2>
+    <p class="u-lead">Si el cliente ya tiene su lista en una planilla, guardala como CSV y subila. Se crean los activos y, si hay una columna «asignado a», las personas que falten.</p>
+    <form method="post" action="/clientes/{{ cli.slug }}/activos/importar" enctype="multipart/form-data" class="form" style="display:flex;gap:.6rem;align-items:center;flex-wrap:wrap">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <input type="file" name="archivo" accept=".csv,text/csv" required>
+      <button class="u-btn" type="submit">Importar</button>
+      <a href="/activos/plantilla.csv" style="font-size:.85rem">Descargar plantilla de ejemplo</a>
+    </form>
+    <p class="muted small">Columnas: tipo, etiqueta, marca, modelo, serie, imei, linea, fecha_compra, garantia_hasta, estado, asignado_a, notas. Solo «tipo» es obligatoria; hace falta etiqueta, modelo o serie para identificar cada fila. Los repetidos (misma etiqueta o serie) se omiten.</p>
+  </section>
+{% endblock %}

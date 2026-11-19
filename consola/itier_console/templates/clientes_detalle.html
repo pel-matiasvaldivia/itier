@@ -132,6 +132,14 @@
     </div>
 
     <div>
+      {% if puede('activos') %}
+      <section class="u-card">
+        <h2>📦 Activos</h2>
+        <p class="u-lead">Notebooks, desktops, monitores y celulares de {{ cli.nombre }}, y a quién están asignados.</p>
+        <a class="u-btn" href="/clientes/{{ cli.slug }}/activos" style="text-decoration:none;display:block;text-align:center">Ver y gestionar activos</a>
+        <p class="muted small" style="margin-top:.6rem"><a href="/clientes/{{ cli.slug }}/personas">👥 Personas</a> · <a href="/clientes/{{ cli.slug }}/activos/nuevo">+ Nuevo activo</a></p>
+      </section>
+      {% endif %}
       <section class="u-card">
         <h2>☁️ Microsoft 365</h2>
         {% if cli.m365_estado == 'conectado' %}

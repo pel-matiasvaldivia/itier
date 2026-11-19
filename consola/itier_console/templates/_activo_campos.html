@@ -1,0 +1,28 @@
+<label>Tipo
+  <select name="tipo" id="a-tipo">
+    {% for k, (n, i) in TIPOS.items() %}<option value="{{ k }}" {{ 'selected' if (v.tipo or 'notebook') == k else '' }}>{{ i }} {{ n }}</option>{% endfor %}
+  </select></label>
+<div class="d-meta" style="gap:.8rem">
+  <label style="flex:1">Etiqueta / código interno <input type="text" name="etiqueta" value="{{ v.etiqueta or '' }}" placeholder="NB-001" maxlength="60"></label>
+  <label style="flex:1">Número de serie <input type="text" name="serie" value="{{ v.serie or '' }}" maxlength="80"></label>
+</div>
+<div class="d-meta" style="gap:.8rem">
+  <label style="flex:1">Marca <input type="text" name="marca" value="{{ v.marca or '' }}" placeholder="Lenovo" maxlength="60"></label>
+  <label style="flex:1">Modelo <input type="text" name="modelo" value="{{ v.modelo or '' }}" placeholder="ThinkPad E14" maxlength="80"></label>
+</div>
+<div class="d-meta" style="gap:.8rem" id="a-celular">
+  <label style="flex:1">IMEI (celulares) <input type="text" name="imei" value="{{ v.imei or '' }}" maxlength="40"></label>
+  <label style="flex:1">Número de línea (celulares) <input type="text" name="linea" value="{{ v.linea or '' }}" maxlength="40"></label>
+</div>
+<div class="d-meta" style="gap:.8rem">
+  <label style="flex:1">Fecha de compra <input type="date" name="fecha_compra" value="{{ v.fecha_compra or '' }}"></label>
+  <label style="flex:1">Garantía hasta <input type="date" name="garantia_hasta" value="{{ v.garantia_hasta or '' }}"></label>
+</div>
+<label>Notas <textarea name="notas" rows="2" maxlength="1000" style="width:100%">{{ v.notas or '' }}</textarea></label>
+<script>
+(function () {
+  var t = document.getElementById("a-tipo"), c = document.getElementById("a-celular");
+  function ver() { c.hidden = t.value !== "celular"; }
+  t.addEventListener("change", ver); ver();
+})();
+</script>

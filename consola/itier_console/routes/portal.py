@@ -16,7 +16,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from .. import audit, security
 from ..adapters import AdapterError
 from ..deps import flash, get_db, render, require_cliente
-from ..services import agents, canales as canales_svc, equipos as equipos_svc, notificaciones, onboarding
+from ..services import activos as activos_svc, agents, canales as canales_svc, equipos as equipos_svc, notificaciones, onboarding
 from ..services import tickets as tickets_svc
 
 router = APIRouter(prefix="/portal")
@@ -210,3 +210,14 @@ def equipos(request: Request, user: dict = Depends(require_cliente), conn: sqlit
     datos = equipos_svc.listar(request.app.state.cfg, cli)
     return render(request, "portal_equipos.html", cli=cli, proxy=datos["proxy"], equipos=datos["equipos"],
                   notas=datos["notas"])
+
+
+# ── Mis activos (solo lectura) ──────────────────────────────────────────────
+
+@router.get("/activos", response_class=HTMLResponse)
+def activos(request: Request, tipo: str = "", user: dict = Depends(require_cliente), conn: sqlite3.Connection = Depends(get_db)):
+    cli = _cliente(conn, user)
+    if not cli:
+        return render(request, "portal_sin_cliente.html")
+    return render(request, "portal_activos.html", cli=cli, activos=[a for a in activos_svc.listar(conn, cli["id"], tipo) if a["estado"] != "de_baja"],
+                  resumen=activos_svc.resumen(conn, cli["id"]), TIPOS=activos_svc.TIPOS, tipo=tipo)

@@ -163,6 +163,40 @@ CREATE TABLE IF NOT EXISTS tarifas (
     usd_hora REAL NOT NULL
 );
 
+-- Activos (notebooks, desktops, monitores, celulares…) de cada cliente y a quién están asignados.
+CREATE TABLE IF NOT EXISTS activos (
+    id             INTEGER PRIMARY KEY AUTOINCREMENT,
+    client_id      INTEGER NOT NULL,
+    tipo           TEXT    NOT NULL,         -- notebook | desktop | monitor | celular | otro
+    etiqueta       TEXT,                     -- código interno (único por cliente)
+    marca          TEXT,
+    modelo         TEXT,
+    serie          TEXT,
+    imei           TEXT,
+    linea          TEXT,
+    fecha_compra   TEXT,
+    garantia_hasta TEXT,
+    estado         TEXT    NOT NULL DEFAULT 'en_stock',   -- en_uso | en_stock | en_reparacion | de_baja
+    persona_id     INTEGER,                  -- client_contactos.id
+    notas          TEXT,
+    created_at     TEXT    NOT NULL,
+    created_by     TEXT,
+    updated_at     TEXT
+);
+CREATE UNIQUE INDEX IF NOT EXISTS ux_activo_etiqueta ON activos(client_id, etiqueta) WHERE etiqueta IS NOT NULL AND etiqueta != '';
+CREATE UNIQUE INDEX IF NOT EXISTS ux_activo_serie ON activos(client_id, tipo, serie) WHERE serie IS NOT NULL AND serie != '';
+CREATE INDEX IF NOT EXISTS ix_activo_cliente ON activos(client_id, tipo);
+CREATE TABLE IF NOT EXISTS activo_historial (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    activo_id  INTEGER NOT NULL,
+    accion     TEXT    NOT NULL,             -- alta | asignado | devuelto | estado | editado
+    persona    TEXT,                         -- nombre de la persona (copia: sobrevive si se desactiva)
+    detalle    TEXT,
+    por        TEXT,
+    at         TEXT    NOT NULL
+);
+CREATE INDEX IF NOT EXISTS ix_historial_activo ON activo_historial(activo_id, id);
+
 -- Enlaces de instalación del appliance: token de un solo propósito, con
 -- vencimiento y usos acotados. Se guarda SOLO el hash (el token se muestra una vez).
 CREATE TABLE IF NOT EXISTS enroll_tokens (
@@ -246,6 +280,11 @@ def _migrar(conn: sqlite3.Connection) -> None:
     for col in ("gws_admin", "gws_estado", "gws_detalle", "gws_dominio", "gws_conectado_at"):
         if col not in ccols:
             conn.execute(f"ALTER TABLE clients ADD COLUMN {col} TEXT")
+    kcols = {r["name"] for r in conn.execute("PRAGMA table_info(client_contactos)").fetchall()}
+    if kcols:
+        for col, ddl in (("cargo", "TEXT"), ("area", "TEXT"), ("activo", "INTEGER NOT NULL DEFAULT 1")):
+            if col not in kcols:
+                conn.execute(f"ALTER TABLE client_contactos ADD COLUMN {col} {ddl}")
     if "facturacion_ars" not in ccols:
         conn.execute("ALTER TABLE clients ADD COLUMN facturacion_ars REAL")
     ucols = {r["name"] for r in conn.execute("PRAGMA table_info(users)").fetchall()}

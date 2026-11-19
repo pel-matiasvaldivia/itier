@@ -189,6 +189,13 @@ consola/
 ```
 
 
+## Activos de un cliente
+
+Ficha del cliente → **Activos**: lista de notebooks, desktops, monitores, celulares (y «otro») con etiqueta, marca, modelo, serie, IMEI/línea, compra y garantía, y su
+**asignación a personas** del cliente (las mismas que figuran como contactos; no hace falta que tengan correo o WhatsApp). Cada movimiento (alta, asignación, devolución,
+estado) queda en el historial del activo y en la auditoría. Estados: en uso, en stock, en reparación, de baja. Se puede **importar desde Excel/CSV**, exportar, y el cliente ve su lista
+(solo lectura) en el portal → **Mis activos**. Un activo solo se asigna a personas del mismo cliente. Es un registro propio de la consola, independiente del inventario automático de GLPI.
+
 ## Respuestas y avisos al cliente
 
 El cliente ve en el portal la conversación de su ticket (sin las notas internas) y puede responder desde ahí; si el ticket estaba resuelto, lo reabre.

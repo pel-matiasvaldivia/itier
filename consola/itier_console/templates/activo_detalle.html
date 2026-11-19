@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% block titulo %}{{ a.etiqueta or a.tipo_label }} · Activos · {{ cli.nombre }}{% endblock %}
+{% block contenido %}
+  <div class="l-head">
+    <div>
+      <p class="u-sub" style="margin:0 0 .2rem"><a href="/clientes/{{ cli.slug }}/activos">← Activos de {{ cli.nombre }}</a></p>
+      <h1>{{ a.tipo_icono }} {{ a.etiqueta or a.tipo_label }}</h1>
+      <p class="u-sub">{{ a.tipo_label }}{% if a.marca or a.modelo %} · {{ a.marca or '' }} {{ a.modelo or '' }}{% endif %} ·
+        <span class="l-pill {{ {'en_uso': 'info', 'en_stock': 'ok', 'en_reparacion': 'warn', 'de_baja': 'off'}[a.estado] }}">{{ a.estado_label }}</span>
+        {% if a.persona %}· asignado a <b>{{ a.persona }}</b>{% endif %}
+        {% if a.garantia == 'vencida' %}<span class="l-pill bad">Garantía vencida</span>{% elif a.garantia == 'por_vencer' %}<span class="l-pill warn">Garantía por vencer</span>{% endif %}</p>
+    </div>
+  </div>
+  <div class="d-cols">
+    <div>
+      <section class="u-card">
+        <h2>✏️ Datos</h2>
+        <form method="post" action="/clientes/{{ cli.slug }}/activos/{{ a.id }}/editar" class="form">
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          {% include "_activo_campos.html" %}
+          <button class="u-btn" type="submit">Guardar datos</button>
+        </form>
+      </section>
+      <section class="u-card">
+        <h2>🕘 Historial</h2>
+        {% for h in hist %}
+        <p class="small" style="margin:.3rem 0"><b>{{ {'alta': 'Alta', 'asignado': 'Asignado a', 'devuelto': 'Devuelto por', 'estado': 'Estado', 'editado': 'Datos editados'}[h.accion] }}</b>{% if h.persona %} {{ h.persona }}{% endif %}{% if h.detalle %} — {{ h.detalle }}{% endif %}
+          <span class="muted"> · {{ h.at[:16]|replace('T', ' ') }} · {{ h.por }}</span></p>
+        {% else %}<p class="muted small">Sin movimientos.</p>{% endfor %}
+      </section>
+    </div>
+    <div>
+      <section class="u-card">
+        <h2>👤 Asignación</h2>
+        {% if a.estado == 'de_baja' %}<p class="muted small">El activo está dado de baja. Para reutilizarlo pasalo a stock.</p>
+        {% else %}
+        <form method="post" action="/clientes/{{ cli.slug }}/activos/{{ a.id }}/asignar" class="form">
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          <label>{{ 'Reasignar a' if a.persona_id else 'Asignar a' }}
+            <select name="persona_id" required>
+              <option value="">Elegí una persona…</option>
+              {% for p in personas %}{% if p.id != a.persona_id %}<option value="{{ p.id }}">{{ p.nombre or p.email }}{% if p.cargo %} · {{ p.cargo }}{% endif %}</option>{% endif %}{% endfor %}
+            </select></label>
+          <label>Nota (opcional) <input type="text" name="nota" maxlength="300" placeholder="Entrega con cargador y funda"></label>
+          <button class="u-btn" type="submit">{{ 'Reasignar' if a.persona_id else 'Asignar' }}</button>
+        </form>
+        {% if not personas %}<p class="muted small">No hay personas cargadas: <a href="/clientes/{{ cli.slug }}/personas">agregá la primera</a>.</p>{% endif %}
+        {% if a.persona_id %}
+        <form method="post" action="/clientes/{{ cli.slug }}/activos/{{ a.id }}/devolver" class="form" style="margin-top:.8rem">
+          <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="nota" value="">
+          <button class="u-b" type="submit">↩ Devolver (queda en stock)</button>
+        </form>{% endif %}
+        {% endif %}
+      </section>
+      <section class="u-card">
+        <h2>🔧 Estado</h2>
+        <form method="post" action="/clientes/{{ cli.slug }}/activos/{{ a.id }}/estado" class="form">
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          <label>Cambiar a
+            <select name="estado">
+              <option value="en_stock" {{ 'disabled' if a.estado == 'en_stock' else '' }}>En stock</option>
+              <option value="en_reparacion" {{ 'disabled' if a.estado == 'en_reparacion' else '' }}>En reparación</option>
+              <option value="de_baja" {{ 'disabled' if a.estado == 'de_baja' else '' }}>De baja</option>
+            </select></label>
+          <label>Motivo (opcional) <input type="text" name="nota" maxlength="300"></label>
+          <button class="u-b" type="submit" onclick="return confirm('Si está asignado, se libera de la persona. ¿Continuar?');">Cambiar estado</button>
+        </form>
+      </section>
+      {% if puede('activos.eliminar') %}
+      <section class="u-card d-danger">
+        <h2>🗑 Eliminar</h2>
+        <form method="post" action="/clientes/{{ cli.slug }}/activos/{{ a.id }}/eliminar" class="inline" onsubmit="return confirm('¿Eliminar este activo y su historial? Para conservar el registro, mejor dalo de baja.');">
+          <input type="hidden" name="csrf" value="{{ csrf }}"><button class="u-b danger" type="submit" style="width:100%;padding:.6rem">Eliminar activo</button>
+        </form>
+        <p class="muted small" style="margin-top:.7rem">Borra el activo y su historial. Si solo salió de servicio, usá «De baja».</p>
+      </section>
+      {% endif %}
+    </div>
+  </div>
+{% endblock %}

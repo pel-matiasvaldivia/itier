@@ -24,6 +24,7 @@ from .config import Config
 from .db import connect, init_db
 from .deps import AccesoConsola, AccesoPortal, AuthRequired, CambioClaveRequerido, PermisoDenegado, BASE, flash
 from .routes import agents as r_agents
+from .routes import activos as r_activos
 from .routes import audit as r_audit
 from .routes import canales as r_canales
 from .routes import clients as r_clients
@@ -150,6 +151,7 @@ def create_app() -> FastAPI:
     app.include_router(r_tickets.router)
     app.include_router(r_canales.router)
     app.include_router(r_m365.router)
+    app.include_router(r_activos.router)
     app.include_router(r_gws.router)
     app.include_router(r_reportes.router)
     app.include_router(r_audit.router)

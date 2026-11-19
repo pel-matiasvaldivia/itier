@@ -17,8 +17,8 @@ ROLES = {
 }
 
 # «reportes» (horas y rentabilidad) no está en ningún rol salvo admin (= todo): maneja plata.
-_TODOS = {"tablero", "tickets", "equipos", "equipos.remoto", "clientes.ver", "m365", "gws"}
-_PM = _TODOS | {"clientes.editar", "instaladores", "descubrimiento", "curacion", "agentes", "auditoria", "bandeja", "m365.eliminar", "gws.eliminar"}
+_TODOS = {"tablero", "tickets", "equipos", "equipos.remoto", "clientes.ver", "m365", "gws", "activos"}
+_PM = _TODOS | {"clientes.editar", "instaladores", "descubrimiento", "curacion", "agentes", "auditoria", "bandeja", "m365.eliminar", "gws.eliminar", "activos.eliminar"}
 
 PERMISOS = {
     "admin": None,                      # None = todo

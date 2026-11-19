@@ -1131,6 +1131,121 @@ check("correo: ignora lo enviado desde las direcciones propias (sin bucles)",
       _cn.procesar_email(_cr, _conn, _mail("Soporte <no-reply@pymesenlinea.com.ar>", "Re: [#1] x", "eco", "loop1"))["estado"] == "ignorado"
       and _cn.procesar_email(_cr, _conn, _mail("soporte@pymesenlinea.com.ar", "Re: [#1] x", "eco", "loop2"))["estado"] == "ignorado")
 
+# ── Activos de un cliente y asignación a personas ───────────────────────────────────────
+from itier_console.services import activos as _ac  # noqa: E402
+from datetime import date as _date, timedelta as _td  # noqa: E402
+_fa = c.get("/clientes/canal-sa")
+check("activos: la ficha del cliente tiene la sección Activos", "📦 Activos" in _fa.text and "Ver y gestionar activos" in _fa.text)
+la = c.get("/clientes/canal-sa/activos")
+check("activos: lista vacía con importación y exportación", la.status_code == 200 and "Todavía no hay activos" in la.text and "Importar desde Excel / CSV" in la.text and "plantilla" in la.text)
+c.post("/clientes/canal-sa/personas", data={"nombre": "Ana Pérez", "cargo": "Gerente", "area": "Gerencia", "email": "ana@canalsa.com.ar", "csrf": csrf_de(c.get("/clientes/canal-sa/personas").text)})
+c.post("/clientes/canal-sa/personas", data={"nombre": "Luis Gómez", "cargo": "", "area": "Ventas", "email": "", "csrf": csrf_de(c.get("/clientes/canal-sa/personas").text)})
+pg_ = c.get("/clientes/canal-sa/personas")
+check("activos: se cargan personas (con o sin correo)", "Ana Pérez" in pg_.text and "Luis Gómez" in pg_.text and "ana@canalsa.com.ar" in pg_.text)
+check("activos: correo de persona inválido o repetido rechazado", "no es válido" in c.post("/clientes/canal-sa/personas", data={"nombre": "X", "email": "malo", "csrf": csrf_de(pg_.text)}).text
+      and "ya está cargado" in c.post("/clientes/canal-sa/personas", data={"nombre": "Otra Ana", "email": "ana@canalsa.com.ar", "csrf": csrf_de(pg_.text)}).text)
+_pa = _conn.execute("SELECT id FROM client_contactos WHERE nombre='Ana Pérez'").fetchone()["id"]
+_pl = _conn.execute("SELECT id FROM client_contactos WHERE nombre='Luis Gómez'").fetchone()["id"]
+_cid_ = _conn.execute("SELECT id FROM clients WHERE slug='canal-sa'").fetchone()["id"]
+_hoy = _date.today()
+def _alta(**kw):
+    d = {"tipo": "notebook", "etiqueta": "", "serie": "", "marca": "", "modelo": "", "imei": "", "linea": "", "fecha_compra": "", "garantia_hasta": "", "notas": "", "persona_id": "", "csrf": csrf_de(c.get("/clientes/canal-sa/activos/nuevo").text)}
+    d.update(kw)
+    return c.post("/clientes/canal-sa/activos/nuevo", data=d)
+nf_ = c.get("/clientes/canal-sa/activos/nuevo")
+check("activos: el formulario ofrece los tipos y las personas", all(x in nf_.text for x in ("Notebook", "Desktop", "Monitor", "Celular")) and "Ana Pérez" in nf_.text)
+r = _alta(tipo="notebook", etiqueta="NB-001", marca="Lenovo", modelo="ThinkPad E14", serie="PF3ABC12", fecha_compra=(_hoy - _td(days=100)).isoformat(),
+          garantia_hasta=(_hoy + _td(days=900)).isoformat(), persona_id=str(_pa))
+check("activos: alta de una notebook asignada queda «En uso» con su historial", "Activo agregado" in r.text and "NB-001" in r.text and "En uso" in r.text and "Asignado a" in r.text and "Ana Pérez" in r.text, r.text[-400:])
+_alta(tipo="desktop", etiqueta="PC-002", marca="HP", modelo="ProDesk")
+_alta(tipo="monitor", etiqueta="MON-014", marca="Dell", modelo="P2422H", serie="CN0XYZ99", garantia_hasta=(_hoy + _td(days=30)).isoformat())
+_alta(tipo="celular", etiqueta="CEL-003", marca="Samsung", modelo="Galaxy A54", imei="356938035643809", linea="1155551234", garantia_hasta=(_hoy - _td(days=10)).isoformat(), persona_id=str(_pl))
+la = c.get("/clientes/canal-sa/activos")
+check("activos: la lista muestra los cuatro tipos con su estado y asignación", all(x in la.text for x in ("NB-001", "PC-002", "MON-014", "CEL-003")) and "En stock" in la.text and "IMEI 356938035643809" in la.text)
+check("activos: el resumen cuenta total, asignados y garantías", _ac.resumen(_conn, _cid_)["total"] == 4 and _ac.resumen(_conn, _cid_)["asignados"] == 2 and _ac.resumen(_conn, _cid_)["garantia"] == 2)
+check("activos: la garantía muestra vencida y por vencer", "Vencida" in la.text and "Por vencer" in la.text)
+check("activos: filtros por tipo, persona, estado y garantía", "MON-014" in c.get("/clientes/canal-sa/activos?tipo=monitor").text and "NB-001" not in c.get("/clientes/canal-sa/activos?tipo=monitor").text
+      and "NB-001" in c.get(f"/clientes/canal-sa/activos?persona={_pa}").text and "PC-002" not in c.get(f"/clientes/canal-sa/activos?persona={_pa}").text
+      and "PC-002" in c.get("/clientes/canal-sa/activos?persona=sin").text and "PC-002" in c.get("/clientes/canal-sa/activos?estado=en_stock").text
+      and "MON-014" in c.get("/clientes/canal-sa/activos?estado=garantia").text and "NB-001" not in c.get("/clientes/canal-sa/activos?estado=garantia").text)
+check("activos: búsqueda por serie, IMEI y persona", "NB-001" in c.get("/clientes/canal-sa/activos?q=PF3ABC").text and "CEL-003" in c.get("/clientes/canal-sa/activos?q=356938").text and "CEL-003" in c.get("/clientes/canal-sa/activos?q=Luis").text)
+for nombre, datos, texto in (
+    ("sin tipo ni identificador", {"tipo": "otro"}, "al menos la etiqueta"),
+    ("etiqueta repetida", {"tipo": "notebook", "etiqueta": "NB-001"}, "Ya existe un activo con esa etiqueta"),
+    ("serie repetida", {"tipo": "monitor", "etiqueta": "MON-99", "serie": "CN0XYZ99"}, "número de serie"),
+    ("fecha inválida", {"tipo": "notebook", "etiqueta": "NB-77", "fecha_compra": "32/13/2025"}, "no es válida"),
+    ("garantía anterior a la compra", {"tipo": "notebook", "etiqueta": "NB-78", "fecha_compra": "2025-05-01", "garantia_hasta": "2025-01-01"}, "no puede vencer antes"),
+    ("tipo inexistente", {"tipo": "tostadora", "etiqueta": "X"}, "Elegí el tipo"),
+    ("persona inexistente", {"tipo": "notebook", "etiqueta": "NB-79", "persona_id": "999999"}, "persona de este cliente")):
+    check(f"activos: rechaza {nombre}", texto in _alta(**datos).text)
+c.post("/clientes/nuevo", data={"nombre": "Otro Cliente", "notas": "", "csrf": csrf_de(c.get("/clientes/nuevo").text)})
+_oc = _conn.execute("SELECT id FROM clients WHERE slug='otro-cliente'").fetchone()["id"]
+_po = _ac.crear_persona(_conn, _oc, "admin", "Persona Ajena")
+check("activos: no se puede asignar a una persona de OTRO cliente", "persona de este cliente" in _alta(tipo="notebook", etiqueta="NB-80", persona_id=str(_po)).text)
+_aid = _conn.execute("SELECT id FROM activos WHERE etiqueta='PC-002'").fetchone()["id"]
+check("activos: un activo de otro cliente no es accesible por la URL del cliente", "no encontrado" in c.get(f"/clientes/otro-cliente/activos/{_aid}").text.lower() or c.get(f"/clientes/otro-cliente/activos/{_aid}").url.path == "/clientes/otro-cliente/activos")
+dt_ = c.get(f"/clientes/canal-sa/activos/{_aid}")
+check("activos: el detalle muestra datos, asignación, estado e historial", "Asignación" in dt_.text and "Historial" in dt_.text and "Alta" in dt_.text)
+r = c.post(f"/clientes/canal-sa/activos/{_aid}/editar", data={"tipo": "desktop", "etiqueta": "PC-002", "marca": "HP", "modelo": "ProDesk 400", "serie": "SER-222", "imei": "", "linea": "", "fecha_compra": "", "garantia_hasta": "", "notas": "Recepción", "csrf": csrf_de(dt_.text)})
+check("activos: editar los datos", "Datos del activo guardados" in r.text and "ProDesk 400" in r.text and "Recepción" in r.text)
+r = c.post(f"/clientes/canal-sa/activos/{_aid}/asignar", data={"persona_id": str(_pa), "nota": "Con cargador", "csrf": csrf_de(r.text)})
+check("activos: asignar pasa a «En uso» y registra la nota", "Activo asignado" in r.text and "En uso" in r.text and "Con cargador" in r.text)
+check("activos: asignar a quien ya lo tiene se rechaza", "Ya está asignado" in c.post(f"/clientes/canal-sa/activos/{_aid}/asignar", data={"persona_id": str(_pa), "csrf": csrf_de(r.text)}).text)
+r = c.post(f"/clientes/canal-sa/activos/{_aid}/asignar", data={"persona_id": str(_pl), "csrf": csrf_de(r.text)})
+check("activos: reasignar deja el historial de la devolución y la nueva asignación", "Luis Gómez" in r.text and "Reasignado a otra persona" in r.text)
+check("activos: la persona con activos no se puede desactivar", "devolvelos antes" in c.post(f"/clientes/canal-sa/personas/{_pl}/editar", data={"nombre": "Luis Gómez", "cargo": "", "area": "Ventas", "csrf": csrf_de(c.get("/clientes/canal-sa/personas").text)}).text)
+r = c.post(f"/clientes/canal-sa/activos/{_aid}/devolver", data={"nota": "", "csrf": csrf_de(r.text)})
+check("activos: devolver lo deja en stock sin persona", "Activo devuelto" in r.text and _conn.execute("SELECT estado, persona_id FROM activos WHERE id=?", (_aid,)).fetchone()["estado"] == "en_stock"
+      and _conn.execute("SELECT persona_id FROM activos WHERE id=?", (_aid,)).fetchone()["persona_id"] is None)
+check("activos: devolver algo sin asignar se rechaza", "no está asignado" in c.post(f"/clientes/canal-sa/activos/{_aid}/devolver", data={"nota": "", "csrf": csrf_de(r.text)}).text)
+r = c.post(f"/clientes/canal-sa/activos/{_aid}/estado", data={"estado": "en_reparacion", "nota": "Pantalla rota", "csrf": csrf_de(r.text)})
+check("activos: pasar a reparación", "Estado actualizado" in r.text and "En reparación" in r.text and "Pantalla rota" in r.text)
+r = c.post(f"/clientes/canal-sa/activos/{_aid}/estado", data={"estado": "de_baja", "nota": "", "csrf": csrf_de(r.text)})
+check("activos: dar de baja y no poder asignarlo", "De baja" in r.text and "dado de baja" in c.post(f"/clientes/canal-sa/activos/{_aid}/asignar", data={"persona_id": str(_pa), "csrf": csrf_de(r.text)}).text)
+check("activos: el resumen no cuenta los dados de baja", _ac.resumen(_conn, _cid_)["total"] == 3 and _ac.resumen(_conn, _cid_)["bajas"] == 1)
+# CSV
+ex = c.get("/clientes/canal-sa/activos/exportar.csv")
+check("activos: exporta a CSV con encabezados y datos", ex.status_code == 200 and "attachment" in ex.headers["content-disposition"] and ex.text.splitlines()[0].lstrip("\ufeff").startswith("tipo;etiqueta") and "NB-001" in ex.text and "Ana Pérez" in ex.text)
+check("activos: ofrece una plantilla de ejemplo", "Notebook;NB-001" in c.get("/activos/plantilla.csv").text)
+_csv = ("Tipo;Código;Marca;Modelo;Serie;Estado;Asignado a;Garantía\n"
+        "Laptop;NB-100;Dell;Latitude;SN100;En uso;Ana Pérez;01/01/2030\n"
+        "Pantalla;MON-100;LG;24MK;SN101;;Pedro Nuevo;\n"
+        "Notebook;NB-001;Lenovo;E14;SN-DUP;;;\n"
+        "Heladera;HEL-1;x;x;;;;\n"
+        "Teléfono;CEL-100;Motorola;G42;SN102;En reparación;;\n"
+        "Notebook;NB-101;Acer;Aspire;SN103;;;31/31/2030\n").encode("utf-8")
+r = c.post("/clientes/canal-sa/activos/importar", data={"csrf": csrf_de(c.get("/clientes/canal-sa/activos").text)}, files={"archivo": ("lista.csv", _csv, "text/csv")})
+check("activos: importa CSV (sinónimos, fechas dd/mm/aaaa, estado, asignación) y crea las personas que faltan",
+      "Importación terminada" in r.text and "<b>3</b> activo(s) cargado(s)" in r.text and "1 persona(s) nueva(s)" in r.text and "1 omitido(s)" in r.text, r.text[r.text.find("Importación"):][:600])
+check("activos: la importación informa las filas con error y no frena el resto", "Fila 5" in r.text and "desconocido" in r.text and "Fila 7" in r.text and "no es válida" in r.text)
+check("activos: lo importado quedó correcto", _conn.execute("SELECT tipo, estado, garantia_hasta FROM activos WHERE etiqueta='NB-100'").fetchone()["garantia_hasta"] == "2030-01-01"
+      and _conn.execute("SELECT estado FROM activos WHERE etiqueta='CEL-100'").fetchone()["estado"] == "en_reparacion"
+      and _conn.execute("SELECT p.nombre FROM activos a JOIN client_contactos p ON p.id=a.persona_id WHERE a.etiqueta='MON-100'").fetchone()["nombre"] == "Pedro Nuevo")
+check("activos: importar de nuevo el mismo archivo no duplica", "<b>0</b> activo(s) cargado(s)" in c.post("/clientes/canal-sa/activos/importar", data={"csrf": csrf_de(r.text)}, files={"archivo": ("lista.csv", _csv, "text/csv")}).text)
+check("activos: archivo CP1252 (Excel) con acentos se lee", "<b>1</b>" in c.post("/clientes/canal-sa/activos/importar", data={"csrf": csrf_de(r.text)}, files={"archivo": ("x.csv", "tipo,etiqueta,modelo,asignado_a\nNotebook,NB-ÑU,Ñandú 5,Luis Gómez\n".encode("cp1252"), "text/csv")}).text)
+check("activos: sin la columna tipo se explica", "Falta la columna" in c.post("/clientes/canal-sa/activos/importar", data={"csrf": csrf_de(r.text)}, files={"archivo": ("x.csv", b"marca;modelo\nA;B\n", "text/csv")}).text)
+check("activos: archivo vacío rechazado", "no tiene filas" in c.post("/clientes/canal-sa/activos/importar", data={"csrf": csrf_de(r.text)}, files={"archivo": ("x.csv", b"tipo\n", "text/csv")}).text)
+check("activos: CSRF inválido no importa", "Sesión expirada" in c.post("/clientes/canal-sa/activos/importar", data={"csrf": "falso"}, files={"archivo": ("x.csv", _csv, "text/csv")}).text)
+# permisos
+check("RBAC activos: el técnico ve y da de alta", ttec.get("/clientes/canal-sa/activos").status_code == 200 and "Activo agregado" in ttec.post("/clientes/canal-sa/activos/nuevo", data={"tipo": "monitor", "etiqueta": "MON-TEC", "marca": "", "modelo": "x", "serie": "", "imei": "", "linea": "", "fecha_compra": "", "garantia_hasta": "", "notas": "", "persona_id": "", "csrf": csrf_de(ttec.get("/clientes/canal-sa/activos/nuevo").text)}).text)
+_at = _conn.execute("SELECT id FROM activos WHERE etiqueta='MON-TEC'").fetchone()["id"]
+ttec.post(f"/clientes/canal-sa/activos/{_at}/eliminar", data={"csrf": csrf_de(ttec.get(f"/clientes/canal-sa/activos/{_at}").text)})
+check("RBAC activos: el técnico NO puede eliminar y no ve el botón", _conn.execute("SELECT 1 FROM activos WHERE id=?", (_at,)).fetchone() is not None and "Eliminar activo" not in ttec.get(f"/clientes/canal-sa/activos/{_at}").text)
+check("RBAC activos: el administrador elimina y se borra el historial", "Activo eliminado" in c.post(f"/clientes/canal-sa/activos/{_at}/eliminar", data={"csrf": csrf_de(c.get(f"/clientes/canal-sa/activos/{_at}").text)}).text
+      and _conn.execute("SELECT 1 FROM activo_historial WHERE activo_id=?", (_at,)).fetchone() is None)
+check("activos: la auditoría registra los movimientos", all(x in c.get("/auditoria").text for x in ("activos.creado", "activos.asignado", "activos.devuelto", "activos.estado", "activos.importado", "activos.eliminado", "activos.persona_creada")))
+# portal (solo lectura, solo su empresa)
+pa = pcs.get("/portal/activos")
+check("portal: el cliente ve sus activos (sin los dados de baja) y a quién están asignados", pa.status_code == 200 and "NB-001" in pa.text and "Ana Pérez" in pa.text and "MON-100" in pa.text and "PC-002" not in pa.text, pa.text[-500:])
+check("portal: no hay acciones de edición y no entra a la gestión", "Nuevo activo" not in pa.text and pcs.get("/clientes/canal-sa/activos").url.path != "/clientes/canal-sa/activos")
+_ac.crear(_conn, _oc, "admin", {"tipo": "notebook", "etiqueta": "NB-AJENA"})
+check("portal: no ve activos de otras empresas", "NB-AJENA" not in pcs.get("/portal/activos").text)
+check("portal: filtra por tipo", "MON-100" in pcs.get("/portal/activos?tipo=monitor").text and "NB-001" not in pcs.get("/portal/activos?tipo=monitor").text)
+check("activos: una persona con activos no se desactiva", "devolvelos antes" in c.post(f"/clientes/canal-sa/personas/{_pl}/editar", data={"nombre": "Luis Gómez", "cargo": "Vendedor", "area": "Ventas", "csrf": csrf_de(c.get("/clientes/canal-sa/personas").text)}).text)
+_ps = _ac.crear_persona(_conn, _cid_, "admin", "Sin Activos")
+c.post(f"/clientes/canal-sa/personas/{_ps}/editar", data={"nombre": "Sin Activos", "cargo": "", "area": "", "csrf": csrf_de(c.get("/clientes/canal-sa/personas").text)})
+check("activos: una persona sin activos se desactiva y deja de ofrecerse para asignar", all(p["id"] != _ps for p in _ac.personas(_conn, _cid_)) and "Sin Activos" not in c.get("/clientes/canal-sa/activos/nuevo").text)
+
 # RBAC: la Bandeja es de PM/admin
 check("RBAC: el técnico no entra a la Bandeja", ttec.get("/bandeja").url.path != "/bandeja")
 check("RBAC: el PM sí", tpm.get("/bandeja").url.path == "/bandeja")

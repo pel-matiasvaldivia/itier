@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block titulo %}Nuevo activo · {{ cli.nombre }}{% endblock %}
+{% block contenido %}
+  <div class="l-head">
+    <div>
+      <p class="u-sub" style="margin:0 0 .2rem"><a href="/clientes/{{ cli.slug }}/activos">← Activos</a></p>
+      <h1>Nuevo activo · {{ cli.nombre }}</h1>
+    </div>
+  </div>
+  <section class="u-card" style="max-width:48rem">
+    <form method="post" action="/clientes/{{ cli.slug }}/activos/nuevo" class="form">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      {% include "_activo_campos.html" %}
+      <label>Asignar a (opcional)
+        <select name="persona_id">
+          <option value="">— Sin asignar (queda en stock) —</option>
+          {% for p in personas %}<option value="{{ p.id }}" {{ 'selected' if v.persona_id|string == p.id|string else '' }}>{{ p.nombre or p.email }}{% if p.cargo %} · {{ p.cargo }}{% endif %}</option>{% endfor %}
+        </select>
+        <small class="muted">¿La persona no está? <a href="/clientes/{{ cli.slug }}/personas">Agregala primero</a>.</small></label>
+      <button class="u-btn" type="submit">Guardar activo</button>
+    </form>
+  </section>
+{% endblock %}

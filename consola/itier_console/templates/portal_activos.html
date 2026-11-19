@@ -1,0 +1,24 @@
+{% extends "portal_base.html" %}
+{% block titulo %}Mis activos · Portal iTier{% endblock %}
+{% block contenido %}
+  <div class="page-head"><h1>Mis activos</h1></div>
+  <div class="card">
+    <p class="muted">{{ resumen.total }} activo(s){% if resumen.asignados %} · {{ resumen.asignados }} asignado(s){% endif %}. Si algo no coincide, avisá a soporte.</p>
+    <form method="get" action="/portal/activos" style="margin:.5rem 0">
+      <select name="tipo" onchange="this.form.submit()"><option value="">Todos</option>
+        {% for k, (n, i) in TIPOS.items() %}<option value="{{ k }}" {{ 'selected' if tipo == k else '' }}>{{ i }} {{ n }}</option>{% endfor %}</select>
+    </form>
+    {% if activos %}
+    <table class="tabla">
+      <thead><tr><th>Activo</th><th>Marca / modelo</th><th>Serie</th><th>Asignado a</th><th>Garantía hasta</th></tr></thead>
+      <tbody>
+        {% for a in activos %}
+        <tr><td><strong>{{ a.tipo_icono }} {{ a.etiqueta or a.tipo_label }}</strong><br><span class="muted small">{{ a.tipo_label }}</span></td>
+          <td>{{ a.marca or '' }} {{ a.modelo or '' }}</td><td>{{ a.serie or '—' }}</td><td>{{ a.persona or 'En stock' }}</td>
+          <td>{{ a.garantia_hasta or '—' }}{% if a.garantia == 'vencida' %} <span class="badge">vencida</span>{% endif %}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}<p class="muted">Todavía no hay activos cargados.</p>{% endif %}
+  </div>
+{% endblock %}

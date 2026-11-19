@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block titulo %}Personas · {{ cli.nombre }} · Consola de iTier{% endblock %}
+{% block contenido %}
+  <div class="l-head">
+    <div>
+      <p class="u-sub" style="margin:0 0 .2rem"><a href="/clientes/{{ cli.slug }}/activos">← Activos de {{ cli.nombre }}</a></p>
+      <h1>Personas</h1>
+      <p class="u-sub">Las personas de {{ cli.nombre }} a las que se asignan los activos. Son las mismas que pueden pedir soporte por correo o WhatsApp (se cargan en la ficha del cliente).</p>
+    </div>
+  </div>
+  <div class="l-wrap">
+    {% if personas %}
+    <table class="l-table">
+      <thead><tr><th>Nombre</th><th>Cargo / área</th><th>Contacto</th><th>Activos</th><th></th></tr></thead>
+      <tbody>
+      {% for p in personas %}
+        <tr style="{{ 'opacity:.55' if not p.activo else '' }}">
+            <td><input form="fp{{ p.id }}" type="text" name="nombre" value="{{ p.nombre or '' }}" required style="min-width:10rem"></td>
+            <td><input form="fp{{ p.id }}" type="text" name="cargo" value="{{ p.cargo or '' }}" placeholder="Cargo" style="width:8rem"> <input form="fp{{ p.id }}" type="text" name="area" value="{{ p.area or '' }}" placeholder="Área" style="width:8rem"></td>
+            <td class="small">{% if p.email %}✉️ {{ p.email }}<br>{% endif %}{% if p.whatsapp %}💬 {{ 'ID interno' if p.whatsapp.startswith('lid:') else '+' ~ p.whatsapp }}{% endif %}{% if not p.email and not p.whatsapp %}<span class="muted">—</span>{% endif %}</td>
+            <td><a href="/clientes/{{ cli.slug }}/activos?persona={{ p.id }}">{{ p.n_activos }}</a></td>
+            <td class="tight" style="display:flex;gap:.4rem;align-items:center">
+              <label class="small" style="display:flex;gap:.25rem;align-items:center"><input form="fp{{ p.id }}" type="checkbox" name="activa" value="1" {{ 'checked' if p.activo else '' }}> Activa</label>
+              <button form="fp{{ p.id }}" class="u-b" type="submit">Guardar</button>
+            </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% for p in personas %}<form id="fp{{ p.id }}" method="post" action="/clientes/{{ cli.slug }}/personas/{{ p.id }}/editar"><input type="hidden" name="csrf" value="{{ csrf }}"></form>{% endfor %}
+    {% else %}<div class="l-empty"><b>👥</b>Todavía no hay personas.</div>{% endif %}
+  </div>
+  <section class="u-card" style="margin-top:1.4rem;max-width:40rem">
+    <h2>+ Nueva persona</h2>
+    <form method="post" action="/clientes/{{ cli.slug }}/personas" class="form">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <label>Nombre <input type="text" name="nombre" required placeholder="Ana Pérez"></label>
+      <div class="d-meta" style="gap:.8rem">
+        <label style="flex:1">Cargo <input type="text" name="cargo"></label>
+        <label style="flex:1">Área <input type="text" name="area"></label>
+      </div>
+      <label>Correo (opcional) <input type="email" name="email" placeholder="ana@empresa.com"></label>
+      <button class="u-btn" type="submit">Agregar</button>
+    </form>
+    <p class="muted small">Desactivar a una persona (cuando se va de la empresa) la saca de las listas de asignación; antes hay que devolver sus activos.</p>
+  </section>
+{% endblock %}
