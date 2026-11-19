@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block titulo %}Aplicación de Microsoft 365 · Consola de iTier{% endblock %}
+{% block contenido %}
+  <div class="l-head">
+    <div>
+      <h1>Aplicación de Microsoft 365</h1>
+      <p class="u-sub">Se configura una sola vez para todos los clientes. Después, el administrador global de cada cliente la autoriza en su tenant desde la ficha del cliente.</p>
+    </div>
+  </div>
+  <div class="d-cols">
+    <section class="u-card">
+      <h2>🔑 Credenciales</h2>
+      <form method="post" action="/m365/aplicacion" class="form">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <label>ID de aplicación (client id) <input type="text" name="client_id" value="{{ cfg_ef.m365_client_id or '' }}" placeholder="00000000-0000-0000-0000-000000000000"></label>
+        <label>Secreto de cliente
+          <input type="password" name="secreto" autocomplete="new-password"
+                 placeholder="{{ '•••••••• (guardado: dejá vacío para conservarlo)' if cfg_ef.m365_client_secret else 'Valor del secreto' }}"></label>
+        <button class="u-btn" type="submit">Guardar</button>
+      </form>
+      <p class="small" style="margin-top:.8rem">Estado: {% if cfg_ef.m365_configurado %}<span class="l-pill ok"><i></i>Configurada</span>{% else %}<span class="l-pill off">Sin configurar</span>{% endif %}</p>
+      <p class="muted small">El secreto se guarda cifrado y no se vuelve a mostrar. Los secretos de Entra vencen (máximo 24 meses): anotá la fecha para renovarlo.</p>
+    </section>
+    <section class="u-card">
+      <h2>📋 Cómo crearla (una vez, en tu Entra ID)</h2>
+      <ol class="small" style="padding-left:1.1rem;line-height:1.6">
+        <li>En <b>entra.microsoft.com</b> → Aplicaciones → Registros de aplicaciones → <b>Nuevo registro</b>.</li>
+        <li>Tipos de cuenta admitidos: <b>«Cuentas en cualquier directorio de la organización» (multiempresa)</b>.</li>
+        <li>URI de redireccionamiento (Web): <code>{{ redirect_uri }}</code></li>
+        <li>Permisos de API → Microsoft Graph → <b>Permisos de aplicación</b>: <code>User.ReadWrite.All</code>, <code>User-PasswordProfile.ReadWrite.All</code>, <code>Organization.Read.All</code>.</li>
+        <li>Certificados y secretos → <b>Nuevo secreto de cliente</b>; copiá el <i>valor</i> acá.</li>
+        <li>Copiá el <b>ID de aplicación (cliente)</b> acá.</li>
+      </ol>
+      <p class="muted small">Cada cliente autoriza la aplicación una vez (consentimiento de administrador) y puede revocarla cuando quiera. Si el tenant exige más permisos para reiniciar claves, sumá <code>Directory.ReadWrite.All</code>.</p>
+    </section>
+  </div>
+{% endblock %}

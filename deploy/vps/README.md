@@ -374,6 +374,27 @@ la API oficial (WhatsApp Business Cloud API).
 Cada mensaje de un número conocido abre un ticket; los siguientes (hasta 24 h) se suman al mismo. Los grupos, mensajes
 propios, estados y adjuntos se ignoran. Hay un tope de mensajes por remitente y hora (`ITIER_CANAL_LIMITE_HORA`).
 
+## Microsoft 365: usuarios del tenant de cada cliente
+
+En la **ficha del cliente → Microsoft 365** se conecta su tenant y se administran sus usuarios (alta, edición, licencias, reinicio de
+clave, bloqueo y baja) por Microsoft Graph, sin entrar al Centro de administración. El correo en sí sigue pagándolo el cliente.
+
+**Una sola vez (tu app, no la del cliente)** — en `entra.microsoft.com` con tu cuenta:
+1. Aplicaciones → Registros de aplicaciones → **Nuevo registro**, tipo **«Cuentas en cualquier directorio de la organización» (multiempresa)**.
+2. URI de redirección (Web): `https://<tu-consola>/m365/consentimiento`.
+3. Permisos de API → Microsoft Graph → **permisos de aplicación**: `User.ReadWrite.All`, `User-PasswordProfile.ReadWrite.All`,
+   `Organization.Read.All`. (Si un tenant exige más para reiniciar claves, sumá `Directory.ReadWrite.All`.)
+4. Certificados y secretos → nuevo secreto (vence: anotá la fecha). En la consola, como administrador: **Aplicación de Microsoft 365**
+   (`/m365/aplicacion`) → pegá el ID de aplicación y el secreto (se guarda cifrado).
+
+**Por cada cliente:** ficha del cliente → **Conectar tenant**. Se abre Microsoft y el **administrador global del cliente** acepta
+una vez. Si el tenant no se conecta enseguida, esperá unos minutos (Microsoft propaga el consentimiento) y usá «Verificar conexión».
+El cliente puede revocar el acceso cuando quiera quitando la aplicación en su Entra ID.
+
+Permisos en la consola: todos los operadores ven y gestionan usuarios (alta, editar, licencias, clave, bloqueo); **eliminar** es de
+PM/administrador; conectar un tenant, de PM/administrador; la aplicación, solo del administrador. Las claves temporales se muestran
+una sola vez y no se guardan ni se auditan. Los usuarios eliminados quedan 30 días en la papelera de Microsoft.
+
 ## Túnel a Zabbix (una sola vez; sirve para todos los clientes)
 
 Los `zabbix-proxy` de los clientes llegan al server por el Cloudflare Tunnel de

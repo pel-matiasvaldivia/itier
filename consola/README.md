@@ -196,6 +196,12 @@ Los pedidos de soporte por correo (buzón IMAP) y WhatsApp (webhook de OpenWA, `
 (o se suma como seguimiento) y lo no reconocido queda en la **Bandeja** (`/bandeja`, PM/administrador). Alta y operación:
 `deploy/vps/README.md` → «Canales de entrada». La cuenta IMAP y el QR de WhatsApp se configuran en la pantalla **Canales** (administrador); los ajustes se guardan en la base (`ajustes`, secretos cifrados). WhatsApp vía OpenWA es una API no oficial: ver la advertencia allí.
 
+## Microsoft 365 por cliente
+
+Ficha del cliente → **Microsoft 365**: conecta el tenant (consentimiento de administrador sobre una app multi-tenant del MSP) y
+permite el ABM de sus usuarios por Microsoft Graph (`adapters/m365.py`, `routes/m365.py`). La app (client id y secreto) se carga en
+`/m365/aplicacion` (administrador, secreto cifrado). Alta y permisos: `deploy/vps/README.md` → «Microsoft 365».
+
 ## Horas y rentabilidad por cliente
 
 Los técnicos registran el tiempo en cada ticket («Tiempo dedicado», va a las tareas de GLPI). La pantalla **Horas**

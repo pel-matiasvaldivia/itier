@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% block titulo %}Microsoft 365 · {{ cli.nombre }} · Consola de iTier{% endblock %}
+{% block contenido %}
+  <div class="l-head">
+    <div>
+      <p class="u-sub" style="margin:0 0 .2rem"><a href="/clientes/{{ cli.slug }}">← {{ cli.nombre }}</a></p>
+      <h1>Microsoft 365 · usuarios</h1>
+      <p class="u-sub">Tenant <b>{{ cli.m365_nombre or cli.m365_tenant_id }}</b>{% if cli.m365_dominio %} · {{ cli.m365_dominio }}{% endif %}. Los cambios se hacen directo en el tenant del cliente.</p>
+    </div>
+    <a class="u-btn" href="/clientes/{{ cli.slug }}/m365/nuevo" style="text-decoration:none">+ Nuevo usuario</a>
+  </div>
+
+  {% if error %}<div class="u-err">No se pudo leer el tenant: {{ error }}</div>{% endif %}
+
+  <div class="u-stats">
+    <div class="u-stat"><b>{{ resumen.total }}</b><span>Usuarios</span></div>
+    <div class="u-stat"><b>{{ resumen.habilitados }}</b><span>Habilitados</span></div>
+    <div class="u-stat {{ 'bad' if resumen.bloqueados else '' }}"><b>{{ resumen.bloqueados }}</b><span>Bloqueados</span></div>
+    <div class="u-stat"><b>{{ resumen.sin_licencia }}</b><span>Sin licencia</span></div>
+  </div>
+
+  {% if planes %}
+  <div class="d-grid" style="margin-bottom:1rem">
+    {% for p in planes %}
+    <div class="d-int"><div class="k">{{ p.nombre }}</div><b style="font-size:1.4rem">{{ p.usadas }} / {{ p.total }}</b>
+      <small>{{ p.libres }} licencia{{ 's' if p.libres != 1 }} libre{{ 's' if p.libres != 1 }}</small></div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <div class="l-wrap">
+    <div class="l-bar-top">
+      <form method="get" action="/clientes/{{ cli.slug }}/m365" class="l-filters">
+        <select class="l-sel" name="estado" onchange="this.form.submit()" aria-label="Filtro">
+          <option value="">Todos</option>
+          <option value="bloqueados" {{ 'selected' if estado == 'bloqueados' else '' }}>Bloqueados</option>
+          <option value="sin_licencia" {{ 'selected' if estado == 'sin_licencia' else '' }}>Sin licencia</option>
+        </select>
+        <input class="u-search" type="search" name="q" value="{{ q }}" placeholder="Buscar por nombre, correo o cargo…" aria-label="Buscar">
+        <button class="u-b" type="submit">Buscar</button>
+      </form>
+    </div>
+    {% if usuarios %}
+    <table class="l-table">
+      <thead><tr><th>Usuario</th><th>Correo / UPN</th><th>Licencias</th><th>Estado</th><th></th></tr></thead>
+      <tbody>
+      {% for u in usuarios %}
+        <tr>
+          <td><a class="l-link" href="/clientes/{{ cli.slug }}/m365/{{ u.id }}"><b>{{ u.nombre or u.upn }}</b></a>{% if u.cargo %}<br><span class="muted small">{{ u.cargo }}{% if u.departamento %} · {{ u.departamento }}{% endif %}</span>{% endif %}</td>
+          <td class="small">{{ u.upn }}{% if u.tipo == 'Guest' %} <span class="l-pill off">Invitado</span>{% endif %}</td>
+          <td class="small">{% for p in u.planes %}<span class="l-pill info">{{ p }}</span> {% else %}<span class="muted">—</span>{% endfor %}</td>
+          <td>{% if u.habilitado %}<span class="l-pill ok"><i></i>Activo</span>{% else %}<span class="l-pill bad"><i></i>Bloqueado</span>{% endif %}</td>
+          <td class="tight"><a class="u-b" href="/clientes/{{ cli.slug }}/m365/{{ u.id }}" style="text-decoration:none">Gestionar</a></td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% else %}<div class="l-empty"><b>👥</b>No hay usuarios que coincidan.</div>{% endif %}
+  </div>
+{% endblock %}

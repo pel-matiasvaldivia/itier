@@ -47,7 +47,56 @@ def _rpc(body, result):
     return httpx.Response(200, json={"jsonrpc": "2.0", "result": result, "id": body.get("id")})
 
 
+GRAPH_ESTADO = {"tokens": 0, "usuarios_get": 0, "forzar_401": False, "sin_ubicacion": False}
+
+
+def _graph(request: httpx.Request) -> httpx.Response:
+    p = request.url.path
+    cuerpo = json.loads(request.content) if request.content and request.headers.get("content-type", "").startswith("application/json") else {}
+    if request.url.host == "login.microsoftonline.com":
+        if "tenant-sin-consent" in p:
+            return httpx.Response(400, json={"error": "invalid_client", "error_description": "AADSTS700016: Application not found in the directory.\r\nTrace ID: x"})
+        GRAPH_ESTADO["tokens"] += 1
+        return httpx.Response(200, json={"access_token": f"tok{GRAPH_ESTADO['tokens']}", "expires_in": 3599})
+    auth = request.headers.get("authorization", "")
+    if GRAPH_ESTADO["forzar_401"] and auth == "Bearer tok1":
+        return httpx.Response(401, json={"error": {"code": "InvalidAuthenticationToken", "message": "expired"}})
+    if p == "/v1.0/organization":
+        return httpx.Response(200, json={"value": [{"id": "T-1", "displayName": "Cliente SA", "verifiedDomains": [
+            {"name": "clientesa.onmicrosoft.com", "isDefault": False}, {"name": "clientesa.com.ar", "isDefault": True}]}]})
+    if p == "/v1.0/subscribedSkus":
+        return httpx.Response(200, json={"value": [
+            {"skuId": "sku-std", "skuPartNumber": "O365_BUSINESS_PREMIUM", "prepaidUnits": {"enabled": 10}, "consumedUnits": 4},
+            {"skuId": "sku-viejo", "skuPartNumber": "VIEJO", "prepaidUnits": {"enabled": 0}, "consumedUnits": 0}]})
+    if p == "/v1.0/users" and request.method == "GET":
+        GRAPH_ESTADO["usuarios_get"] += 1
+        if "page2" in str(request.url):
+            return httpx.Response(200, json={"value": [{"id": "u3", "displayName": "C", "userPrincipalName": "c@x"}]})
+        return httpx.Response(200, json={"value": [{"id": "u1", "displayName": "A", "userPrincipalName": "a@x", "accountEnabled": True,
+                                                    "assignedLicenses": [{"skuId": "sku-std"}]},
+                                                   {"id": "u2", "displayName": "B", "userPrincipalName": "b@x", "accountEnabled": False}],
+                                         "@odata.nextLink": "https://graph.microsoft.com/v1.0/users?page2=1"})
+    if p == "/v1.0/users" and request.method == "POST":
+        if cuerpo.get("userPrincipalName") == "dup@x":
+            return httpx.Response(400, json={"error": {"code": "Request_BadRequest", "message": "Another object with the same value for property userPrincipalName already exists."}})
+        return httpx.Response(201, json={"id": "nuevo-1", "displayName": cuerpo["displayName"], "userPrincipalName": cuerpo["userPrincipalName"], "accountEnabled": True})
+    if p.endswith("/assignLicense"):
+        return httpx.Response(200, json={"id": "nuevo-1"})
+    if p == "/v1.0/users/sinloc" and request.method == "GET":
+        return httpx.Response(200, json={"id": "sinloc", "usageLocation": None})
+    if p == "/v1.0/users/prohibido":
+        return httpx.Response(403, json={"error": {"code": "Authorization_RequestDenied", "message": "Insufficient privileges to complete the operation."}})
+    if p.startswith("/v1.0/users/") and request.method in ("PATCH", "DELETE"):
+        return httpx.Response(204)
+    return httpx.Response(404, json={"error": {"code": "Request_ResourceNotFound", "message": "no existe"}})
+
+
 def handler(request: httpx.Request) -> httpx.Response:
+    if request.url.host in ("graph.microsoft.com", "login.microsoftonline.com"):
+        captured.append({"method": request.method, "path": request.url.path, "host": request.url.host,
+                         "headers": {k.lower(): v for k, v in request.headers.items()},
+                         "body": json.loads(request.content) if request.content and request.headers.get("content-type", "").startswith("application/json") else {}})
+        return _graph(request)
     p = request.url.path
     body = json.loads(request.content) if request.content else {}
     captured.append({"method": request.method, "path": p,
@@ -561,6 +610,71 @@ WA_ESTADO = {"connected": True, "session": {"state": "READY", "ready": True}, "q
 check("WhatsApp: sesión lista → «conectado», sin QR", wa_svc.estado(_cw)["estado"] == "conectado" and wa_svc.estado(_cw)["qr"] is None)
 check("WhatsApp: la API key viaja como X-API-Key", any(x["headers"].get("x-api-key") == "k" for x in captured if x["path"] == "/health"))
 check("WhatsApp: sin URL queda «no configurado»", wa_svc.estado(_dc.replace(cfg, wa_api_url=None))["estado"] == "no_configurado")
+# ── Microsoft 365 (Graph) ──
+from itier_console.adapters import m365 as m365_mod  # noqa: E402
+_cm = _dc.replace(cfg, m365_client_id="app-id", m365_client_secret="secreto")
+m365_mod._TOKENS.clear()
+_g = m365_mod.cliente(_cm, "tenant-1")
+_org = _g.organizacion()
+check("M365: lee la organización y su dominio principal", _org["nombre"] == "Cliente SA" and _org["dominio_principal"] == "clientesa.com.ar" and len(_org["dominios"]) == 2, _org)
+_pl = _g.planes()
+check("M365: planes con nombre comercial y licencias libres, sin los vencidos", len(_pl) == 1 and _pl[0]["nombre"] == "Microsoft 365 Business Standard" and _pl[0]["libres"] == 6, _pl)
+_us = _g.listar_usuarios()
+check("M365: lista usuarios siguiendo la paginación", [u["id"] for u in _us] == ["u1", "u2", "u3"] and _us[1]["habilitado"] is False and _us[0]["licencias"] == ["sku-std"], _us)
+check("M365: el token se pide una sola vez por tenant (caché)", GRAPH_ESTADO["tokens"] == 1, GRAPH_ESTADO)
+_tk = [x for x in captured if x.get("host") == "login.microsoftonline.com"]
+check("M365: el token sale por client credentials con el scope de Graph", _tk and "/tenant-1/oauth2/v2.0/token" in _tk[0]["path"], _tk)
+check("M365: las llamadas a Graph llevan el Bearer", all(x["headers"].get("authorization") == "Bearer tok1" for x in captured if x.get("host") == "graph.microsoft.com"))
+_n5 = len(captured)
+_nuevo = _g.crear_usuario(upn="ana@clientesa.com.ar", nombre="Ana", apellido="Gómez", clave="Cl4ve-Temporal!", cargo="Ventas", sku_ids=["sku-std"])
+_c5 = [x for x in captured[_n5:] if x.get("host") == "graph.microsoft.com"]
+_post = next(x for x in _c5 if x["method"] == "POST" and x["path"] == "/v1.0/users")
+check("M365: crear usuario manda UPN, ubicación AR y clave con cambio obligatorio",
+      _post["body"]["userPrincipalName"] == "ana@clientesa.com.ar" and _post["body"]["usageLocation"] == "AR" and _post["body"]["mailNickname"] == "ana"
+      and _post["body"]["passwordProfile"] == {"forceChangePasswordNextSignIn": True, "password": "Cl4ve-Temporal!"} and _post["body"]["displayName"] == "Ana Gómez", _post)
+_al = next(x for x in _c5 if x["path"].endswith("/assignLicense"))
+check("M365: asigna la licencia al crear", _al["body"]["addLicenses"][0]["skuId"] == "sku-std" and _al["path"] == "/v1.0/users/nuevo-1/assignLicense", _al)
+try:
+    _g.crear_usuario(upn="dup@x", nombre="D", apellido="D", clave="x")
+    _ok = False
+except Exception as _e:  # noqa: BLE001
+    _ok = "already exists" in str(_e)
+check("M365: un UPN repetido devuelve el motivo de Microsoft", _ok)
+try:
+    _g.reiniciar_clave("prohibido", "Nueva-Clave1!")
+    _ok = False
+except Exception as _e:  # noqa: BLE001
+    _ok = "no tiene el permiso necesario" in str(_e)
+check("M365: un 403 se explica en castellano", _ok)
+_n5 = len(captured)
+_g.reiniciar_clave("u1", "Nueva-Clave1!")
+_g.habilitar("u1", False)
+_g.eliminar("u1")
+_c5 = captured[_n5:]
+check("M365: reiniciar clave, bloquear y eliminar usan PATCH/PATCH/DELETE",
+      [(x["method"], x["path"]) for x in _c5 if x.get("host") == "graph.microsoft.com"] == [("PATCH", "/v1.0/users/u1"), ("PATCH", "/v1.0/users/u1"), ("DELETE", "/v1.0/users/u1")]
+      and _c5[0]["body"]["passwordProfile"]["password"] == "Nueva-Clave1!" and _c5[1]["body"] == {"accountEnabled": False}, _c5)
+_n5 = len(captured)
+_g.asignar_licencias("sinloc", ["sku-std"], ["viejo"])
+_c5 = [(x["method"], x["path"]) for x in captured[_n5:] if x.get("host") == "graph.microsoft.com"]
+check("M365: si falta la ubicación de uso, se completa antes de asignar licencias", _c5 == [("GET", "/v1.0/users/sinloc"), ("PATCH", "/v1.0/users/sinloc"), ("POST", "/v1.0/users/sinloc/assignLicense")], _c5)
+try:
+    m365_mod.cliente(_cm, "tenant-sin-consent").organizacion()
+    _ok = False
+except Exception as _e:  # noqa: BLE001
+    _ok = "no autorizó la aplicación" in str(_e) and "Trace ID" not in str(_e)
+check("M365: sin consentimiento del administrador el error lo explica", _ok)
+m365_mod._TOKENS.clear(); GRAPH_ESTADO["tokens"] = 0; GRAPH_ESTADO["forzar_401"] = True
+_g.organizacion()
+check("M365: ante un 401 pide un token nuevo y reintenta", GRAPH_ESTADO["tokens"] == 2, GRAPH_ESTADO)
+GRAPH_ESTADO["forzar_401"] = False
+try:
+    m365_mod.cliente(_dc.replace(cfg, m365_client_id=None), "t").organizacion()
+    _ok = False
+except Exception as _e:  # noqa: BLE001
+    _ok = "Falta configurar la aplicación" in str(_e)
+check("M365: sin credenciales de aplicación avisa qué falta", _ok)
+check("M365: nombres comerciales de planes comunes", m365_mod.nombre_plan("SPB") == "Microsoft 365 Business Premium" and m365_mod.nombre_plan("RARO") == "RARO")
 httpx.Client = _real_Client  # type: ignore[assignment]
 print("\nRESULTADO:", "TODO OK" if not fails else f"{len(fails)} FALLAS: {fails}")
 sys.exit(1 if fails else 0)

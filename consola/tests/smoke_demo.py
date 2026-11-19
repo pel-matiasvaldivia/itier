@@ -569,6 +569,13 @@ check("rendimiento: hay barra de progreso de navegación", "nav-bar" in c.get(f"
 
 # 10) Logout
 
+# Técnico de prueba vigente para los chequeos de permisos de las secciones nuevas
+_rt = c.post("/usuarios", data={"username": "tecrbac", "email": "tecrbac@pymesenlinea.com.ar", "nombre": "Tec RBAC", "rol": "tecnico", "csrf": csrf_de(c.get("/usuarios").text)})
+ttec, _ = _login_operador("tecrbac", re.search(r"Clave:\s+([^\s<]+)", _rt.text).group(1))
+check("RBAC: técnico de prueba operativo", ttec.get("/equipos").status_code == 200)
+_rp = c.post("/usuarios", data={"username": "pmrbac", "email": "pmrbac@pymesenlinea.com.ar", "nombre": "PM RBAC", "rol": "pm", "csrf": csrf_de(c.get("/usuarios").text)})
+tpm, _ = _login_operador("pmrbac", re.search(r"Clave:\s+([^\s<]+)", _rp.text).group(1))
+check("RBAC: PM de prueba operativo y ve la Bandeja", tpm.get("/bandeja").url.path == "/bandeja")
 # ── Canales de entrada: WhatsApp (OpenWA) y correo ──────────────────────────────
 from itier_console.services import canales as _cn  # noqa: E402
 from itier_console import db as _db  # noqa: E402
@@ -741,7 +748,7 @@ finally:
 r = c.post("/canales/whatsapp", data={"wa_api_url": "http://openwa:8080", "wa_api_key": "k-wa-123", "wa_numero": "5491155550000", "csrf": csrf_de(c.get("/canales").text)})
 check("canales: se guarda la config de WhatsApp (clave oculta)", "5491155550000" in r.text and "k-wa-123" not in r.text)
 check("canales: URL inválida rechazada", "debe empezar con http" in c.post("/canales/whatsapp", data={"wa_api_url": "ftp://x", "wa_numero": "", "csrf": csrf_de(c.get("/canales").text)}).text)
-check("RBAC: PM y técnico no entran a Canales", tp.get("/canales").url.path != "/canales" and tj.get("/canales/whatsapp/estado").url.path != "/canales/whatsapp/estado")
+check("RBAC: PM y técnico no entran a Canales", tpm.get("/canales").url.path != "/canales" and ttec.get("/canales/whatsapp/estado").url.path != "/canales/whatsapp/estado")
 check("RBAC: el menú del administrador muestra Canales", 'href="/canales"' in c.get("/").text)
 
 # Reporte de horas por cliente
@@ -785,13 +792,85 @@ _g = _hx.get
 _hx.get = lambda *a, **k: type("R", (), {"raise_for_status": lambda s: None, "json": lambda s: {"status": 200, "results": {"fecha": "2026-11-17", "detalle": [{"codigoMoneda": "USD", "tipoCotizacion": 1432.25}]}}})()
 check("horas: interpreta la respuesta del BCRA", _hs.cotizacion_bcra() == (1432.25, "2026-11-17"))
 _hx.get = _g
-check("RBAC: el reporte de horas es solo del administrador", tp.get("/reportes/horas").url.path != "/reportes/horas" and tj.get("/reportes/horas").url.path != "/reportes/horas")
+check("RBAC: el reporte de horas es solo del administrador", tpm.get("/reportes/horas").url.path != "/reportes/horas" and ttec.get("/reportes/horas").url.path != "/reportes/horas")
 check("RBAC: el menú muestra Horas al administrador", 'href="/reportes/horas"' in c.get("/").text)
 
+# ── Microsoft 365: ABM de usuarios del tenant de un cliente ─────────────────────────────
+from itier_console.adapters import m365 as _m365  # noqa: E402
+_fc = c.get("/clientes/canal-sa")
+check("m365: la ficha del cliente tiene la sección Microsoft 365", "☁️ Microsoft 365" in _fc.text and "Conectar tenant" in _fc.text)
+check("m365: sin conectar, la lista de usuarios manda a la ficha", c.get("/clientes/canal-sa/m365").url.path == "/clientes/canal-sa")
+check("m365: un técnico no puede conectar un tenant", "Conectado" not in (ttec.post("/clientes/canal-sa/m365/conectar", data={"tenant": "", "csrf": csrf_de(ttec.get("/").text)}).text))
+r = c.post("/clientes/canal-sa/m365/conectar", data={"tenant": "", "csrf": csrf_de(_fc.text)})
+check("m365: conectar el tenant (demo) lo deja conectado con su nombre", "Conectado" in r.text and "Cliente Demo SRL" in r.text and "Administrar usuarios" in r.text)
+check("m365: sin dominio/ID válido el tenant se rechaza", "no es válido" in c.post("/clientes/canal-sa/m365/conectar", data={"tenant": "no valido!!", "csrf": csrf_de(c.get("/clientes/canal-sa").text)}).text)
+lu = c.get("/clientes/canal-sa/m365")
+check("m365: lista usuarios con licencias y estado", lu.status_code == 200 and "Ana Pérez" in lu.text and "Microsoft 365 Business Standard" in lu.text and "Bloqueado" in lu.text)
+check("m365: muestra los planes con licencias libres", "4 licencias libres" in lu.text or "8 licencias libres" in lu.text)
+check("m365: buscar filtra", "Luis Gómez" in c.get("/clientes/canal-sa/m365?q=luis").text and "Ana Pérez" not in c.get("/clientes/canal-sa/m365?q=luis").text)
+check("m365: filtro de bloqueados", "Eva Ruiz" in c.get("/clientes/canal-sa/m365?estado=bloqueados").text and "Ana Pérez" not in c.get("/clientes/canal-sa/m365?estado=bloqueados").text)
+check("m365: un técnico ve la lista", ttec.get("/clientes/canal-sa/m365").url.path == "/clientes/canal-sa/m365")
+nf = c.get("/clientes/canal-sa/m365/nuevo")
+check("m365: el alta ofrece dominios verificados y planes", "@clientedemo.com.ar" in nf.text and "Business Basic" in nf.text)
+_sku = _m365._SKU_BASICO
+r = c.post("/clientes/canal-sa/m365/nuevo", data={"nombre": "María", "apellido": "Gómez", "usuario": "", "dominio": "clientedemo.com.ar",
+           "cargo": "Compras", "departamento": "Adm", "licencias": _sku, "enviar_a": "", "csrf": csrf_de(nf.text)})
+_mc = re.search(r"Clave:\s+([^\s<]+)", r.text)
+check("m365: el alta muestra usuario y clave UNA vez", "Usuario creado" in r.text and "maria.gomez@clientedemo.com.ar" in r.text and bool(_mc), r.text[:300])
+_cl = _mc.group(1) if _mc else ""
+check("m365: la clave generada es fuerte", len(_cl) >= 16 and re.search(r"[A-Z]", _cl) and re.search(r"[a-z]", _cl) and re.search(r"\d", _cl))
+lu = c.get("/clientes/canal-sa/m365")
+check("m365: el usuario nuevo aparece con su licencia y la clave no se vuelve a mostrar", "María Gómez" in lu.text and _cl not in lu.text and "Clave:" not in lu.text)
+check("m365: la auditoría no guarda la clave", "m365.usuario_creado" in c.get("/auditoria").text and _cl not in c.get("/auditoria").text)
+_dup = c.post("/clientes/canal-sa/m365/nuevo", data={"nombre": "María", "apellido": "Gómez", "usuario": "maria.gomez", "dominio": "clientedemo.com.ar",
+              "cargo": "", "departamento": "", "enviar_a": "", "csrf": csrf_de(nf.text)})
+check("m365: usuario repetido rechazado con el motivo", "Ya existe" in _dup.text and _dup.status_code == 400)
+check("m365: dominio que no es del tenant rechazado", "dominio verificado" in c.post("/clientes/canal-sa/m365/nuevo", data={"nombre": "A", "apellido": "B", "usuario": "ab", "dominio": "otro.com",
+      "enviar_a": "", "csrf": csrf_de(nf.text)}).text)
+check("m365: usuario con caracteres inválidos rechazado", "solo puede llevar" in c.post("/clientes/canal-sa/m365/nuevo", data={"nombre": "A", "apellido": "B", "usuario": "a b/c", "dominio": "clientedemo.com.ar",
+      "enviar_a": "", "csrf": csrf_de(nf.text)}).text)
+_uid = next(k for k, v in _m365._DEMO_USERS.items() if v["userPrincipalName"] == "maria.gomez@clientedemo.com.ar")
+dt = c.get(f"/clientes/canal-sa/m365/{_uid}")
+check("m365: el detalle muestra datos, licencias y acciones", "Maria Gómez".replace("Maria", "María") in dt.text and "Reiniciar clave" in dt.text and "Eliminar usuario" in dt.text)
+r = c.post(f"/clientes/canal-sa/m365/{_uid}/editar", data={"nombre": "María", "apellido": "Gómez Ruiz", "cargo": "Jefa de compras", "departamento": "Adm", "csrf": csrf_de(dt.text)})
+check("m365: editar los datos", "Datos actualizados" in r.text and "Gómez Ruiz" in r.text and "Jefa de compras" in r.text)
+r = c.post(f"/clientes/canal-sa/m365/{_uid}/licencias", data={"licencias": _m365._SKU_STD, "csrf": csrf_de(r.text)})
+check("m365: cambiar licencias quita una y asigna otra", "Licencias actualizadas" in r.text and [x["skuId"] for x in _m365._DEMO_USERS[_uid]["assignedLicenses"]] == [_m365._SKU_STD])
+r = c.post(f"/clientes/canal-sa/m365/{_uid}/estado", data={"habilitar": "0", "csrf": csrf_de(r.text)})
+check("m365: bloquear el inicio de sesión", "Usuario bloqueado" in r.text and _m365._DEMO_USERS[_uid]["accountEnabled"] is False)
+r = c.post(f"/clientes/canal-sa/m365/{_uid}/estado", data={"habilitar": "1", "csrf": csrf_de(r.text)})
+check("m365: habilitar de nuevo", "Usuario habilitado" in r.text and _m365._DEMO_USERS[_uid]["accountEnabled"] is True)
+r = c.post(f"/clientes/canal-sa/m365/{_uid}/clave", data={"enviar_a": "", "csrf": csrf_de(r.text)})
+_c2 = re.search(r"Clave:\s+([^\s<]+)", r.text)
+check("m365: reiniciar clave muestra la nueva una vez", "Clave reiniciada" in r.text and bool(_c2) and _c2.group(1) != _cl and _c2.group(1) not in c.get(f"/clientes/canal-sa/m365/{_uid}").text)
+check("m365: un técnico NO puede eliminar usuarios", ttec.post(f"/clientes/canal-sa/m365/{_uid}/eliminar", data={"csrf": csrf_de(ttec.get("/").text)}).url.path != "/clientes/canal-sa/m365"
+      and _uid in _m365._DEMO_USERS)
+check("m365: id de usuario inválido rechazado", "inválido" in c.get("/clientes/canal-sa/m365/u..x").text)
+check("m365: CSRF inválido no cambia nada", "Sesión expirada" in c.post(f"/clientes/canal-sa/m365/{_uid}/estado", data={"habilitar": "0", "csrf": "falso"}).text and _m365._DEMO_USERS[_uid]["accountEnabled"] is True)
+r = c.post(f"/clientes/canal-sa/m365/{_uid}/eliminar", data={"csrf": csrf_de(c.get(f"/clientes/canal-sa/m365/{_uid}").text)})
+check("m365: el administrador elimina al usuario", "Usuario eliminado" in r.text and _uid not in _m365._DEMO_USERS and "María Gómez" not in r.text)
+check("m365: la auditoría registra todas las acciones", all(a in c.get("/auditoria").text for a in ("m365.usuario_editado", "m365.licencias", "m365.usuario_bloqueado", "m365.clave_reiniciada", "m365.usuario_eliminado")))
+# aplicación del MSP
+ap = c.get("/m365/aplicacion")
+check("m365: el administrador ve la configuración de la aplicación con el URI de redirección", ap.status_code == 200 and "/m365/consentimiento" in ap.text and "User.ReadWrite.All" in ap.text)
+check("m365: client id inválido rechazado", "36 caracteres" in c.post("/m365/aplicacion", data={"client_id": "corto", "secreto": "", "csrf": csrf_de(ap.text)}).text)
+r = c.post("/m365/aplicacion", data={"client_id": "12345678-1234-1234-1234-123456789012", "secreto": "S3cr3to~app", "csrf": csrf_de(ap.text)})
+check("m365: se guarda la aplicación y el secreto no se muestra", "guardada" in r.text and "S3cr3to~app" not in r.text and "Configurada" in r.text)
+_rw = _conn.execute("SELECT valor, secreto FROM ajustes WHERE clave='m365_client_secret'").fetchone()
+check("m365: el secreto queda cifrado en la base", _rw["secreto"] == 1 and "S3cr3to~app" not in _rw["valor"])
+check("m365: PM y técnico no configuran la aplicación", tpm.get("/m365/aplicacion").url.path != "/m365/aplicacion" and ttec.get("/m365/aplicacion").url.path != "/m365/aplicacion")
+check("m365: el retorno de Microsoft con un state ajeno se rechaza", "no coincide" in c.get("/m365/consentimiento?state=falso&tenant=x&admin_consent=True").text)
+_ef = _aj.efectiva(_conn, app.state.cfg)
+_u = _m365.url_consentimiento(_ef, "https://c.example/m365/consentimiento", "st123", "empresa.onmicrosoft.com")
+check("m365: el enlace de consentimiento lleva client id, redirect y state", _u.startswith("https://login.microsoftonline.com/empresa.onmicrosoft.com/v2.0/adminconsent?")
+      and "client_id=12345678-1234-1234-1234-123456789012" in _u and "state=st123" in _u and "redirect_uri=https%3A%2F%2Fc.example" in _u)
+r = c.post("/clientes/canal-sa/m365/desconectar", data={"csrf": csrf_de(c.get("/clientes/canal-sa").text)})
+check("m365: desconectar el tenant", "Tenant desconectado" in r.text and "Conectar tenant" in r.text)
+
 # RBAC: la Bandeja es de PM/admin
-check("RBAC: el técnico no entra a la Bandeja", tj.get("/bandeja").url.path != "/bandeja")
-check("RBAC: el PM sí", tp.get("/bandeja").url.path == "/bandeja")
-check("RBAC: técnico no puede cargar dominios", tj.post("/clientes/canal-sa/dominios", data={"dominio": "x.com.ar", "csrf": csrf_de(tj.get("/").text)}).url.path != "/clientes/canal-sa" or
+check("RBAC: el técnico no entra a la Bandeja", ttec.get("/bandeja").url.path != "/bandeja")
+check("RBAC: el PM sí", tpm.get("/bandeja").url.path == "/bandeja")
+check("RBAC: técnico no puede cargar dominios", ttec.post("/clientes/canal-sa/dominios", data={"dominio": "x.com.ar", "csrf": csrf_de(ttec.get("/").text)}).url.path != "/clientes/canal-sa" or
       _conn.execute("SELECT 1 FROM client_dominios WHERE dominio='x.com.ar'").fetchone() is None)
 r = c.post("/clientes/canal-sa/dominios/%d/quitar" % _conn.execute("SELECT id FROM client_dominios").fetchone()["id"], data={"csrf": csrf_c()})
 check("canales: se puede quitar un dominio", "@pruebasrl.com.ar" not in r.text.split("Dominios de correo")[1].split("Personas")[0])

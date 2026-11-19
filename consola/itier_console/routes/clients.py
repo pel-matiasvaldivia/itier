@@ -72,7 +72,7 @@ def detalle(request: Request, slug: str, user: dict = Depends(require_permiso("c
     ef = ajustes.efectiva(conn, cfg)
     return render(request, "clientes_detalle.html", cli=cli, bundle=bundle, usuarios=usuarios,
                   dominios=canales.dominios_de(conn, cli["id"]), contactos=canales.contactos_de(conn, cli["id"]),
-                  soporte_email=ef.soporte_email, wa_numero=ef.wa_numero)
+                  soporte_email=ef.soporte_email, wa_numero=ef.wa_numero, m365_app_ok=ef.m365_configurado)
 
 
 @router.post("/clientes/{slug}/portal-usuarios")

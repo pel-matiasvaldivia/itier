@@ -110,6 +110,9 @@ class Config:
     wa_api_key: str | None = None
     wa_numero: str | None = None           # número de soporte (solo para mostrarlo)
     canal_limite_hora: int = 20
+    # -- Microsoft 365 (aplicación multi-tenant del MSP; se carga en la consola) -----------------
+    m365_client_id: str | None = None
+    m365_client_secret: str | None = None
     # -- Reporte de horas / rentabilidad (editables en la pantalla Horas) ---------------------
     fx_ars_usd: float | None = None        # cotización de referencia (BCRA), pesos por dólar
     fx_fecha: str | None = None
@@ -201,6 +204,8 @@ class Config:
             wa_api_key=os.environ.get("ITIER_WA_API_KEY") or None,
             wa_numero=(os.environ.get("ITIER_WA_NUMERO") or "").strip() or None,
             canal_limite_hora=int(os.environ.get("ITIER_CANAL_LIMITE_HORA", "20")),
+            m365_client_id=(os.environ.get("ITIER_M365_CLIENT_ID") or "").strip() or None,
+            m365_client_secret=os.environ.get("ITIER_M365_CLIENT_SECRET") or None,
             fx_ars_usd=float(os.environ["ITIER_FX_ARS_USD"]) if os.environ.get("ITIER_FX_ARS_USD") else None,
             costo_plataforma_usd=float(os.environ.get("ITIER_COSTO_PLATAFORMA_USD", "60")),
             mesh_support_group=(os.environ.get("ITIER_MESH_SUPPORT_GROUP", "SOPORTE") or "").strip(),
@@ -217,6 +222,10 @@ class Config:
     @property
     def zbx_configurado(self) -> bool:
         return self.demo or bool(self.zbx_url and (self.zbx_token or (self.zbx_user and self.zbx_password)))
+
+    @property
+    def m365_configurado(self) -> bool:
+        return bool(self.m365_client_id and self.m365_client_secret)
 
     @property
     def imap_configurado(self) -> bool:

@@ -240,6 +240,9 @@ def _migrar(conn: sqlite3.Connection) -> None:
                 "glpi_rule_id", "zbx_action_id", "autoasig_detalle", "report_key", "central_key", "mesh_id"):
         if col not in ccols:
             conn.execute(f"ALTER TABLE clients ADD COLUMN {col} TEXT")
+    for col in ("m365_tenant_id", "m365_estado", "m365_detalle", "m365_dominio", "m365_nombre", "m365_conectado_at"):
+        if col not in ccols:
+            conn.execute(f"ALTER TABLE clients ADD COLUMN {col} TEXT")
     if "facturacion_ars" not in ccols:
         conn.execute("ALTER TABLE clients ADD COLUMN facturacion_ars REAL")
     ucols = {r["name"] for r in conn.execute("PRAGMA table_info(users)").fetchall()}

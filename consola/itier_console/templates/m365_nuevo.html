@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block titulo %}Nuevo usuario de Microsoft 365 · {{ cli.nombre }}{% endblock %}
+{% block contenido %}
+  <div class="l-head">
+    <div>
+      <p class="u-sub" style="margin:0 0 .2rem"><a href="/clientes/{{ cli.slug }}/m365">← Usuarios de Microsoft 365</a></p>
+      <h1>Nuevo usuario · {{ cli.nombre }}</h1>
+    </div>
+  </div>
+  <section class="u-card" style="max-width:46rem">
+    <form method="post" action="/clientes/{{ cli.slug }}/m365/nuevo" class="form">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <div class="d-meta" style="gap:.8rem">
+        <label style="flex:1">Nombre <input type="text" name="nombre" value="{{ v.nombre or '' }}" required id="m-nombre"></label>
+        <label style="flex:1">Apellido <input type="text" name="apellido" value="{{ v.apellido or '' }}" required id="m-apellido"></label>
+      </div>
+      <div class="d-meta" style="gap:.8rem">
+        <label style="flex:1">Usuario (antes de la @) <input type="text" name="usuario" value="{{ v.usuario or '' }}" id="m-usuario" placeholder="se completa solo: nombre.apellido"></label>
+        <label style="flex:1">Dominio
+          <select name="dominio">
+            {% for d in org.dominios %}<option value="{{ d }}" {{ 'selected' if (v.dominio or org.dominio_principal) == d else '' }}>@{{ d }}</option>{% endfor %}
+          </select></label>
+      </div>
+      <div class="d-meta" style="gap:.8rem">
+        <label style="flex:1">Cargo <input type="text" name="cargo" value="{{ v.cargo or '' }}"></label>
+        <label style="flex:1">Área <input type="text" name="departamento" value="{{ v.departamento or '' }}"></label>
+      </div>
+      <fieldset style="border:0;padding:0;margin:.6rem 0">
+        <legend class="small"><b>Licencias</b></legend>
+        {% for p in planes %}
+        <label class="small" style="display:flex;gap:.5rem;align-items:center;margin:.25rem 0">
+          <input type="checkbox" name="licencias" value="{{ p.sku_id }}" {{ 'checked' if p.sku_id in (v.licencias or []) else '' }} {{ 'disabled' if p.libres < 1 else '' }}>
+          {{ p.nombre }} <span class="muted">· {{ p.libres }} libre{{ 's' if p.libres != 1 }}</span></label>
+        {% else %}<p class="muted small">El tenant no tiene licencias disponibles: se crea la cuenta sin licencia.</p>{% endfor %}
+      </fieldset>
+      <label>Enviar la clave temporal a este correo (opcional)
+        <input type="email" name="enviar_a" value="{{ v.enviar_a or '' }}" placeholder="persona@correo-personal.com">
+        <small class="muted">{% if smtp %}Usá un correo distinto al nuevo (todavía no tiene buzón activo).{% else %}SMTP sin configurar: copiá la clave en la pantalla siguiente.{% endif %}</small></label>
+      <button class="u-btn" type="submit">Crear usuario</button>
+    </form>
+  </section>
+  <script>
+  (function () {
+    var n = document.getElementById("m-nombre"), a = document.getElementById("m-apellido"), u = document.getElementById("m-usuario"), tocado = !!u.value;
+    function limpio(s) { return s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]/g, ""); }
+    u.addEventListener("input", function () { tocado = true; });
+    function sugerir() { if (!tocado) u.value = [limpio(n.value), limpio(a.value)].filter(Boolean).join("."); }
+    n.addEventListener("input", sugerir); a.addEventListener("input", sugerir);
+  })();
+  </script>
+{% endblock %}

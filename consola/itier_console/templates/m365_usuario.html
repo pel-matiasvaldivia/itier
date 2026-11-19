@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+{% block titulo %}{{ u.nombre or u.upn }} · Microsoft 365 · {{ cli.nombre }}{% endblock %}
+{% block contenido %}
+  <div class="l-head">
+    <div>
+      <p class="u-sub" style="margin:0 0 .2rem"><a href="/clientes/{{ cli.slug }}/m365">← Usuarios de Microsoft 365</a></p>
+      <h1>{{ u.nombre or u.upn }}</h1>
+      <p class="u-sub">{{ u.upn }} · {% if u.habilitado %}<span class="l-pill ok"><i></i>Activo</span>{% else %}<span class="l-pill bad"><i></i>Bloqueado</span>{% endif %}
+        {% if u.tipo == 'Guest' %}<span class="l-pill off">Invitado</span>{% endif %}{% if u.creado %} · alta {{ u.creado }}{% endif %}</p>
+    </div>
+  </div>
+
+  {% if nueva %}
+  <section class="u-cred">
+    <h2>{{ '✅ Usuario creado' if nueva.motivo == 'alta' else '🔑 Clave reiniciada' }} · {{ nueva.usuario }}</h2>
+    <p class="u-sub">Estos datos se muestran <strong>una sola vez</strong> y no se guardan. Entregáselos por un canal seguro.</p>
+    <div class="u-cred-grid">
+      <div class="u-cred-box"><span>Usuario</span><div>{{ nueva.usuario }}</div></div>
+      <div class="u-cred-box"><span>Clave temporal</span><div>{{ nueva.clave }}</div></div>
+      <button class="u-b" type="button" data-copy="#cred-nueva">Copiar usuario y clave</button>
+    </div>
+    <pre class="u-sr" id="cred-nueva">Usuario: {{ nueva.usuario }}
+Clave:   {{ nueva.clave }}</pre>
+    {% if nueva.correo and nueva.correo.startswith('ok') %}<div class="u-warn">Correo: {{ nueva.correo }}.</div>
+    {% elif nueva.correo and nueva.correo.startswith('error') %}<div class="u-err">No se pudo enviar el correo: {{ nueva.correo[7:] }}</div>{% endif %}
+    <div class="u-warn">La clave es temporal: en el primer ingreso (https://www.office.com) Microsoft le pide cambiarla.</div>
+  </section>
+  {% endif %}
+
+  <div class="d-cols">
+    <section class="u-card">
+      <h2>✏️ Datos</h2>
+      <form method="post" action="/clientes/{{ cli.slug }}/m365/{{ u.id }}/editar" class="form">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <div class="d-meta" style="gap:.8rem">
+          <label style="flex:1">Nombre <input type="text" name="nombre" value="{{ u.nombre_pila }}" required></label>
+          <label style="flex:1">Apellido <input type="text" name="apellido" value="{{ u.apellido }}" required></label>
+        </div>
+        <label>Cargo <input type="text" name="cargo" value="{{ u.cargo }}"></label>
+        <label>Área <input type="text" name="departamento" value="{{ u.departamento }}"></label>
+        <button class="u-btn" type="submit">Guardar datos</button>
+      </form>
+    </section>
+
+    <div>
+      <section class="u-card">
+        <h2>🪪 Licencias</h2>
+        <form method="post" action="/clientes/{{ cli.slug }}/m365/{{ u.id }}/licencias" class="form">
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          {% for p in planes %}
+          {% set tiene = p.sku_id in u.licencias %}
+          <label class="small" style="display:flex;gap:.5rem;align-items:center;margin:.25rem 0">
+            <input type="checkbox" name="licencias" value="{{ p.sku_id }}" {{ 'checked' if tiene else '' }} {{ 'disabled' if (p.libres < 1 and not tiene) else '' }}>
+            {{ p.nombre }} <span class="muted">· {{ p.libres }} libre{{ 's' if p.libres != 1 }}</span></label>
+          {% else %}<p class="muted small">El tenant no tiene planes con licencias disponibles.</p>{% endfor %}
+          <button class="u-b" type="submit">Guardar licencias</button>
+        </form>
+      </section>
+
+      <section class="u-card">
+        <h2>🔐 Acceso</h2>
+        <form method="post" action="/clientes/{{ cli.slug }}/m365/{{ u.id }}/clave" class="form" onsubmit="return confirm('¿Reiniciar la clave de {{ u.upn }}? La actual deja de funcionar.');">
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          <label>Enviar la nueva clave a (opcional) <input type="email" name="enviar_a" placeholder="correo alternativo"></label>
+          <button class="u-b" type="submit">🔑 Reiniciar clave</button>
+        </form>
+        <form method="post" action="/clientes/{{ cli.slug }}/m365/{{ u.id }}/estado" class="inline" style="margin-top:.6rem"
+              onsubmit="return confirm('{{ '¿Habilitar' if not u.habilitado else '¿Bloquear' }} a {{ u.upn }}?');">
+          <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="habilitar" value="{{ '1' if not u.habilitado else '0' }}">
+          <button class="u-b {{ '' if not u.habilitado else 'danger' }}" type="submit">{{ '✅ Habilitar' if not u.habilitado else '⛔ Bloquear inicio de sesión' }}</button>
+        </form>
+      </section>
+
+      {% if puede('m365.eliminar') %}
+      <section class="u-card d-danger">
+        <h2>🗑 Eliminar</h2>
+        <form method="post" action="/clientes/{{ cli.slug }}/m365/{{ u.id }}/eliminar" class="inline"
+              onsubmit="return confirm('¿Eliminar a {{ u.upn }}? Su buzón y archivos se conservan 30 días en la papelera de Microsoft.');">
+          <input type="hidden" name="csrf" value="{{ csrf }}"><button class="u-b danger" type="submit" style="width:100%;padding:.6rem">Eliminar usuario</button>
+        </form>
+        <p class="muted small" style="margin-top:.7rem">Microsoft lo mantiene 30 días en usuarios eliminados: se puede restaurar desde su Centro de administración.</p>
+      </section>
+      {% endif %}
+    </div>
+  </div>
+{% endblock %}
