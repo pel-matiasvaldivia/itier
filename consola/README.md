@@ -216,6 +216,8 @@ y compara contra lo facturado (pesos → USD con la cotización del BCRA, que se
 
 ## Soporte remoto (MeshCentral)
 
+En el panel Equipos, «Conectar» abre el equipo con tres pestañas embebidas: **Escritorio**, **Terminal** y **Archivos** (viewmode 11/12/13 de MeshCentral). Cada vista se abre con su propio enlace y queda en la auditoría.
+
 `ITIER_MESH_URL`, `ITIER_MESH_USER`, `ITIER_MESH_PASSWORD` (cuenta de servicio **sin 2FA**). Al dar de alta o reprovisionar un
 cliente se crea su grupo `itier-<slug>` y el instalador de Windows instala el Mesh Agent de ese grupo (ADR-0011).
 Alta del servidor: `deploy/vps/README.md` → «Soporte remoto: MeshCentral».
