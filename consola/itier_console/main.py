@@ -32,6 +32,7 @@ from .routes import dashboard as r_dashboard
 from .routes import discovery as r_discovery
 from .routes import enrolamiento as r_enrolamiento
 from .routes import equipos as r_equipos
+from .routes import gws as r_gws
 from .routes import m365 as r_m365
 from .routes import manual as r_manual
 from .routes import portal as r_portal
@@ -149,6 +150,7 @@ def create_app() -> FastAPI:
     app.include_router(r_tickets.router)
     app.include_router(r_canales.router)
     app.include_router(r_m365.router)
+    app.include_router(r_gws.router)
     app.include_router(r_reportes.router)
     app.include_router(r_audit.router)
     app.include_router(r_portal.router)

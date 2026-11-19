@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block titulo %}Cuenta de servicio de Google · Consola de iTier{% endblock %}
+{% block contenido %}
+  <div class="l-head">
+    <div>
+      <h1>Google Workspace · cuenta de servicio</h1>
+      <p class="u-sub">Se configura una sola vez para todos los clientes. Cada cliente autoriza después el ID de cliente de esta cuenta en su Admin console.</p>
+    </div>
+  </div>
+  <div class="d-cols">
+    <section class="u-card">
+      <h2>🔑 Clave de la cuenta de servicio</h2>
+      {% if sa %}
+      <p class="small" style="margin:.2rem 0"><span class="l-pill ok"><i></i>Configurada</span> <b>{{ sa.email }}</b></p>
+      <div class="u-cred-box" style="margin:.7rem 0"><span>ID de cliente (para la delegación)</span><div id="gws-cid">{{ sa.client_id }}</div></div>
+      <button class="u-b" type="button" data-copy="#gws-cid">Copiar ID de cliente</button>
+      <div class="u-cred-box" style="margin:.7rem 0"><span>Permisos (scopes) a autorizar</span><div id="gws-scopes" style="word-break:break-all">{{ scopes|join(',') }}</div></div>
+      <button class="u-b" type="button" data-copy="#gws-scopes">Copiar permisos</button>
+      {% elif guardada %}<div class="u-err">Hay una clave guardada pero no se pudo leer: cargala de nuevo.</div>
+      {% else %}<span class="l-pill off">Sin configurar</span>{% endif %}
+      <form method="post" action="/gws/aplicacion" class="form" style="margin-top:1rem">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <label>Pegá el contenido del archivo JSON de la clave
+          <textarea name="clave_json" rows="6" autocomplete="off" spellcheck="false" placeholder='{"type": "service_account", ...}' style="width:100%;font-family:monospace;font-size:.78rem"></textarea></label>
+        <button class="u-btn" type="submit">{{ 'Reemplazar clave' if guardada else 'Guardar' }}</button>
+      </form>
+      {% if guardada %}
+      <form method="post" action="/gws/aplicacion/borrar" class="inline" onsubmit="return confirm('¿Borrar la clave? La gestión de Google Workspace queda apagada.');" style="margin-top:.6rem">
+        <input type="hidden" name="csrf" value="{{ csrf }}"><button class="u-b danger" type="submit">Borrar clave guardada</button></form>
+      {% endif %}
+      <p class="muted small" style="margin-top:.8rem">La clave se guarda cifrada y no se vuelve a mostrar. Solo se muestran el correo y el ID de cliente de la cuenta.</p>
+    </section>
+    <section class="u-card">
+      <h2>📋 Cómo crearla (una vez, en tu Google Cloud)</h2>
+      <ol class="small" style="padding-left:1.1rem;line-height:1.6">
+        <li>En <b>console.cloud.google.com</b> creá un proyecto (por ejemplo «iTier Soporte»).</li>
+        <li>APIs y servicios → <b>Biblioteca</b> → habilitá <b>Admin SDK API</b>.</li>
+        <li>IAM → <b>Cuentas de servicio</b> → crear cuenta (sin roles). En <i>Claves</i> → Agregar clave → <b>JSON</b>: pegá el contenido acá.</li>
+        <li>Anotá el <b>ID de cliente</b> (número largo) de la cuenta: lo ves arriba una vez guardada.</li>
+      </ol>
+      <h2 style="margin-top:1rem">🏢 Por cada cliente (lo hace un super administrador suyo)</h2>
+      <ol class="small" style="padding-left:1.1rem;line-height:1.6">
+        <li>En <b>admin.google.com</b> → Seguridad → Controles de acceso y datos → Controles de API → <b>Administrar la delegación en todo el dominio</b>.</li>
+        <li><b>Agregar</b> → ID de cliente (el de arriba) y los permisos (scopes), separados por coma → Autorizar:<br><code style="word-break:break-all">{{ scopes|join(',') }}</code></li>
+        <li>En la consola: ficha del cliente → Google Workspace → indicar un <b>super administrador</b> del cliente (la consola actúa como esa persona) → Conectar.</li>
+      </ol>
+      <p class="muted small">Es el método estándar de los proveedores de servicios: no requiere la verificación de la app por Google. El cliente puede revocarlo cuando quiera quitando esa entrada. Conviene usar una cuenta de administrador dedicada (por ejemplo <code>soporte-itier@…</code>) y no la de una persona.</p>
+    </section>
+  </div>
+{% endblock %}

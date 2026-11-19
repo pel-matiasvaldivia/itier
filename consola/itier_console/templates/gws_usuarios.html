@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block titulo %}Google Workspace · {{ cli.nombre }} · Consola de iTier{% endblock %}
+{% block contenido %}
+  <div class="l-head">
+    <div>
+      <p class="u-sub" style="margin:0 0 .2rem"><a href="/clientes/{{ cli.slug }}">← {{ cli.nombre }}</a></p>
+      <h1>Google Workspace · usuarios</h1>
+      <p class="u-sub">Dominio <b>{{ cli.gws_dominio or '—' }}</b> · conectado como {{ cli.gws_admin }}. Los cambios se hacen directo en el Workspace del cliente.</p>
+    </div>
+    <a class="u-btn" href="/clientes/{{ cli.slug }}/gws/nuevo" style="text-decoration:none">+ Nuevo usuario</a>
+  </div>
+
+  {% if error %}<div class="u-err">No se pudo leer el dominio: {{ error }}</div>{% endif %}
+
+  <div class="u-stats">
+    <div class="u-stat"><b>{{ resumen.total }}</b><span>Usuarios</span></div>
+    <div class="u-stat"><b>{{ resumen.activos }}</b><span>Activos</span></div>
+    <div class="u-stat {{ 'bad' if resumen.suspendidos else '' }}"><b>{{ resumen.suspendidos }}</b><span>Suspendidos</span></div>
+    <div class="u-stat"><b>{{ resumen.admins }}</b><span>Administradores</span></div>
+  </div>
+
+  <div class="l-wrap">
+    <div class="l-bar-top">
+      <form method="get" action="/clientes/{{ cli.slug }}/gws" class="l-filters">
+        <select class="l-sel" name="estado" onchange="this.form.submit()" aria-label="Filtro">
+          <option value="">Todos</option>
+          <option value="suspendidos" {{ 'selected' if estado == 'suspendidos' else '' }}>Suspendidos</option>
+          <option value="admins" {{ 'selected' if estado == 'admins' else '' }}>Administradores</option>
+        </select>
+        <input class="u-search" type="search" name="q" value="{{ q }}" placeholder="Buscar por nombre, correo o cargo…" aria-label="Buscar">
+        <button class="u-b" type="submit">Buscar</button>
+      </form>
+    </div>
+    {% if usuarios %}
+    <table class="l-table">
+      <thead><tr><th>Usuario</th><th>Correo</th><th>Último ingreso</th><th>Estado</th><th></th></tr></thead>
+      <tbody>
+      {% for u in usuarios %}
+        <tr>
+          <td><a class="l-link" href="/clientes/{{ cli.slug }}/gws/{{ u.id }}"><b>{{ u.nombre or u.email }}</b></a>{% if u.cargo %}<br><span class="muted small">{{ u.cargo }}{% if u.departamento %} · {{ u.departamento }}{% endif %}</span>{% endif %}</td>
+          <td class="small">{{ u.email }}{% if u.admin %} <span class="l-pill warn">Admin</span>{% endif %}</td>
+          <td class="muted small">{{ u.ultimo_ingreso or 'nunca' }}</td>
+          <td>{% if u.suspendido %}<span class="l-pill bad"><i></i>Suspendido</span>{% else %}<span class="l-pill ok"><i></i>Activo</span>{% endif %}</td>
+          <td class="tight"><a class="u-b" href="/clientes/{{ cli.slug }}/gws/{{ u.id }}" style="text-decoration:none">Gestionar</a></td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% else %}<div class="l-empty"><b>👥</b>No hay usuarios que coincidan.</div>{% endif %}
+  </div>
+{% endblock %}

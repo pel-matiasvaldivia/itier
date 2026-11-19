@@ -154,6 +154,31 @@
         {% if puede('m365.app') %}<p class="muted small" style="margin-top:.6rem"><a href="/m365/aplicacion">Configurar la aplicación de Microsoft 365</a></p>{% endif %}
       </section>
       <section class="u-card">
+        <h2>🟦 Google Workspace</h2>
+        {% if cli.gws_estado == 'conectado' %}
+        <p class="small" style="margin:.2rem 0"><span class="l-pill ok"><i></i>Conectado</span> <b>{{ cli.gws_dominio }}</b><br><span class="muted">como {{ cli.gws_admin }}</span></p>
+        {% if puede('gws') %}<a class="u-btn" href="/clientes/{{ cli.slug }}/gws" style="text-decoration:none;display:block;text-align:center;margin:.6rem 0">👥 Administrar usuarios</a>{% endif %}
+        {% if puede('clientes.editar') %}
+        <div class="d-meta" style="gap:.5rem">
+          <form method="post" action="/clientes/{{ cli.slug }}/gws/verificar" class="inline"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="u-b" type="submit">Verificar conexión</button></form>
+          <form method="post" action="/clientes/{{ cli.slug }}/gws/desconectar" class="inline" onsubmit="return confirm('¿Desconectar el dominio de {{ cli.nombre }}?');"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="u-b danger" type="submit">Desconectar</button></form>
+        </div>{% endif %}
+        {% else %}
+        <p class="u-lead">Alta, baja, suspensión y claves de los usuarios del Workspace de {{ cli.nombre }}.</p>
+        {% if cli.gws_estado == 'error' %}<div class="u-err small">No se pudo conectar: {{ cli.gws_detalle }}</div>{% endif %}
+        {% if puede('clientes.editar') %}
+        <form method="post" action="/clientes/{{ cli.slug }}/gws/conectar" class="form">
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          <label>Correo de un super administrador del cliente
+            <input type="email" name="admin" value="{{ cli.gws_admin or '' }}" placeholder="soporte-itier@empresa.com.ar" required></label>
+          <button class="u-btn" type="submit">Conectar dominio</button>
+        </form>
+        <p class="muted small">Antes, el cliente tiene que autorizar la delegación en todo el dominio con los datos de <a href="/gws/aplicacion">esta pantalla</a>{% if not puede('gws.app') %} (pedíselos a un administrador){% endif %}.</p>
+        {% else %}<p class="muted small">Pedile a un PM o administrador que conecte el dominio.</p>{% endif %}
+        {% endif %}
+        {% if puede('gws.app') %}<p class="muted small" style="margin-top:.6rem"><a href="/gws/aplicacion">Configurar la cuenta de servicio de Google</a></p>{% endif %}
+      </section>
+      <section class="u-card">
         <h2>📨 Canales de contacto</h2>
         <p class="u-lead">Cómo le llegan a soporte los pedidos de {{ cli.nombre }}: cada uno abre un ticket en su entidad.</p>
         <p class="small" style="margin:.2rem 0"><b>Dominios de correo</b>

@@ -202,6 +202,12 @@ Ficha del cliente → **Microsoft 365**: conecta el tenant (consentimiento de ad
 permite el ABM de sus usuarios por Microsoft Graph (`adapters/m365.py`, `routes/m365.py`). La app (client id y secreto) se carga en
 `/m365/aplicacion` (administrador, secreto cifrado). Alta y permisos: `deploy/vps/README.md` → «Microsoft 365».
 
+## Google Workspace por cliente
+
+Ficha del cliente → **Google Workspace**: conecta el dominio (delegación en todo el dominio con una cuenta de servicio del MSP) y permite el
+ABM de sus usuarios (`adapters/gws.py`, `routes/gws.py`). La cuenta de servicio se carga en `/gws/aplicacion` (administrador, cifrada). No se opera
+sobre administradores del dominio. Alta y permisos: `deploy/vps/README.md` → «Google Workspace».
+
 ## Horas y rentabilidad por cliente
 
 Los técnicos registran el tiempo en cada ticket («Tiempo dedicado», va a las tareas de GLPI). La pantalla **Horas**

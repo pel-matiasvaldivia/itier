@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% block titulo %}{{ u.nombre or u.email }} · Google Workspace · {{ cli.nombre }}{% endblock %}
+{% block contenido %}
+  <div class="l-head">
+    <div>
+      <p class="u-sub" style="margin:0 0 .2rem"><a href="/clientes/{{ cli.slug }}/gws">← Usuarios de Google Workspace</a></p>
+      <h1>{{ u.nombre or u.email }}</h1>
+      <p class="u-sub">{{ u.email }} · {% if u.suspendido %}<span class="l-pill bad"><i></i>Suspendido</span>{% else %}<span class="l-pill ok"><i></i>Activo</span>{% endif %}
+        {% if u.admin %}<span class="l-pill warn">Administrador</span>{% endif %}{% if u.creado %} · alta {{ u.creado }}{% endif %}{% if u.ultimo_ingreso %} · último ingreso {{ u.ultimo_ingreso }}{% endif %}</p>
+    </div>
+  </div>
+
+  {% if nueva %}
+  <section class="u-cred">
+    <h2>{{ '✅ Usuario creado' if nueva.motivo == 'alta' else '🔑 Clave reiniciada' }} · {{ nueva.usuario }}</h2>
+    <p class="u-sub">Estos datos se muestran <strong>una sola vez</strong> y no se guardan. Entregáselos por un canal seguro.</p>
+    <div class="u-cred-grid">
+      <div class="u-cred-box"><span>Usuario</span><div>{{ nueva.usuario }}</div></div>
+      <div class="u-cred-box"><span>Clave temporal</span><div>{{ nueva.clave }}</div></div>
+      <button class="u-b" type="button" data-copy="#cred-nueva">Copiar usuario y clave</button>
+    </div>
+    <pre class="u-sr" id="cred-nueva">Usuario: {{ nueva.usuario }}
+Clave:   {{ nueva.clave }}</pre>
+    {% if nueva.correo and nueva.correo.startswith('ok') %}<div class="u-warn">Correo: {{ nueva.correo }}.</div>
+    {% elif nueva.correo and nueva.correo.startswith('error') %}<div class="u-err">No se pudo enviar el correo: {{ nueva.correo[7:] }}</div>{% endif %}
+    <div class="u-warn">La clave es temporal: en el primer ingreso (https://accounts.google.com) Google le pide cambiarla.</div>
+  </section>
+  {% endif %}
+
+  <div class="d-cols">
+    <section class="u-card">
+      <h2>✏️ Datos</h2>
+      <form method="post" action="/clientes/{{ cli.slug }}/gws/{{ u.id }}/editar" class="form">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <div class="d-meta" style="gap:.8rem">
+          <label style="flex:1">Nombre <input type="text" name="nombre" value="{{ u.nombre_pila }}" required></label>
+          <label style="flex:1">Apellido <input type="text" name="apellido" value="{{ u.apellido }}" required></label>
+        </div>
+        <label>Cargo <input type="text" name="cargo" value="{{ u.cargo }}"></label>
+        <label>Área <input type="text" name="departamento" value="{{ u.departamento }}"></label>
+        <button class="u-btn" type="submit">Guardar datos</button>
+      </form>
+    </section>
+
+    <div>
+      <section class="u-card">
+        <h2>🔐 Acceso</h2>
+        {% if u.admin %}
+        <p class="muted small">Es administrador del dominio: la consola no reinicia su clave, no lo suspende ni lo elimina. Hacelo desde la Admin console de Google.</p>
+        {% else %}
+        <form method="post" action="/clientes/{{ cli.slug }}/gws/{{ u.id }}/clave" class="form" onsubmit="return confirm('¿Reiniciar la clave de {{ u.email }}? La actual deja de funcionar.');">
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          <label>Enviar la nueva clave a (opcional) <input type="email" name="enviar_a" placeholder="correo alternativo"></label>
+          <button class="u-b" type="submit">🔑 Reiniciar clave</button>
+        </form>
+        <form method="post" action="/clientes/{{ cli.slug }}/gws/{{ u.id }}/estado" class="inline" style="margin-top:.6rem"
+              onsubmit="return confirm('{{ '¿Reactivar' if u.suspendido else '¿Suspender' }} a {{ u.email }}?');">
+          <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="suspender" value="{{ '0' if u.suspendido else '1' }}">
+          <button class="u-b {{ '' if u.suspendido else 'danger' }}" type="submit">{{ '✅ Reactivar' if u.suspendido else '⛔ Suspender inicio de sesión' }}</button>
+        </form>
+        {% endif %}
+      </section>
+
+      {% if puede('gws.eliminar') and not u.admin %}
+      <section class="u-card d-danger">
+        <h2>🗑 Eliminar</h2>
+        <form method="post" action="/clientes/{{ cli.slug }}/gws/{{ u.id }}/eliminar" class="inline"
+              onsubmit="return confirm('¿Eliminar a {{ u.email }}? Sus correos y archivos se pierden salvo que se restaure a tiempo.');">
+          <input type="hidden" name="csrf" value="{{ csrf }}"><button class="u-b danger" type="submit" style="width:100%;padding:.6rem">Eliminar usuario</button>
+        </form>
+        <p class="muted small" style="margin-top:.7rem">Antes de eliminar, conviene transferir sus archivos y correos desde la Admin console. Google permite restaurarlo ~20 días.</p>
+      </section>
+      {% endif %}
+    </div>
+  </div>
+{% endblock %}

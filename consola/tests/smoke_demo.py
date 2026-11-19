@@ -867,6 +867,75 @@ check("m365: el enlace de consentimiento lleva client id, redirect y state", _u.
 r = c.post("/clientes/canal-sa/m365/desconectar", data={"csrf": csrf_de(c.get("/clientes/canal-sa").text)})
 check("m365: desconectar el tenant", "Tenant desconectado" in r.text and "Conectar tenant" in r.text)
 
+# ── Google Workspace: ABM de usuarios del dominio de un cliente ─────────────────────────
+from itier_console.adapters import gws as _gws  # noqa: E402
+_fg = c.get("/clientes/canal-sa")
+check("gws: la ficha del cliente tiene la sección Google Workspace", "🟦 Google Workspace" in _fg.text and "Conectar dominio" in _fg.text)
+check("gws: sin conectar, la lista manda a la ficha", c.get("/clientes/canal-sa/gws").url.path == "/clientes/canal-sa")
+check("gws: un técnico no puede conectar un dominio", "Conectado" not in ttec.post("/clientes/canal-sa/gws/conectar", data={"admin": "admin@gdemo.com.ar", "csrf": csrf_de(ttec.get("/").text)}).text)
+check("gws: el correo del administrador se valida", "no es válida" in c.post("/clientes/canal-sa/gws/conectar", data={"admin": "no-es-correo", "csrf": csrf_de(_fg.text)}).text or "No se pudo conectar" in c.get("/clientes/canal-sa").text)
+r = c.post("/clientes/canal-sa/gws/conectar", data={"admin": "admin@gdemo.com.ar", "csrf": csrf_de(c.get("/clientes/canal-sa").text)})
+check("gws: conectar (demo) deja el dominio conectado", "Conectado" in r.text and "gdemo.com.ar" in r.text and "Administrar usuarios" in r.text)
+lg = c.get("/clientes/canal-sa/gws")
+check("gws: lista usuarios con estado y administradores", lg.status_code == 200 and "Sofía Paz" in lg.text and "Suspendido" in lg.text and "Admin" in lg.text)
+check("gws: buscar y filtrar", "Sofía Paz" in c.get("/clientes/canal-sa/gws?q=sofia").text and "Raúl Díaz" not in c.get("/clientes/canal-sa/gws?q=sofia").text
+      and "Raúl Díaz" in c.get("/clientes/canal-sa/gws?estado=suspendidos").text)
+check("gws: un técnico ve la lista", ttec.get("/clientes/canal-sa/gws").url.path == "/clientes/canal-sa/gws")
+nf = c.get("/clientes/canal-sa/gws/nuevo")
+check("gws: el alta ofrece los dominios verificados", "@gdemo.com.ar" in nf.text and "@gdemo.com" in nf.text)
+r = c.post("/clientes/canal-sa/gws/nuevo", data={"nombre": "Lucía", "apellido": "Fernández", "usuario": "", "dominio": "gdemo.com.ar", "cargo": "Compras",
+           "departamento": "Adm", "enviar_a": "", "csrf": csrf_de(nf.text)})
+_gm = re.search(r"Clave:\s+([^\s<]+)", r.text)
+check("gws: el alta muestra usuario y clave UNA vez", "Usuario creado" in r.text and "lucia.fernandez@gdemo.com.ar" in r.text and bool(_gm), r.text[:300])
+_gc = _gm.group(1) if _gm else ""
+check("gws: la clave generada es fuerte y no se vuelve a mostrar", len(_gc) >= 16 and _gc not in c.get("/clientes/canal-sa/gws").text and "Lucía Fernández" in c.get("/clientes/canal-sa/gws").text)
+check("gws: la auditoría no guarda la clave", "gws.usuario_creado" in c.get("/auditoria").text and _gc not in c.get("/auditoria").text)
+check("gws: usuario repetido rechazado", "Ya existe" in c.post("/clientes/canal-sa/gws/nuevo", data={"nombre": "L", "apellido": "F", "usuario": "lucia.fernandez", "dominio": "gdemo.com.ar", "enviar_a": "", "csrf": csrf_de(nf.text)}).text)
+check("gws: dominio ajeno rechazado", "dominio verificado" in c.post("/clientes/canal-sa/gws/nuevo", data={"nombre": "A", "apellido": "B", "usuario": "ab", "dominio": "otro.com", "enviar_a": "", "csrf": csrf_de(nf.text)}).text)
+check("gws: usuario inválido rechazado", "solo puede llevar" in c.post("/clientes/canal-sa/gws/nuevo", data={"nombre": "A", "apellido": "B", "usuario": "a b/c", "dominio": "gdemo.com.ar", "enviar_a": "", "csrf": csrf_de(nf.text)}).text)
+_gid = next(k for k, v in _gws._DEMO_USERS.items() if v["primaryEmail"] == "lucia.fernandez@gdemo.com.ar")
+dg = c.get(f"/clientes/canal-sa/gws/{_gid}")
+r = c.post(f"/clientes/canal-sa/gws/{_gid}/editar", data={"nombre": "Lucía", "apellido": "Fernández Paz", "cargo": "Jefa de compras", "departamento": "Adm", "csrf": csrf_de(dg.text)})
+check("gws: editar datos", "Datos actualizados" in r.text and "Fernández Paz" in r.text and "Jefa de compras" in r.text)
+r = c.post(f"/clientes/canal-sa/gws/{_gid}/estado", data={"suspender": "1", "csrf": csrf_de(r.text)})
+check("gws: suspender el inicio de sesión", "Usuario suspendido" in r.text and _gws._DEMO_USERS[_gid]["suspended"] is True)
+r = c.post(f"/clientes/canal-sa/gws/{_gid}/estado", data={"suspender": "0", "csrf": csrf_de(r.text)})
+check("gws: reactivar", "Usuario reactivado" in r.text and _gws._DEMO_USERS[_gid]["suspended"] is False)
+r = c.post(f"/clientes/canal-sa/gws/{_gid}/clave", data={"enviar_a": "", "csrf": csrf_de(r.text)})
+_g2 = re.search(r"Clave:\s+([^\s<]+)", r.text)
+check("gws: reiniciar clave muestra la nueva una vez", "Clave reiniciada" in r.text and bool(_g2) and _g2.group(1) != _gc and _g2.group(1) not in c.get(f"/clientes/canal-sa/gws/{_gid}").text)
+_adm = "g-admin"
+da = c.get(f"/clientes/canal-sa/gws/{_adm}")
+check("gws: el administrador del dominio no ofrece reiniciar/suspender/eliminar", "Reiniciar clave" not in da.text and "Eliminar usuario" not in da.text and "no reinicia su clave" in da.text)
+check("gws: aunque se fuerce la petición, no se opera sobre un administrador",
+      "es administrador del dominio" in c.post(f"/clientes/canal-sa/gws/{_adm}/clave", data={"enviar_a": "", "csrf": csrf_de(da.text)}).text
+      and "es administrador del dominio" in c.post(f"/clientes/canal-sa/gws/{_adm}/estado", data={"suspender": "1", "csrf": csrf_de(da.text)}).text
+      and "es administrador del dominio" in c.post(f"/clientes/canal-sa/gws/{_adm}/eliminar", data={"csrf": csrf_de(da.text)}).text
+      and _gws._DEMO_USERS[_adm]["suspended"] is False and _adm in _gws._DEMO_USERS)
+check("gws: un técnico NO puede eliminar", ttec.post(f"/clientes/canal-sa/gws/{_gid}/eliminar", data={"csrf": csrf_de(ttec.get("/").text)}).url.path != "/clientes/canal-sa/gws" and _gid in _gws._DEMO_USERS)
+check("gws: id inválido rechazado", "inválido" in c.get("/clientes/canal-sa/gws/u..x").text)
+check("gws: CSRF inválido no cambia nada", "Sesión expirada" in c.post(f"/clientes/canal-sa/gws/{_gid}/estado", data={"suspender": "1", "csrf": "falso"}).text and _gws._DEMO_USERS[_gid]["suspended"] is False)
+r = c.post(f"/clientes/canal-sa/gws/{_gid}/eliminar", data={"csrf": csrf_de(c.get(f"/clientes/canal-sa/gws/{_gid}").text)})
+check("gws: el administrador de la consola elimina al usuario", "Usuario eliminado" in r.text and _gid not in _gws._DEMO_USERS)
+check("gws: la auditoría registra las acciones", all(a in c.get("/auditoria").text for a in ("gws.conectado", "gws.usuario_editado", "gws.usuario_suspendido", "gws.clave_reiniciada", "gws.usuario_eliminado")))
+ga = c.get("/gws/aplicacion")
+check("gws: la pantalla de la cuenta de servicio explica los pasos", ga.status_code == 200 and "Admin SDK API" in ga.text and "admin.directory.user" in ga.text)
+check("gws: JSON inválido rechazado", "no se guardó" in c.post("/gws/aplicacion", data={"clave_json": "{no es json", "csrf": csrf_de(ga.text)}).text)
+check("gws: un JSON que no es de cuenta de servicio se rechaza", "service_account" in c.post("/gws/aplicacion", data={"clave_json": "{\"type\": \"otra\"}", "csrf": csrf_de(ga.text)}).text)
+from cryptography.hazmat.primitives.asymmetric import rsa as _rsa  # noqa: E402
+from cryptography.hazmat.primitives import serialization as _ser  # noqa: E402
+import json as _json  # noqa: E402
+_pem = _rsa.generate_private_key(public_exponent=65537, key_size=2048).private_bytes(_ser.Encoding.PEM, _ser.PrivateFormat.PKCS8, _ser.NoEncryption()).decode()
+_sa_json = _json.dumps({"type": "service_account", "client_email": "itier@proy.iam.gserviceaccount.com", "client_id": "112233445566778899", "private_key": _pem})
+r = c.post("/gws/aplicacion", data={"clave_json": _sa_json, "csrf": csrf_de(ga.text)})
+check("gws: se guarda la cuenta de servicio y se muestran solo correo e ID de cliente", "itier@proy.iam.gserviceaccount.com" in r.text and "112233445566778899" in r.text and "BEGIN PRIVATE KEY" not in r.text)
+_rg = _conn.execute("SELECT valor, secreto FROM ajustes WHERE clave='gws_sa_json'").fetchone()
+check("gws: la clave privada queda cifrada en la base", _rg["secreto"] == 1 and "BEGIN PRIVATE KEY" not in _rg["valor"])
+check("gws: la auditoría no guarda la clave privada", "gws.cuenta_servicio_configurada" in c.get("/auditoria").text and "PRIVATE KEY" not in c.get("/auditoria").text)
+check("gws: PM y técnico no configuran la cuenta de servicio", tpm.get("/gws/aplicacion").url.path != "/gws/aplicacion" and ttec.get("/gws/aplicacion").url.path != "/gws/aplicacion")
+r = c.post("/clientes/canal-sa/gws/desconectar", data={"csrf": csrf_de(c.get("/clientes/canal-sa").text)})
+check("gws: desconectar el dominio", "Dominio desconectado" in r.text and "Conectar dominio" in r.text)
+
 # RBAC: la Bandeja es de PM/admin
 check("RBAC: el técnico no entra a la Bandeja", ttec.get("/bandeja").url.path != "/bandeja")
 check("RBAC: el PM sí", tpm.get("/bandeja").url.path == "/bandeja")

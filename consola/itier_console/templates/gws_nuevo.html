@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block titulo %}Nuevo usuario de Google Workspace · {{ cli.nombre }}{% endblock %}
+{% block contenido %}
+  <div class="l-head">
+    <div>
+      <p class="u-sub" style="margin:0 0 .2rem"><a href="/clientes/{{ cli.slug }}/gws">← Usuarios de Google Workspace</a></p>
+      <h1>Nuevo usuario · {{ cli.nombre }}</h1>
+    </div>
+  </div>
+  <section class="u-card" style="max-width:46rem">
+    <form method="post" action="/clientes/{{ cli.slug }}/gws/nuevo" class="form">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <div class="d-meta" style="gap:.8rem">
+        <label style="flex:1">Nombre <input type="text" name="nombre" value="{{ v.nombre or '' }}" required id="m-nombre"></label>
+        <label style="flex:1">Apellido <input type="text" name="apellido" value="{{ v.apellido or '' }}" required id="m-apellido"></label>
+      </div>
+      <div class="d-meta" style="gap:.8rem">
+        <label style="flex:1">Usuario (antes de la @) <input type="text" name="usuario" value="{{ v.usuario or '' }}" id="m-usuario" placeholder="se completa solo: nombre.apellido"></label>
+        <label style="flex:1">Dominio
+          <select name="dominio">
+            {% for d in doms.dominios %}<option value="{{ d }}" {{ 'selected' if (v.dominio or doms.principal) == d else '' }}>@{{ d }}</option>{% endfor %}
+          </select></label>
+      </div>
+      <div class="d-meta" style="gap:.8rem">
+        <label style="flex:1">Cargo <input type="text" name="cargo" value="{{ v.cargo or '' }}"></label>
+        <label style="flex:1">Área <input type="text" name="departamento" value="{{ v.departamento or '' }}"></label>
+      </div>
+      <label>Enviar la clave temporal a este correo (opcional)
+        <input type="email" name="enviar_a" value="{{ v.enviar_a or '' }}" placeholder="persona@correo-personal.com">
+        <small class="muted">{% if smtp %}Usá un correo distinto al nuevo (todavía no tiene la bandeja activa).{% else %}SMTP sin configurar: copiá la clave en la pantalla siguiente.{% endif %}</small></label>
+      <p class="muted small">La licencia de Google Workspace se asigna según la configuración de licencias automáticas del dominio (o desde la Admin console).</p>
+      <button class="u-btn" type="submit">Crear usuario</button>
+    </form>
+  </section>
+  <script>
+  (function () {
+    var n = document.getElementById("m-nombre"), a = document.getElementById("m-apellido"), u = document.getElementById("m-usuario"), tocado = !!u.value;
+    function limpio(s) { return s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]/g, ""); }
+    u.addEventListener("input", function () { tocado = true; });
+    function sugerir() { if (!tocado) u.value = [limpio(n.value), limpio(a.value)].filter(Boolean).join("."); }
+    n.addEventListener("input", sugerir); a.addEventListener("input", sugerir);
+  })();
+  </script>
+{% endblock %}

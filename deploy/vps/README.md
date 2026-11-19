@@ -395,6 +395,25 @@ Permisos en la consola: todos los operadores ven y gestionan usuarios (alta, edi
 PM/administrador; conectar un tenant, de PM/administrador; la aplicación, solo del administrador. Las claves temporales se muestran
 una sola vez y no se guardan ni se auditan. Los usuarios eliminados quedan 30 días en la papelera de Microsoft.
 
+## Google Workspace: usuarios del dominio de cada cliente
+
+Igual que Microsoft 365, en la **ficha del cliente → Google Workspace**: alta, edición, suspensión, reinicio de clave y baja de usuarios
+(Admin SDK · Directory API). Usa **delegación en todo el dominio** con una cuenta de servicio tuya: es lo habitual para proveedores
+de servicios y evita la verificación de app que Google exige para el OAuth de usuario con estos permisos.
+
+**Una sola vez (tu Google Cloud):** proyecto → habilitar **Admin SDK API** → cuenta de servicio (sin roles) → clave **JSON**. En la consola,
+como administrador: **Cuenta de servicio de Google** (`/gws/aplicacion`) → pegá el JSON (se guarda cifrado). La pantalla te muestra el
+**ID de cliente** y los **permisos** que hay que autorizar en cada cliente (`admin.directory.user`, `admin.directory.domain.readonly`).
+
+**Por cada cliente** (lo hace un super administrador suyo): `admin.google.com` → Seguridad → Controles de API → **Administrar la delegación
+en todo el dominio** → Agregar el ID de cliente y los permisos. Después, en la consola: ficha del cliente → **Conectar dominio** con el correo
+de un super administrador del cliente (conviene una cuenta dedicada, p. ej. `soporte-itier@…`); la consola actúa como esa cuenta.
+
+La consola **no reinicia la clave, suspende ni elimina a administradores del dominio** (es la vía típica de toma de cuenta): eso se hace en la
+Admin console. Las licencias se asignan según la configuración de licencias automáticas del dominio. Las claves temporales se muestran una
+sola vez y no se guardan ni auditan. Permisos: ver/alta/editar/clave/suspender, todos los operadores; eliminar y conectar, PM y administrador;
+la cuenta de servicio, solo el administrador.
+
 ## Túnel a Zabbix (una sola vez; sirve para todos los clientes)
 
 Los `zabbix-proxy` de los clientes llegan al server por el Cloudflare Tunnel de

@@ -91,7 +91,51 @@ def _graph(request: httpx.Request) -> httpx.Response:
     return httpx.Response(404, json={"error": {"code": "Request_ResourceNotFound", "message": "no existe"}})
 
 
+GWS_ESTADO = {"tokens": 0, "forzar_401": False, "pub": None, "ultimo_jwt": None, "modo_token": "ok"}
+
+
+def _gws(request: httpx.Request) -> httpx.Response:
+    p = request.url.path
+    cuerpo = json.loads(request.content) if request.content and request.headers.get("content-type", "").startswith("application/json") else {}
+    if request.url.host == "oauth2.googleapis.com":
+        if GWS_ESTADO["modo_token"] == "unauthorized":
+            return httpx.Response(401, json={"error": "unauthorized_client", "error_description": "Client is unauthorized to retrieve access tokens using this method"})
+        if GWS_ESTADO["modo_token"] == "grant":
+            return httpx.Response(400, json={"error": "invalid_grant", "error_description": "Not a valid email or user ID."})
+        form = dict(x.split("=", 1) for x in request.content.decode().split("&"))
+        GWS_ESTADO["ultimo_jwt"] = form["assertion"]
+        GWS_ESTADO["tokens"] += 1
+        return httpx.Response(200, json={"access_token": f"gtok{GWS_ESTADO['tokens']}", "expires_in": 3599})
+    if GWS_ESTADO["forzar_401"] and request.headers.get("authorization") == "Bearer gtok1":
+        return httpx.Response(401, json={"error": {"message": "Invalid Credentials"}})
+    if p == "/admin/directory/v1/customer/my_customer/domains":
+        return httpx.Response(200, json={"domains": [{"domainName": "empresa.com.ar", "verified": True, "isPrimary": True},
+                                                      {"domainName": "alias.com", "verified": True}, {"domainName": "sinverificar.com", "verified": False}]})
+    if p == "/admin/directory/v1/users" and request.method == "GET":
+        if request.url.params.get("pageToken") == "p2":
+            return httpx.Response(200, json={"users": [{"id": "3", "primaryEmail": "c@empresa.com.ar", "name": {"givenName": "C", "familyName": "C"}}]})
+        return httpx.Response(200, json={"users": [
+            {"id": "1", "primaryEmail": "a@empresa.com.ar", "name": {"givenName": "Ana", "familyName": "Paz", "fullName": "Ana Paz"}, "isAdmin": True,
+             "lastLoginTime": "2026-11-18T10:00:00.000Z", "organizations": [{"title": "CTO", "department": "IT"}]},
+            {"id": "2", "primaryEmail": "b@empresa.com.ar", "name": {"givenName": "Beto", "familyName": "Ruiz"}, "suspended": True, "lastLoginTime": "1970-01-01T00:00:00.000Z"}],
+            "nextPageToken": "p2"})
+    if p == "/admin/directory/v1/users" and request.method == "POST":
+        if cuerpo.get("primaryEmail") == "dup@empresa.com.ar":
+            return httpx.Response(409, json={"error": {"code": 409, "message": "Entity already exists.", "errors": [{"reason": "duplicate"}]}})
+        return httpx.Response(200, json={"id": "9", "primaryEmail": cuerpo["primaryEmail"], "name": cuerpo["name"]})
+    if p == "/admin/directory/v1/users/prohibido":
+        return httpx.Response(403, json={"error": {"code": 403, "message": "Not Authorized to access this resource/api", "errors": [{"reason": "forbidden"}]}})
+    if p.startswith("/admin/directory/v1/users/") and request.method in ("PATCH", "DELETE"):
+        return httpx.Response(200 if request.method == "PATCH" else 204, json={} if request.method == "PATCH" else None)
+    return httpx.Response(404, json={"error": {"message": "no", "errors": [{"reason": "notFound"}]}})
+
+
 def handler(request: httpx.Request) -> httpx.Response:
+    if request.url.host in ("admin.googleapis.com", "oauth2.googleapis.com"):
+        captured.append({"method": request.method, "path": request.url.path, "host": request.url.host, "query": request.url.query.decode(),
+                         "headers": {k.lower(): v for k, v in request.headers.items()},
+                         "body": json.loads(request.content) if request.content and request.headers.get("content-type", "").startswith("application/json") else {}})
+        return _gws(request)
     if request.url.host in ("graph.microsoft.com", "login.microsoftonline.com"):
         captured.append({"method": request.method, "path": request.url.path, "host": request.url.host,
                          "headers": {k.lower(): v for k, v in request.headers.items()},
@@ -675,6 +719,92 @@ except Exception as _e:  # noqa: BLE001
     _ok = "Falta configurar la aplicación" in str(_e)
 check("M365: sin credenciales de aplicación avisa qué falta", _ok)
 check("M365: nombres comerciales de planes comunes", m365_mod.nombre_plan("SPB") == "Microsoft 365 Business Premium" and m365_mod.nombre_plan("RARO") == "RARO")
+# ── Google Workspace (Directory API) ──
+import base64 as _b64m  # noqa: E402
+from cryptography.hazmat.primitives import hashes as _h, serialization as _ser  # noqa: E402
+from cryptography.hazmat.primitives.asymmetric import padding as _pad, rsa as _rsa  # noqa: E402
+from itier_console.adapters import gws as gws_mod  # noqa: E402
+_priv = _rsa.generate_private_key(public_exponent=65537, key_size=2048)
+_pem = _priv.private_bytes(_ser.Encoding.PEM, _ser.PrivateFormat.PKCS8, _ser.NoEncryption()).decode()
+_saj = json.dumps({"type": "service_account", "client_email": "itier@proy.iam.gserviceaccount.com", "client_id": "112233", "private_key": _pem})
+check("GWS: valida el JSON de la cuenta de servicio", gws_mod.parsear_cuenta_servicio(_saj)["client_id"] == "112233")
+for _malo, _txt in (("no json", "JSON"), ('{"type": "x"}', "service_account"), (json.dumps({"type": "service_account", "client_email": "a", "client_id": "1"}), "private_key"),
+                    (json.dumps({"type": "service_account", "client_email": "a", "client_id": "1", "private_key": "basura"}), "clave privada")):
+    try:
+        gws_mod.parsear_cuenta_servicio(_malo)
+        _ok = False
+    except ValueError as _e:
+        _ok = _txt in str(_e)
+    check(f"GWS: JSON inválido rechazado ({_txt})", _ok)
+_cg = _dc.replace(cfg, gws_sa_json=_saj)
+gws_mod._TOKENS.clear()
+_gg = gws_mod.cliente(_cg, "soporte@empresa.com.ar")
+_d = _gg.dominios()
+check("GWS: dominios verificados y principal (sin los no verificados)", _d == {"dominios": ["empresa.com.ar", "alias.com"], "principal": "empresa.com.ar"}, _d)
+_jwt = GWS_ESTADO["ultimo_jwt"].split(".")
+_claims = json.loads(_b64m.urlsafe_b64decode(_jwt[1] + "=="))
+check("GWS: el JWT lleva emisor, administrador suplantado, scopes y destino", _claims["iss"] == "itier@proy.iam.gserviceaccount.com" and _claims["sub"] == "soporte@empresa.com.ar"
+      and "admin.directory.user" in _claims["scope"] and _claims["aud"] == "https://oauth2.googleapis.com/token" and _claims["exp"] - _claims["iat"] == 3600, _claims)
+try:
+    _priv.public_key().verify(_b64m.urlsafe_b64decode(_jwt[2] + "=="), f"{_jwt[0]}.{_jwt[1]}".encode(), _pad.PKCS1v15(), _h.SHA256())
+    _ok = True
+except Exception:  # noqa: BLE001
+    _ok = False
+check("GWS: la firma RS256 del JWT es válida con la clave pública", _ok)
+_us = _gg.listar_usuarios()
+check("GWS: lista usuarios siguiendo la paginación y normaliza campos", [u["id"] for u in _us] == ["1", "2", "3"] and _us[0]["admin"] and _us[0]["cargo"] == "CTO"
+      and _us[1]["suspendido"] and _us[1]["ultimo_ingreso"] == "" and _us[0]["ultimo_ingreso"] == "2026-11-18", _us)
+_pg = [x for x in captured if x.get("host") == "admin.googleapis.com" and x["path"] == "/admin/directory/v1/users"]
+check("GWS: pide los usuarios del cliente (my_customer) ordenados por correo", _pg and "customer=my_customer" in _pg[0]["query"] and "orderBy=email" in _pg[0]["query"], _pg)
+check("GWS: el token se pide una sola vez (caché)", GWS_ESTADO["tokens"] == 1, GWS_ESTADO)
+check("GWS: las llamadas llevan el Bearer", all(x["headers"].get("authorization") == "Bearer gtok1" for x in captured if x.get("host") == "admin.googleapis.com"))
+_n6 = len(captured)
+_nu = _gg.crear_usuario(email="nueva@empresa.com.ar", nombre="Nora", apellido="Gil", clave="Cl4ve-Temporal!", cargo="Ventas", departamento="Comercial")
+_post = next(x for x in captured[_n6:] if x["method"] == "POST")
+check("GWS: crear usuario manda nombre, clave con cambio obligatorio y organización",
+      _post["body"]["primaryEmail"] == "nueva@empresa.com.ar" and _post["body"]["password"] == "Cl4ve-Temporal!" and _post["body"]["changePasswordAtNextLogin"] is True
+      and _post["body"]["name"] == {"givenName": "Nora", "familyName": "Gil"} and _post["body"]["organizations"][0]["title"] == "Ventas", _post)
+try:
+    _gg.crear_usuario(email="dup@empresa.com.ar", nombre="D", apellido="D", clave="x")
+    _ok = False
+except Exception as _e:  # noqa: BLE001
+    _ok = "Ya existe un usuario" in str(_e)
+check("GWS: un correo repetido se explica", _ok)
+try:
+    _gg.reiniciar_clave("prohibido", "Nueva-Clave1!")
+    _ok = False
+except Exception as _e:  # noqa: BLE001
+    _ok = "no tiene privilegios" in str(_e)
+check("GWS: un 403 se explica en castellano", _ok)
+_n6 = len(captured)
+_gg.reiniciar_clave("2", "Nueva-Clave1!")
+_gg.suspender("2", True)
+_gg.actualizar_usuario("2", {"nombre": "Beto", "apellido": "R"})
+_gg.eliminar("2")
+_c6 = [x for x in captured[_n6:] if x.get("host") == "admin.googleapis.com"]
+check("GWS: reiniciar clave, suspender, editar y eliminar usan PATCH/PATCH/PATCH/DELETE",
+      [(x["method"], x["path"]) for x in _c6] == [("PATCH", "/admin/directory/v1/users/2")] * 3 + [("DELETE", "/admin/directory/v1/users/2")]
+      and _c6[0]["body"] == {"password": "Nueva-Clave1!", "changePasswordAtNextLogin": True} and _c6[1]["body"] == {"suspended": True}
+      and _c6[2]["body"] == {"name": {"givenName": "Beto", "familyName": "R"}}, _c6)
+for _modo, _txt in (("unauthorized", "Delegación en todo el dominio"), ("grant", "super administrador activo")):
+    gws_mod._TOKENS.clear(); GWS_ESTADO["modo_token"] = _modo
+    try:
+        gws_mod.cliente(_cg, "soporte@empresa.com.ar").dominios()
+        _ok = False
+    except Exception as _e:  # noqa: BLE001
+        _ok = _txt in str(_e) and ("112233" in str(_e) if _modo == "unauthorized" else True)
+    check(f"GWS: error de token «{_modo}» explicado con el ID de cliente / el motivo", _ok)
+GWS_ESTADO["modo_token"] = "ok"
+gws_mod._TOKENS.clear(); GWS_ESTADO["tokens"] = 0; GWS_ESTADO["forzar_401"] = True
+gws_mod.cliente(_cg, "soporte@empresa.com.ar").dominios()
+check("GWS: ante un 401 pide un token nuevo y reintenta", GWS_ESTADO["tokens"] == 2, GWS_ESTADO)
+GWS_ESTADO["forzar_401"] = False
+try:
+    gws_mod.cliente(_dc.replace(cfg, gws_sa_json=None), "a@b.com").dominios()
+    _ok = False
+except Exception as _e:  # noqa: BLE001
+    _ok = "Falta configurar la cuenta de servicio" in str(_e)
+check("GWS: sin cuenta de servicio avisa qué falta", _ok)
 httpx.Client = _real_Client  # type: ignore[assignment]
 print("\nRESULTADO:", "TODO OK" if not fails else f"{len(fails)} FALLAS: {fails}")
 sys.exit(1 if fails else 0)

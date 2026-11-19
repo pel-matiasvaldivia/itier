@@ -21,6 +21,7 @@ MISION = {
 RESPONSABILIDADES = {
     "tecnico": [
         "Atender y actualizar los tickets que se te asignan, dentro de los tiempos acordados con cada cliente; si hay un ticket nuevo sin técnico, tomarlo con «Tomar este caso».",
+        "Gestionar los usuarios de Google Workspace de los clientes (ficha del cliente → Google Workspace): altas, reinicio de clave y suspensiones; los administradores del dominio se tratan desde la Admin console de Google.",
         "Gestionar los usuarios de Microsoft 365 de los clientes (ficha del cliente → Microsoft 365): altas, licencias, reinicio de clave y bloqueos; confirmá siempre la identidad de quien lo pide antes de reiniciar una clave.",
         "Registrar en cada ticket el tiempo que le dedicaste («Tiempo dedicado»): de ahí salen las horas por cliente y la rentabilidad de cada contrato.",
         "Revisar todos los días la pantalla Equipos: discos con más del 90 % de uso, antivirus apagado o ausente y equipos sin conexión; "
@@ -35,6 +36,7 @@ RESPONSABILIDADES = {
         "Desplegar los agentes en los equipos de cada cliente y confirmar que reporten (inventario y soporte remoto en línea).",
         "Definir con el cliente la criticidad de sus activos y los rangos de red que se descubren.",
         "Hacer seguimiento de los tickets y de las alertas pendientes, y asignarlos a los técnicos.",
+        "Conectar el dominio de Google Workspace de cada cliente (lo autoriza un super administrador suyo) y autorizar las bajas de usuarios.",
         "Conectar el tenant de Microsoft 365 de cada cliente (lo autoriza su administrador global) y autorizar las bajas de usuarios de Microsoft 365.",
         "Atender la Bandeja: los pedidos por correo o WhatsApp que no se asociaron solos a un cliente; cargar los dominios y las personas de cada cliente para que la próxima vez entren directo.",
         "Revisar la auditoría con regularidad y detectar usos indebidos.",
@@ -48,6 +50,7 @@ RESPONSABILIDADES = {
         "Mantener operativos y actualizados GLPI, Zabbix, MeshCentral y la consola, y verificar los respaldos.",
         "Mantener los canales de entrada (pantalla Canales): la cuenta IMAP del correo de soporte y el número de WhatsApp vinculado por QR; si WhatsApp se desvincula, volver a escanear.",
         "Revisar la auditoría y la integridad de su cadena de hash; investigar cualquier anomalía.",
+        "Custodiar la cuenta de servicio de Google (clave JSON): rotarla ante cualquier sospecha y borrarla si deja de usarse.",
         "Mantener la aplicación de Microsoft 365 (client id y secreto en Entra ID): renovar el secreto antes de que venza.",
         "Revisar cada mes la pantalla Horas: horas por cliente y por persona, costo y margen; mantener actualizadas las tarifas por hora, la facturación de cada cliente y la cotización del dólar.",
         "Autorizar y ejecutar las bajas de clientes (borra su configuración), sabiendo que es irreversible.",

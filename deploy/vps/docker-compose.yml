@@ -311,6 +311,8 @@ services:
       # Microsoft 365 (aplicación multi-tenant del MSP): valores iniciales; se cargan en la consola → Clientes → Microsoft 365.
       ITIER_M365_CLIENT_ID: ${ITIER_M365_CLIENT_ID:-}
       ITIER_M365_CLIENT_SECRET: ${ITIER_M365_CLIENT_SECRET:-}
+      # Google Workspace: cuenta de servicio (JSON) con delegación en todo el dominio; se carga mejor desde la consola.
+      ITIER_GWS_SA_JSON: ${ITIER_GWS_SA_JSON:-}
       # Reporte de horas: valores iniciales (se editan en la pantalla Horas).
       ITIER_FX_ARS_USD: ${ITIER_FX_ARS_USD:-}
       ITIER_COSTO_PLATAFORMA_USD: ${ITIER_COSTO_PLATAFORMA_USD:-60}
