@@ -1312,7 +1312,15 @@ _m3._DEMO_USERS.update({
                 "accountEnabled": True, "userType": "Guest", "assignedLicenses": [{"skuId": _m3._SKU_STD}]},
     "u-shared": {"id": "u-shared", "displayName": "Soporte Compartido", "userPrincipalName": "compartido@clientedemo.com.ar", "mail": "compartido@clientedemo.com.ar",
                  "accountEnabled": True, "userType": "Member", "assignedLicenses": []}})
+_orig_su = _ac.sincronizar_usuarios
+_cfg_visto = {}
+def _espia(conn_, cfg_, cli_, actor_):
+    _cfg_visto["m365_client_id"], _cfg_visto["m365_configurado"] = cfg_.m365_client_id, cfg_.m365_configurado
+    return _orig_su(conn_, cfg_, cli_, actor_)
+_ac.sincronizar_usuarios = _espia
 r = c.post("/clientes/canal-sa/personas/sincronizar", data={"csrf": csrf_de(pp.text)})
+_ac.sincronizar_usuarios = _orig_su
+check("usuarios nube: usa la aplicación de Microsoft 365 guardada en la consola (no solo el entorno)", _cfg_visto.get("m365_configurado") is True and _cfg_visto.get("m365_client_id") == "12345678-1234-1234-1234-123456789012", _cfg_visto)
 check("usuarios nube: informa el total y cuántos tienen licencia activa", "Sincronización de usuarios terminada" in r.text and "Microsoft 365" in r.text and "con licencia activa" in r.text, r.text[r.text.find("Sincronización"):][:500])
 _p = {x["email"]: dict(x) for x in _conn.execute("SELECT * FROM client_contactos WHERE client_id=? AND email IS NOT NULL", (_cid_,))}
 check("usuarios nube: se traen los que tienen licencia activa con cargo y área", "lic@clientedemo.com.ar" in _p and _p["lic@clientedemo.com.ar"]["cargo"] == "Contadora" and _p["lic@clientedemo.com.ar"]["area"] == "Finanzas"

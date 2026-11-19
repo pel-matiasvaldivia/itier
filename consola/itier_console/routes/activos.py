@@ -9,7 +9,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse, Response
 
 from .. import security
 from ..deps import flash, get_db, render, require_permiso
-from ..services import ServiceError, onboarding
+from ..services import ServiceError, ajustes, onboarding
 from ..services import activos as svc
 
 router = APIRouter()
@@ -239,7 +239,8 @@ def personas_sincronizar(request: Request, slug: str, csrf: str = Form(""), user
     if not svc.fuentes_conectadas(cli):
         flash(request, "Este cliente no tiene Microsoft 365 ni Google Workspace conectados (ficha del cliente).", "error")
         return RedirectResponse(f"/clientes/{slug}/personas", status_code=303)
-    res = svc.sincronizar_usuarios(conn, request.app.state.cfg, cli, user["user"])
+    # La aplicación de Microsoft 365 y la cuenta de servicio de Google se cargan en la consola (ajustes cifrados), no en el entorno.
+    res = svc.sincronizar_usuarios(conn, ajustes.efectiva(conn, request.app.state.cfg), cli, user["user"])
     return render(request, "personas.html", cli=cli, personas=svc.personas(conn, cli["id"], solo_activas=False), fuentes=svc.fuentes_conectadas(cli), sync=res)
 
 
