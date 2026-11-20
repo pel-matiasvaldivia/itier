@@ -5,13 +5,15 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="robots" content="noindex, nofollow">
   <title>{% block titulo %}Consola de iTier{% endblock %}</title>
+  <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+  <meta name="theme-color" content="#4F46E5">
   <link rel="stylesheet" href="/static/app.css?v={{ static_v('app.css') }}">
 </head>
 <body class="{% if user %}app{% else %}auth{% endif %}">
 
 {% if user %}
   <header class="topbar">
-    <a class="brand" href="/">i<span>Tier</span> <small>consola</small></a>
+    <a class="brand" href="/"><img src="/static/itier-icon.svg" alt="" width="28" height="28"><b class="bw">i<span>Tier</span></b> <small>consola</small></a>
     <div class="topbar-right">
       {% if demo %}<span class="chip chip-demo" title="Datos de ejemplo; sin GLPI/Zabbix reales">modo demo</span>{% endif %}
       <span class="who">{{ user.user }}{% if user.is_admin %} · admin{% endif %}</span>
@@ -46,7 +48,7 @@
 {% else %}
   <main class="authwrap">
     <div class="authcard">
-      <div class="authbrand">i<span>Tier</span></div>
+      <div class="authbrand"><img src="/static/itier-icon.svg" alt="" width="56" height="56"><br>i<span>Tier</span><small>Managed IT, tier by tier</small></div>
       {% include "_flash.html" %}
       {% block auth %}{% endblock %}
     </div>

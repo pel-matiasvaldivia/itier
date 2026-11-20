@@ -452,3 +452,10 @@ a.u-b{text-decoration:none;display:inline-block}
 .u-b.on{background:var(--indigo);color:#fff;border-color:var(--indigo)}
 #l-lista td{vertical-align:top}#l-lista small.note{font-size:.72rem}
 .l-mut{color:#64748b;font-size:.74rem}
+
+/* Marca */
+.brand{display:inline-flex;align-items:center;gap:.5rem}
+.brand img{border-radius:8px}
+.authbrand img{margin-bottom:.4rem;filter:drop-shadow(0 6px 14px rgba(79,70,229,.35))}
+.authbrand small{display:block;font-size:.78rem;font-weight:600;color:var(--muted);letter-spacing:.04em;margin-top:.15rem}
+.brand .bw{font-weight:800}
