@@ -10,7 +10,13 @@
     <a class="u-btn" href="/clientes/{{ cli.slug }}/m365/nuevo" style="text-decoration:none">+ Nuevo usuario</a>
   </div>
 
-  {% if error %}<div class="u-err">No se pudo leer el tenant: {{ error }}</div>{% endif %}
+  {% if error %}<div class="u-err">No se pudo leer el tenant: {{ error }}
+    {% if 'consentimiento' in error and puede('clientes.editar') %}
+    <form method="post" action="/clientes/{{ cli.slug }}/m365/conectar" class="inline" style="margin-top:.5rem">
+      <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="tenant" value="{{ cli.m365_tenant_id }}">
+      <button class="u-btn" type="submit">Volver a autorizar el tenant</button>
+      <span class="l-mut">Un administrador global del cliente tiene que aceptar el permiso.</span>
+    </form>{% endif %}</div>{% endif %}
 
   <div class="u-stats">
     <div class="u-stat"><b>{{ resumen.total }}</b><span>Usuarios</span></div>

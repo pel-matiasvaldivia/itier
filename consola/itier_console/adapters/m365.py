@@ -76,7 +76,7 @@ def _token(client_id: str, secret: str, tenant: str) -> str:
         except ValueError:
             det = r.text
         det = str(det).splitlines()[0][:220]
-        if "AADSTS700016" in str(det) or "AADSTS65001" in str(det) or "AADSTS500011" in str(det):
+        if "AADSTS700016" in str(det) or "AADSTS65001" in str(det) or "AADSTS7000229" in str(det) or "AADSTS500011" in str(det):
             det = "El tenant todavía no autorizó la aplicación (falta el consentimiento del administrador). " + det
         elif "AADSTS7000215" in str(det) or "AADSTS7000222" in str(det):
             det = "El secreto de la aplicación es inválido o venció. " + det
