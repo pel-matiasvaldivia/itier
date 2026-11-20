@@ -446,3 +446,9 @@ pre,code{overflow-wrap:anywhere}
 .form.cols2 #auth-pass:not([hidden]),.form.cols2 #auth-ms:not([hidden]){display:contents}
 .form.cols2 .span-all{grid-column:1/-1}
 .form.cols2>label>input,.form.cols2>label>select{width:100%}
+
+/* Clientes: tabla priorizada */
+a.u-b{text-decoration:none;display:inline-block}
+.u-b.on{background:var(--indigo);color:#fff;border-color:var(--indigo)}
+#l-lista td{vertical-align:top}#l-lista small.note{font-size:.72rem}
+.l-mut{color:#64748b;font-size:.74rem}

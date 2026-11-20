@@ -11,20 +11,72 @@ from .. import audit, security
 from ..deps import flash, get_db, render, require_permiso
 from ..services import ServiceError, correo
 from ..services import onboarding
+from ..services import tickets as tickets_svc
+from ..adapters import AdapterError
 
 router = APIRouter()
 
 
 @router.get("/clientes", response_class=HTMLResponse)
 def listar(request: Request, user: dict = Depends(require_permiso("clientes.ver")), conn: sqlite3.Connection = Depends(get_db)):
-    equipos = {r["client_id"]: r["n"] for r in conn.execute(
-        "SELECT client_id, COUNT(*) n FROM endpoint_reports GROUP BY client_id")}
+    from datetime import datetime, timedelta
+    cfg = request.app.state.cfg
+    eq = {r["client_id"]: dict(r) for r in conn.execute(
+        "SELECT client_id, COUNT(*) n, SUM(estado != 'ok') n_err, MAX(ts) ultimo FROM endpoint_reports GROUP BY client_id")}
+    act = {r["client_id"]: dict(r) for r in conn.execute(
+        "SELECT client_id, COUNT(*) n, SUM(glpi_id IS NULL AND tipo IN ('notebook','desktop')) sin_agente "
+        "FROM activos WHERE estado != 'de_baja' GROUP BY client_id")}
+    ctc = {r["client_id"]: r["n"] for r in conn.execute(
+        "SELECT client_id, COUNT(*) n FROM client_contactos WHERE activo = 1 GROUP BY client_id")}
     clientes = onboarding.listar_clientes(conn)
+
+    # Tickets abiertos por cliente: una sola consulta a GLPI agrupada por entidad (si GLPI cae, se muestra «—»).
+    por_ent, glpi_ok = {}, False
+    if cfg.glpi_configurado:
+        try:
+            for t in tickets_svc.listar(cfg, limit=500):
+                st = int(t.get("status", 0) or 0)
+                if st not in (1, 2, 3, 4):
+                    continue
+                d = por_ent.setdefault(str(t.get("entities_id")), {"abiertos": 0, "nuevos": 0, "urgentes": 0})
+                d["abiertos"] += 1
+                d["nuevos"] += st == 1
+                d["urgentes"] += int(t.get("priority", 0) or 0) >= 5
+            glpi_ok = True
+        except AdapterError:
+            pass
+
+    limite = (datetime.utcnow() - timedelta(days=2)).strftime("%Y-%m-%d %H:%M:%S")
     for c in clientes:
-        c["n_equipos"] = equipos.get(c["id"], 0)
+        e = eq.get(c["id"], {})
+        c["n_equipos"] = e.get("n", 0)
+        c["equipos_err"] = e.get("n_err") or 0
+        c["equipos_ultimo"] = (e.get("ultimo") or "")[:16]
+        c["equipos_viejo"] = bool(e.get("ultimo")) and e["ultimo"] < limite
+        a = act.get(c["id"], {})
+        c["n_activos"], c["sin_agente"] = a.get("n", 0), a.get("sin_agente") or 0
+        c["n_contactos"] = ctc.get(c["id"], 0)
+        t = por_ent.get(str(c.get("glpi_entity_id")), {}) if glpi_ok else None
+        c["tk"] = (t or {"abiertos": 0, "nuevos": 0, "urgentes": 0}) if glpi_ok else None
+        motivos = []
+        if c["estado"] != "activo":
+            motivos.append("Aprovisionamiento: " + c["estado"])
+        if c["tk"] and c["tk"]["urgentes"]:
+            motivos.append(f"{c['tk']['urgentes']} ticket(s) urgente(s)")
+        if c["equipos_err"]:
+            motivos.append(f"{c['equipos_err']} equipo(s) con error de agente")
+        if c["n_equipos"] and c["equipos_viejo"]:
+            motivos.append("Equipos sin reportar hace >2 días")
+        c["motivos"] = motivos
+        c["prio"] = (0 if c["estado"] != "activo" else 1 if (c["tk"] and c["tk"]["urgentes"]) else
+                     2 if (c["equipos_err"] or c["equipos_viejo"]) else 3 if (c["tk"] and c["tk"]["nuevos"]) else 4)
+    clientes.sort(key=lambda c: (c["prio"], -(c["tk"]["abiertos"] if c["tk"] else 0), c["nombre"].lower()))
     resumen = {"total": len(clientes), "activos": sum(1 for c in clientes if c["estado"] == "activo"),
-               "avisos": sum(1 for c in clientes if c["estado"] != "activo"),
-               "equipos": sum(c["n_equipos"] for c in clientes)}
+               "avisos": sum(1 for c in clientes if c["motivos"]),
+               "equipos": sum(c["n_equipos"] for c in clientes),
+               "abiertos": sum(c["tk"]["abiertos"] for c in clientes if c["tk"]),
+               "urgentes": sum(c["tk"]["urgentes"] for c in clientes if c["tk"]),
+               "sin_equipos": sum(1 for c in clientes if not c["n_equipos"]), "glpi_ok": glpi_ok}
     return render(request, "clientes_lista.html", clientes=clientes, resumen=resumen)
 
 

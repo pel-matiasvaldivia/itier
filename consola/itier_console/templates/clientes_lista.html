@@ -4,59 +4,91 @@
   <div class="l-head">
     <div>
       <h1>Clientes</h1>
-      <p class="u-sub">Cada cliente tiene su entidad en GLPI, su grupo en Zabbix y su grupo de equipos en MeshCentral.</p>
+      <p class="u-sub">Ordenados por prioridad: primero los que necesitan atención.</p>
     </div>
     {% if puede('clientes.editar') %}<a class="u-btn" href="/clientes/nuevo" style="text-decoration:none">+ Nuevo cliente</a>{% endif %}
   </div>
 
   <div class="u-stats">
-    <div class="u-stat"><b>{{ resumen.total }}</b><span>Clientes</span></div>
-    <div class="u-stat"><b>{{ resumen.activos }}</b><span>Activos</span></div>
-    <div class="u-stat {{ 'bad' if resumen.avisos else '' }}"><b>{{ resumen.avisos }}</b><span>Con avisos</span></div>
+    <div class="u-stat {{ 'bad' if resumen.avisos else '' }}"><b>{{ resumen.avisos }}</b><span>Requieren atención</span></div>
+    <div class="u-stat {{ 'warn' if resumen.urgentes else '' }}"><b>{{ resumen.abiertos if resumen.glpi_ok else '—' }}</b><span>Tickets abiertos{% if resumen.urgentes %} · {{ resumen.urgentes }} urgentes{% endif %}</span></div>
     <div class="u-stat"><b>{{ resumen.equipos }}</b><span>Equipos instalados</span></div>
+    <div class="u-stat {{ 'warn' if resumen.sin_equipos else '' }}"><b>{{ resumen.sin_equipos }}</b><span>Sin equipos</span></div>
+    <div class="u-stat"><b>{{ resumen.activos }}/{{ resumen.total }}</b><span>Activos</span></div>
   </div>
 
   {% if clientes %}
-  <div class="l-bar-top" style="background:transparent;border:0;padding:0 0 .9rem">
+  <div class="l-bar-top" style="background:transparent;border:0;padding:0 0 .6rem;display:flex;gap:.5rem;flex-wrap:wrap;align-items:center">
     <input class="u-search" type="search" id="l-buscar" placeholder="Buscar cliente…" aria-label="Buscar cliente">
+    <span id="l-chips" style="display:flex;gap:.35rem;flex-wrap:wrap">
+      <button type="button" class="u-b on" data-f="">Todos</button>
+      <button type="button" class="u-b" data-f="atencion">Con avisos</button>
+      <button type="button" class="u-b" data-f="tickets">Con tickets</button>
+      <button type="button" class="u-b" data-f="sinequipos">Sin equipos</button>
+    </span>
   </div>
-  <div class="l-cards" id="l-lista">
+  <div class="l-wrap">
+  <table class="l-table" id="l-lista">
+    <thead><tr><th>Cliente</th><th>Estado</th><th>Tickets</th><th>Equipos</th><th>Activos</th><th>Nubes</th><th>Acciones</th></tr></thead>
+    <tbody>
     {% for c in clientes %}
-    <article class="l-client" data-q="{{ (c.nombre ~ ' ' ~ c.slug)|lower }}">
-      <div class="l-client-head">
-        <span class="l-logo">{{ (c.nombre.split()[0][:1] ~ (c.nombre.split()[1][:1] if c.nombre.split()|length > 1 else c.nombre[1:2]))|upper }}</span>
-        <div style="min-width:0">
-          <h3><a href="/clientes/{{ c.slug }}">{{ c.nombre }}</a></h3>
-          <small>{{ c.slug }}</small>
-        </div>
-        {% if c.estado == 'activo' %}<span class="l-pill ok"><i></i>Activo</span>
-        {% elif c.estado == 'error' %}<span class="l-pill bad"><i></i>Con error</span>
-        {% else %}<span class="l-pill warn"><i></i>{{ c.estado|capitalize }}</span>{% endif %}
-      </div>
-      <div class="l-kv">
-        <div><span>GLPI</span><b>{{ ('#' ~ c.glpi_entity_id) if c.glpi_entity_id else '—' }}</b></div>
-        <div><span>Mesh</span><b>{{ 'grupo creado' if c.mesh_id else '—' }}</b></div>
-        <div><span>Equipos</span><b>{{ c.n_equipos }}</b></div>
-      </div>
-      <div class="l-client-foot">
-        <a class="pri" href="/clientes/{{ c.slug }}">Ver ficha</a>
-        {% if puede('equipos') %}<a href="/equipos?cliente={{ c.slug }}">Equipos</a>{% endif %}
-        {% if puede('instaladores') %}<a href="/clientes/{{ c.slug }}/instaladores">Instaladores</a>{% endif %}
-        {% if puede('agentes') %}<a href="/clientes/{{ c.slug }}/agentes">Agentes</a>{% endif %}
-      </div>
-    </article>
+    <tr data-q="{{ (c.nombre ~ ' ' ~ c.slug)|lower }}" data-atencion="{{ 1 if c.motivos else 0 }}" data-tickets="{{ 1 if c.tk and c.tk.abiertos else 0 }}" data-sinequipos="{{ 0 if c.n_equipos else 1 }}">
+      <td>
+        <a href="/clientes/{{ c.slug }}"><b>{{ c.nombre }}</b></a><br><small class="l-mut">{{ c.slug }}{% if c.glpi_entity_id %} · GLPI #{{ c.glpi_entity_id }}{% endif %}</small>
+      </td>
+      <td>
+        {% if c.estado == 'error' %}<span class="l-pill bad"><i></i>Con error</span>
+        {% elif c.estado != 'activo' %}<span class="l-pill warn"><i></i>{{ c.estado|capitalize }}</span>
+        {% elif c.motivos %}<span class="l-pill warn" title="{{ c.motivos|join(' · ') }}"><i></i>Atención</span>
+        {% else %}<span class="l-pill ok"><i></i>OK</span>{% endif %}
+        {% for m in c.motivos %}<br><small class="l-mut">{{ m }}</small>{% endfor %}
+      </td>
+      <td>
+        {% if c.tk is none %}<span class="l-mut">—</span>
+        {% elif c.tk.abiertos %}<b>{{ c.tk.abiertos }}</b> abiertos{% if c.tk.nuevos %} · <span class="l-pill info">{{ c.tk.nuevos }} nuevos</span>{% endif %}{% if c.tk.urgentes %} <span class="l-pill bad">{{ c.tk.urgentes }} urgentes</span>{% endif %}
+        {% else %}<span class="l-mut">ninguno</span>{% endif %}
+      </td>
+      <td>
+        {% if c.n_equipos %}<b>{{ c.n_equipos }}</b>{% if c.equipos_err %} <span class="l-pill bad">{{ c.equipos_err }} error</span>{% endif %}<br><small class="l-mut">{{ 'sin reportar desde ' if c.equipos_viejo else 'último reporte ' }}{{ c.equipos_ultimo }}</small>
+        {% else %}<span class="l-mut">0</span>{% endif %}
+      </td>
+      <td>{% if c.n_activos %}<b>{{ c.n_activos }}</b>{% if c.sin_agente %}<br><small class="l-mut">{{ c.sin_agente }} sin agente</small>{% endif %}{% else %}<span class="l-mut">—</span>{% endif %}</td>
+      <td>
+        {% if c.m365_estado == 'conectado' %}<span class="l-pill ok">M365</span>{% endif %}
+        {% if c.gws_estado == 'conectado' %}<span class="l-pill ok">Google</span>{% endif %}
+        {% if c.mesh_id %}<span class="l-pill info">Mesh</span>{% endif %}
+        {% if c.n_contactos %}<br><small class="l-mut">{{ c.n_contactos }} contactos</small>{% endif %}
+      </td>
+      <td style="white-space:nowrap">
+        <a class="u-b" href="/clientes/{{ c.slug }}">Ficha</a>
+        {% if puede('tickets') and c.glpi_entity_id %}<a class="u-b" href="/tickets?cliente={{ c.slug }}">Tickets</a>{% endif %}
+        {% if puede('equipos') %}<a class="u-b" href="/equipos?cliente={{ c.slug }}">Equipos</a>{% endif %}
+        {% if puede('activos') %}<a class="u-b" href="/clientes/{{ c.slug }}/activos">Activos</a>{% endif %}
+      </td>
+    </tr>
     {% endfor %}
-    <div class="l-empty" id="l-vacio" hidden style="grid-column:1/-1">Ningún cliente coincide con la búsqueda.</div>
+    </tbody>
+  </table>
+  <div class="l-empty" id="l-vacio" hidden>Ningún cliente coincide con el filtro.</div>
   </div>
   <script>
     (function () {
-      var q = document.getElementById('l-buscar'); if (!q) return;
-      q.addEventListener('input', function () {
+      var q = document.getElementById('l-buscar'), filtro = '';
+      function aplicar() {
         var t = q.value.trim().toLowerCase(), n = 0;
-        document.querySelectorAll('#l-lista .l-client').forEach(function (r) {
-          var ok = !t || (r.getAttribute('data-q') || '').indexOf(t) >= 0; r.hidden = !ok; if (ok) n++;
+        document.querySelectorAll('#l-lista tbody tr').forEach(function (r) {
+          var ok = (!t || (r.getAttribute('data-q') || '').indexOf(t) >= 0) && (!filtro || r.getAttribute('data-' + filtro) === '1');
+          r.hidden = !ok; if (ok) n++;
         });
         document.getElementById('l-vacio').hidden = n > 0;
+      }
+      q.addEventListener('input', aplicar);
+      document.querySelectorAll('#l-chips button').forEach(function (b) {
+        b.addEventListener('click', function () {
+          filtro = b.getAttribute('data-f');
+          document.querySelectorAll('#l-chips button').forEach(function (x) { x.classList.toggle('on', x === b); });
+          aplicar();
+        });
       });
     })();
   </script>
