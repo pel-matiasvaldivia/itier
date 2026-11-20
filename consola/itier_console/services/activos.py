@@ -536,10 +536,11 @@ def desvincular(conn, client_id: int, aid: int, actor: str) -> None:
 def _usuarios_origen(cfg, cli: dict) -> tuple[list[dict], list[dict], dict]:
     """(licenciados, fuentes, errores): usuarios normalizados {origen, origen_id, email, nombre, cargo, area} de cada nube conectada al cliente."""
     from ..adapters import AdapterError, gws as gws_mod, m365 as m365_mod
+    from . import m365 as m365_svc
     lic, fuentes, errores = [], [], {}
     if cli.get("m365_tenant_id") and cli.get("m365_estado") == "conectado":
         try:
-            todos = m365_mod.cliente(cfg, cli["m365_tenant_id"]).listar_usuarios()
+            todos = m365_mod.cliente(m365_svc.cfg_de(cfg, cli), cli["m365_tenant_id"]).listar_usuarios()
             act = [u for u in todos if u["licencias"] and u["habilitado"] and u["tipo"] != "Guest" and (u["correo"] or u["upn"])]
             lic += [{"origen": "m365", "origen_id": u["id"], "email": (u["correo"] or u["upn"]).lower(), "nombre": u["nombre"] or u["upn"].split("@")[0],
                      "cargo": u["cargo"], "area": u["departamento"]} for u in act]

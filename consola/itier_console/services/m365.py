@@ -42,14 +42,44 @@ def conectado(cli: dict) -> bool:
     return bool(cli.get("m365_tenant_id")) and cli.get("m365_estado") == "conectado"
 
 
+def app_propia(cli: dict) -> bool:
+    return bool(cli.get("m365_app_id") and cli.get("m365_app_secret"))
+
+
+def cfg_de(cfg, cli: dict):
+    """Config con la aplicación de Entra de ESTE cliente (cada tenant tiene la suya); si no tiene, la general."""
+    import dataclasses
+    from . import ajustes
+    if not app_propia(cli):
+        return cfg
+    try:
+        sec = ajustes._fernet(cfg).decrypt(cli["m365_app_secret"].encode()).decode()
+    except Exception:  # noqa: BLE001 - clave de la consola cambió: se pide cargar de nuevo
+        raise ServiceError("No se pudo leer el secreto guardado de la aplicación de este cliente; cargalo de nuevo.")
+    return dataclasses.replace(cfg, m365_client_id=cli["m365_app_id"], m365_client_secret=sec)
+
+
+def guardar_app(conn: sqlite3.Connection, cfg, cli_id: int, app_id: str, secreto: str) -> None:
+    from . import ajustes
+    app_id = (app_id or "").strip()
+    if len(app_id) != 36:
+        raise ServiceError("El ID de aplicación (client id) es un GUID de 36 caracteres.")
+    if secreto.strip():
+        conn.execute("UPDATE clients SET m365_app_id = ?, m365_app_secret = ? WHERE id = ?",
+                     (app_id, ajustes._fernet(cfg).encrypt(secreto.strip().encode()).decode(), cli_id))
+    else:
+        conn.execute("UPDATE clients SET m365_app_id = ? WHERE id = ? AND m365_app_secret IS NOT NULL", (app_id, cli_id))
+    conn.commit()
+
+
 def cliente_m365(cfg, cli: dict) -> m365_mod.M365Client:
     if not cli.get("m365_tenant_id"):
         raise ServiceError("Este cliente no tiene un tenant de Microsoft 365 conectado.")
-    return m365_mod.cliente(cfg, cli["m365_tenant_id"])
+    return m365_mod.cliente(cfg_de(cfg, cli), cli["m365_tenant_id"])
 
 
 def marcar(conn: sqlite3.Connection, cli_id: int, **campos) -> None:
-    permitidos = {"m365_tenant_id", "m365_estado", "m365_detalle", "m365_dominio", "m365_nombre", "m365_conectado_at"}
+    permitidos = {"m365_app_id", "m365_app_secret", "m365_tenant_id", "m365_estado", "m365_detalle", "m365_dominio", "m365_nombre", "m365_conectado_at"}
     campos = {k: v for k, v in campos.items() if k in permitidos}
     conn.execute(f"UPDATE clients SET {', '.join(k + ' = ?' for k in campos)} WHERE id = ?", (*campos.values(), cli_id))
     conn.commit()
@@ -61,7 +91,7 @@ def verificar_conexion(conn: sqlite3.Connection, cfg, cli: dict, tenant: str | N
     if not tenant:
         raise ServiceError("Falta el tenant.")
     try:
-        org = m365_mod.cliente(cfg, tenant).organizacion()
+        org = m365_mod.cliente(cfg_de(cfg, cli), tenant).organizacion()
     except AdapterError as e:
         marcar(conn, cli["id"], m365_tenant_id=tenant, m365_estado="error", m365_detalle=e.detalle[:300])
         raise
@@ -89,7 +119,7 @@ def crear(cfg, cli: dict, org: dict, *, nombre: str, apellido: str, usuario: str
     if enviar_a.strip():
         enviar_a = correo.validar_email(enviar_a)
     clave = generar_clave()
-    g = m365_mod.cliente(cfg, cli["m365_tenant_id"])
+    g = m365_mod.cliente(cfg_de(cfg, cli), cli["m365_tenant_id"])
     creado = g.crear_usuario(upn=upn, nombre=nombre.strip(), apellido=apellido.strip(), clave=clave,
                              cargo=(cargo or "").strip(), departamento=(departamento or "").strip(), sku_ids=sku_ids)
     estado = "no solicitado"

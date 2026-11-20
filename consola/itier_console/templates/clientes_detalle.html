@@ -146,7 +146,14 @@
         <div class="d-meta" style="gap:.5rem">
           <form method="post" action="/clientes/{{ cli.slug }}/m365/verificar" class="inline"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="u-b" type="submit">Verificar conexión</button></form>
           <form method="post" action="/clientes/{{ cli.slug }}/m365/desconectar" class="inline" onsubmit="return confirm('¿Desconectar el tenant de {{ cli.nombre }}?');"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="u-b danger" type="submit">Desconectar</button></form>
-        </div>{% endif %}
+        </div>
+        <details style="margin-top:.5rem"><summary class="small">Aplicación de este cliente</summary>
+          <form method="post" action="/clientes/{{ cli.slug }}/m365/aplicacion" class="form">
+            <input type="hidden" name="csrf" value="{{ csrf }}">
+            <label>ID de aplicación <input type="text" name="app_id" value="{{ cli.m365_app_id or '' }}"></label>
+            <label>Secreto <input type="password" name="app_secreto" autocomplete="off" placeholder="{{ '•••••••• (dejá vacío para conservarlo)' if cli.m365_app_secret else 'Valor del secreto' }}"></label>
+            <button class="u-b" type="submit">Guardar</button>
+          </form></details>{% endif %}
         {% else %}
         <p class="u-lead">Alta, baja, bloqueo, licencias y claves de los usuarios del tenant de {{ cli.nombre }}.</p>
         {% if cli.m365_estado == 'error' %}<div class="u-err small">No se pudo conectar: {{ cli.m365_detalle }}</div>
@@ -155,14 +162,16 @@
         <form method="post" action="/clientes/{{ cli.slug }}/m365/conectar" class="form">
           <input type="hidden" name="csrf" value="{{ csrf }}">
           <label>Dominio o ID del tenant del cliente (opcional)
-            <input type="text" name="tenant" placeholder="empresa.onmicrosoft.com"></label>
+            <input type="text" name="tenant" value="{{ cli.m365_tenant_id or '' }}" placeholder="empresa.onmicrosoft.com"></label>
+          <label>ID de aplicación (client id) de este cliente
+            <input type="text" name="app_id" value="{{ cli.m365_app_id or '' }}" placeholder="00000000-0000-0000-0000-000000000000"></label>
+          <label>Secreto de la aplicación
+            <input type="password" name="app_secreto" autocomplete="off" placeholder="{{ '•••••••• (guardado: dejá vacío para conservarlo)' if cli.m365_app_secret else 'Valor del secreto' }}"></label>
           <button class="u-btn" type="submit">Conectar tenant</button>
         </form>
-        <p class="muted small">Se abre Microsoft: el <b>administrador global del cliente</b> inicia sesión y acepta que iTier gestione sus usuarios. Se hace una sola vez y puede revocarse.</p>
-        {% if puede('m365.app') and not m365_app_ok %}<p class="small"><a href="/m365/aplicacion">⚠ Primero configurá la aplicación de Microsoft 365 →</a></p>{% endif %}
+        <p class="muted small">Cada cliente usa <b>su propia aplicación</b> (registro de app en el Entra ID de ese tenant, con permisos de aplicación de Graph: User.ReadWrite.All, Directory.Read.All, Organization.Read.All). Se abre Microsoft: el administrador global inicia sesión y acepta.</p>
         {% else %}<p class="muted small">Pedile a un PM o administrador que conecte el tenant.</p>{% endif %}
         {% endif %}
-        {% if puede('m365.app') %}<p class="muted small" style="margin-top:.6rem"><a href="/m365/aplicacion">Configurar la aplicación de Microsoft 365</a></p>{% endif %}
       </section>
       <section class="u-card">
         <h2>🟦 Google Workspace</h2>

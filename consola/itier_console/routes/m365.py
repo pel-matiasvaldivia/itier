@@ -72,7 +72,7 @@ def app_guardar(request: Request, client_id: str = Form(""), secreto: str = Form
 # ---------------------------------------------------------------- conexión del tenant de un cliente
 
 @router.post("/clientes/{slug}/m365/conectar")
-def conectar(request: Request, slug: str, tenant: str = Form(""), csrf: str = Form(""),
+def conectar(request: Request, slug: str, tenant: str = Form(""), app_id: str = Form(""), app_secreto: str = Form(""), csrf: str = Form(""),
              user: dict = Depends(require_permiso("clientes.editar")), conn: sqlite3.Connection = Depends(get_db)):
     cli = _cli(conn, slug)
     if not cli:
@@ -90,9 +90,18 @@ def conectar(request: Request, slug: str, tenant: str = Form(""), csrf: str = Fo
         audit.registrar(conn, user["user"], "m365.conectado", {"cliente": cli["nombre"], "tenant": "demo-tenant"})
         flash(request, "Tenant de ejemplo conectado (modo demo).", "ok")
         return RedirectResponse(f"/clientes/{slug}", status_code=303)
-    if not cfg.m365_configurado:
-        flash(request, "Primero un administrador tiene que configurar la aplicación de Microsoft 365 (client id y secreto).", "error")
+    try:
+        if app_id.strip():
+            svc.guardar_app(conn, request.app.state.cfg, cli["id"], app_id, app_secreto)
+            cli = _cli(conn, slug)
+        ccli = svc.cfg_de(cfg, cli)
+    except ServiceError as e:
+        flash(request, e.mensaje, "error")
         return RedirectResponse(f"/clientes/{slug}", status_code=303)
+    if not ccli.m365_configurado:
+        flash(request, "Cargá el ID de aplicación y el secreto de la app registrada en el tenant de este cliente.", "error")
+        return RedirectResponse(f"/clientes/{slug}", status_code=303)
+    cfg = ccli
     state = secrets.token_urlsafe(24)
     request.session["m365_state"] = {"state": state, "slug": slug}
     return RedirectResponse(m365_mod.url_consentimiento(cfg, _redirect_uri(cfg, request), state, hint or None), status_code=303)
@@ -123,6 +132,23 @@ def consentimiento(request: Request, state: str = "", tenant: str = "", admin_co
         return RedirectResponse(f"/clientes/{slug}", status_code=303)
     audit.registrar(conn, user["user"], "m365.conectado", {"cliente": cli["nombre"], "tenant": tenant, "organizacion": org.get("nombre")})
     flash(request, f"Tenant «{org.get('nombre') or tenant}» conectado.", "ok")
+    return RedirectResponse(f"/clientes/{slug}", status_code=303)
+
+
+@router.post("/clientes/{slug}/m365/aplicacion")
+def app_cliente(request: Request, slug: str, app_id: str = Form(""), app_secreto: str = Form(""), csrf: str = Form(""),
+                user: dict = Depends(require_permiso("clientes.editar")), conn: sqlite3.Connection = Depends(get_db)):
+    cli = _cli(conn, slug)
+    if not cli:
+        return _fuera(request)
+    if _csrf(request, csrf):
+        try:
+            svc.guardar_app(conn, request.app.state.cfg, cli["id"], app_id, app_secreto)
+            audit.registrar(conn, user["user"], "m365.app_cliente", {"cliente": cli["nombre"], "app_id": app_id.strip(),
+                                                                    "secreto_cambiado": bool(app_secreto.strip())})
+            flash(request, "Aplicación de este cliente guardada. Verificá la conexión o volvé a autorizar el tenant.", "ok")
+        except ServiceError as e:
+            flash(request, e.mensaje, "error")
     return RedirectResponse(f"/clientes/{slug}", status_code=303)
 
 
@@ -167,7 +193,11 @@ def _contexto(request, conn, slug):
         flash(request, "Este cliente todavía no tiene el tenant de Microsoft 365 conectado.", "error")
         return None, None, None
     cfg = _cfg(request, conn)
-    return cli, cfg, m365_mod.cliente(cfg, cli["m365_tenant_id"])
+    try:
+        return cli, cfg, m365_mod.cliente(svc.cfg_de(cfg, cli), cli["m365_tenant_id"])
+    except ServiceError as e:
+        flash(request, e.mensaje, "error")
+        return None, None, None
 
 
 @router.get("/clientes/{slug}/m365", response_class=HTMLResponse)

@@ -1322,6 +1322,18 @@ r = c.post("/clientes/canal-sa/personas/sincronizar", data={"csrf": csrf_de(pp.t
 _ac.sincronizar_usuarios = _orig_su
 check("usuarios nube: usa la aplicación de Microsoft 365 guardada en la consola (no solo el entorno)", _cfg_visto.get("m365_configurado") is True and _cfg_visto.get("m365_client_id") == "12345678-1234-1234-1234-123456789012", _cfg_visto)
 check("usuarios nube: informa el total y cuántos tienen licencia activa", "Sincronización de usuarios terminada" in r.text and "Microsoft 365" in r.text and "con licencia activa" in r.text, r.text[r.text.find("Sincronización"):][:500])
+# Aplicación de Microsoft 365 propia de cada cliente
+from itier_console.services import m365 as _m365s  # noqa: E402
+_pg = c.get("/clientes/canal-sa")
+_ga, _gb = "aaaaaaaa-1111-2222-3333-444444444444", "bbbbbbbb-1111-2222-3333-444444444444"
+c.post("/clientes/canal-sa/m365/aplicacion", data={"app_id": _ga, "app_secreto": "secreto-A", "csrf": csrf_de(_pg.text)})
+_row = dict(_db.connect(os.environ["ITIER_CONSOLE_DB"]).execute("SELECT * FROM clients WHERE slug='canal-sa'").fetchone())
+check("m365 por cliente: el secreto se guarda cifrado", _row["m365_app_id"] == _ga and "secreto-A" not in (_row["m365_app_secret"] or ""), _row.get("m365_app_secret"))
+_ef = _m365s.cfg_de(app.state.cfg, _row)
+check("m365 por cliente: se usa la app del cliente en lugar de la general", _ef.m365_client_id == _ga and _ef.m365_client_secret == "secreto-A")
+check("m365 por cliente: un cliente sin app propia usa la general", _m365s.cfg_de(app.state.cfg, {"m365_app_id": None}) is app.state.cfg)
+check("m365 por cliente: client id inválido se rechaza", "36 caracteres" in c.post("/clientes/canal-sa/m365/aplicacion", data={"app_id": "xx", "csrf": csrf_de(c.get("/clientes/canal-sa").text)}, follow_redirects=True).text)
+
 _p = {x["email"]: dict(x) for x in _conn.execute("SELECT * FROM client_contactos WHERE client_id=? AND email IS NOT NULL", (_cid_,))}
 check("usuarios nube: se traen los que tienen licencia activa con cargo y área", "lic@clientedemo.com.ar" in _p and _p["lic@clientedemo.com.ar"]["cargo"] == "Contadora" and _p["lic@clientedemo.com.ar"]["area"] == "Finanzas"
       and _p["lic@clientedemo.com.ar"]["origen"] == "m365" and _p["ana@clientedemo.com.ar"]["origen"] == "m365" and "luis@clientedemo.com.ar" in _p)
