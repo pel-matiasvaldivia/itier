@@ -1012,7 +1012,7 @@ _co_orig = (_co.configurado, _co.enviar)
 _co.configurado = lambda cfg: True
 _co.enviar = lambda cfg, dest, asunto, cuerpo, html=None: _enviados.append((dest, asunto, cuerpo))
 _rpu = c.post("/clientes/canal-sa/portal-usuarios", data={"username": "ronan.cp", "password": "Clave-Portal-123", "email": "ronan@canalsa.com.ar", "csrf": csrf_de(c.get("/clientes/canal-sa").text)})
-check("portal: el usuario se crea con su correo y se ve en la ficha", "ronan@canalsa.com.ar" in c.get("/clientes/canal-sa").text and "Correo (avisos)" in c.get("/clientes/canal-sa").text)
+check("portal: el usuario se crea con su correo y se ve en la ficha", "ronan@canalsa.com.ar" in c.get("/clientes/canal-sa").text and "Correo para avisos" in c.get("/clientes/canal-sa").text)
 check("portal: correo inválido rechazado al crear", "no es válida" in c.post("/clientes/canal-sa/portal-usuarios", data={"username": "x.cp", "password": "Clave-Portal-123", "email": "malo", "csrf": csrf_de(c.get("/clientes/canal-sa").text)}).text)
 _pid = _conn.execute("SELECT id FROM users WHERE username='ronan.cp'").fetchone()["id"]
 c.post(f"/clientes/canal-sa/portal-usuarios/{_pid}/email", data={"email": "ronan.p@canalsa.com.ar", "csrf": csrf_de(c.get("/clientes/canal-sa").text)})

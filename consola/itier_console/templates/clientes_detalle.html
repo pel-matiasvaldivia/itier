@@ -40,41 +40,35 @@
       <b style="font-size:.98rem">{{ cli.created_at }}</b>{% if cli.notas %}<small title="{{ cli.notas }}">{{ cli.notas }}</small>{% else %}<small>Sin notas</small>{% endif %}</div>
   </div>
 
-  <div class="masonry">
+  <div class="ficha">
+    <div class="fcol">
       <section class="u-card">
         <h2>👥 Usuarios del portal</h2>
         <p class="u-lead">Accesos para que el cliente entre a <code>/portal</code> (ve solo su empresa: sus tickets y equipos).</p>
         {% if usuarios %}
-        <table class="tabla">
-          <thead><tr><th>Usuario</th><th>Correo (avisos)</th><th>2FA</th><th>Último ingreso</th><th></th></tr></thead>
-          <tbody>
-            {% for u in usuarios %}
-            <tr>
-              <td><strong>{{ u.username }}</strong></td>
-              <td>{% if puede('clientes.editar') %}<form method="post" action="/clientes/{{ cli.slug }}/portal-usuarios/{{ u.id }}/email" class="inline" style="display:flex;gap:.3rem">
-                <input type="hidden" name="csrf" value="{{ csrf }}"><input type="email" name="email" value="{{ u.email or '' }}" placeholder="correo@cliente.com">
-                <button class="u-b" type="submit" title="Guardar correo">💾</button></form>{% else %}{{ u.email or '—' }}{% endif %}</td>
-              <td>{% if u.totp_confirmed %}<span class="l-pill ok"><i></i>activo</span>{% else %}<span class="l-pill warn"><i></i>pendiente</span>{% endif %}</td>
-              <td class="muted">{{ u.last_login or '—' }}</td>
-              <td class="acciones">
-                {% if puede('clientes.editar') %}
-                <form method="post" action="/clientes/{{ cli.slug }}/portal-usuarios/{{ u.id }}/eliminar" class="inline"
-                      onsubmit="return confirm('¿Eliminar el acceso de {{ u.username }}?');">
-                  <input type="hidden" name="csrf" value="{{ csrf }}">
-                  <button class="u-b danger" type="submit">Eliminar</button>
-                </form>
-                {% endif %}
-              </td>
-            </tr>
-            {% endfor %}
-          </tbody>
-        </table>
+        <div class="urows">
+          {% for u in usuarios %}
+          <div class="urow">
+            <div class="u-id"><strong>{{ u.username }}</strong>
+              {% if u.totp_confirmed %}<span class="l-pill ok"><i></i>2FA activo</span>{% else %}<span class="l-pill warn"><i></i>2FA pendiente</span>{% endif %}
+              <span class="muted small">Último ingreso: {{ u.last_login or '—' }}</span></div>
+            {% if puede('clientes.editar') %}
+            <form method="post" action="/clientes/{{ cli.slug }}/portal-usuarios/{{ u.id }}/email" class="inline u-mail">
+              <input type="hidden" name="csrf" value="{{ csrf }}"><input type="email" name="email" value="{{ u.email or '' }}" placeholder="correo para avisos" aria-label="Correo para avisos de {{ u.username }}">
+              <button class="u-b" type="submit" title="Guardar correo">Guardar</button></form>
+            <form method="post" action="/clientes/{{ cli.slug }}/portal-usuarios/{{ u.id }}/eliminar" class="inline"
+                  onsubmit="return confirm('¿Eliminar el acceso de {{ u.username }}?');">
+              <input type="hidden" name="csrf" value="{{ csrf }}"><button class="u-b danger" type="submit">Eliminar</button></form>
+            {% else %}<span class="muted">{{ u.email or '—' }}</span>{% endif %}
+          </div>
+          {% endfor %}
+        </div>
         {% else %}
         <p class="muted">Todavía no hay usuarios de portal para este cliente.</p>
         {% endif %}
 
         {% if puede('clientes.editar') %}
-        <form method="post" action="/clientes/{{ cli.slug }}/portal-usuarios" class="form row" style="margin-top:1.1rem">
+        <form method="post" action="/clientes/{{ cli.slug }}/portal-usuarios" class="form cols2" style="margin-top:1.1rem">
           <input type="hidden" name="csrf" value="{{ csrf }}">
           <label>Usuario
             <input type="text" name="username" placeholder="contacto@cliente" required>
@@ -90,7 +84,6 @@
         <p class="muted small">El cliente cambia la clave y enrola su 2FA en el primer ingreso.</p>
         {% endif %}
       </section>
-
       <section class="u-card">
         <h2>🚀 Despliegue en el cliente</h2>
         <p>
@@ -128,7 +121,47 @@
         </details>
         {% endif %}
       </section>
-
+      <section class="u-card">
+        <h2>📨 Canales de contacto</h2>
+        <p class="u-lead">Cómo le llegan a soporte los pedidos de {{ cli.nombre }}: cada uno abre un ticket en su entidad.</p>
+        <p class="small" style="margin:.2rem 0"><b>Dominios de correo</b>
+          {% if soporte_email %}<span class="muted">· escriben a {{ soporte_email }}</span>{% endif %}</p>
+        {% for d in dominios %}
+        <div class="chiprow">
+          <span class="l-pill info wrap">@{{ d.dominio }}</span>
+          {% if puede('clientes.editar') %}<form method="post" action="/clientes/{{ cli.slug }}/dominios/{{ d.id }}/quitar" class="inline">
+            <input type="hidden" name="csrf" value="{{ csrf }}"><button class="u-b danger" type="submit" title="Quitar">✕</button></form>{% endif %}
+        </div>
+        {% else %}<p class="muted small">Ninguno: los correos de este cliente irán a la Bandeja.</p>{% endfor %}
+        {% if puede('clientes.editar') %}
+        <form method="post" action="/clientes/{{ cli.slug }}/dominios" class="form cols">
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          <label>Agregar dominio<input type="text" name="dominio" placeholder="cuyopack.com.ar" required></label>
+          <button class="u-b" type="submit">Asociar dominio</button>
+        </form>
+        {% endif %}
+        <p class="small" style="margin:1rem 0 .2rem"><b>Personas (correo / WhatsApp)</b>
+          {% if wa_numero %}<span class="muted">· escriben al {{ wa_numero }}</span>{% endif %}</p>
+        {% for c in contactos %}
+        <div class="chiprow">
+          <span class="l-pill off wrap">{{ c.nombre or 'Sin nombre' }}{% if c.email %} · ✉️ {{ c.email }}{% endif %}{% if c.whatsapp %} · 💬 {{ 'ID interno ' ~ c.whatsapp[4:] if c.whatsapp.startswith('lid:') else '+' ~ c.whatsapp }}{% endif %}</span>
+          {% if puede('clientes.editar') %}<form method="post" action="/clientes/{{ cli.slug }}/contactos/{{ c.id }}/quitar" class="inline">
+            <input type="hidden" name="csrf" value="{{ csrf }}"><button class="u-b danger" type="submit" title="Quitar">✕</button></form>{% endif %}
+        </div>
+        {% else %}<p class="muted small">Sin personas cargadas.</p>{% endfor %}
+        {% if puede('clientes.editar') %}
+        <form method="post" action="/clientes/{{ cli.slug }}/contactos" class="form cols">
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          <label>Nombre<input type="text" name="nombre" placeholder="Ronan Pérez"></label>
+          <label>Correo<input type="email" name="email" placeholder="ronan@gmail.com"></label>
+          <label>WhatsApp<input type="text" name="whatsapp" placeholder="11 5555 1234"></label>
+          <button class="u-b" type="submit">Agregar persona</button>
+        </form>
+        <p class="muted small">Para correos públicos (Gmail, Hotmail…) y para WhatsApp hay que cargar a cada persona: un dominio público no se puede asociar.</p>
+        {% endif %}
+      </section>
+    </div>
+    <div class="fcol">
       {% if puede('activos') %}
       <section class="u-card">
         <h2>📦 Activos</h2>
@@ -198,45 +231,6 @@
         {% endif %}
         {% if puede('gws.app') %}<p class="muted small" style="margin-top:.6rem"><a href="/gws/aplicacion">Configurar la cuenta de servicio de Google</a></p>{% endif %}
       </section>
-      <section class="u-card">
-        <h2>📨 Canales de contacto</h2>
-        <p class="u-lead">Cómo le llegan a soporte los pedidos de {{ cli.nombre }}: cada uno abre un ticket en su entidad.</p>
-        <p class="small" style="margin:.2rem 0"><b>Dominios de correo</b>
-          {% if soporte_email %}<span class="muted">· escriben a {{ soporte_email }}</span>{% endif %}</p>
-        {% for d in dominios %}
-        <div class="d-meta" style="align-items:center">
-          <span class="l-pill info">@{{ d.dominio }}</span>
-          {% if puede('clientes.editar') %}<form method="post" action="/clientes/{{ cli.slug }}/dominios/{{ d.id }}/quitar" class="inline">
-            <input type="hidden" name="csrf" value="{{ csrf }}"><button class="u-b danger" type="submit" title="Quitar">✕</button></form>{% endif %}
-        </div>
-        {% else %}<p class="muted small">Ninguno: los correos de este cliente irán a la Bandeja.</p>{% endfor %}
-        {% if puede('clientes.editar') %}
-        <form method="post" action="/clientes/{{ cli.slug }}/dominios" class="form cols">
-          <input type="hidden" name="csrf" value="{{ csrf }}">
-          <label>Agregar dominio<input type="text" name="dominio" placeholder="cuyopack.com.ar" required></label>
-          <button class="u-b" type="submit">Asociar dominio</button>
-        </form>
-        {% endif %}
-        <p class="small" style="margin:1rem 0 .2rem"><b>Personas (correo / WhatsApp)</b>
-          {% if wa_numero %}<span class="muted">· escriben al {{ wa_numero }}</span>{% endif %}</p>
-        {% for c in contactos %}
-        <div class="d-meta" style="align-items:center">
-          <span class="l-pill off">{{ c.nombre or 'Sin nombre' }}{% if c.email %} · ✉️ {{ c.email }}{% endif %}{% if c.whatsapp %} · 💬 {{ 'ID interno ' ~ c.whatsapp[4:] if c.whatsapp.startswith('lid:') else '+' ~ c.whatsapp }}{% endif %}</span>
-          {% if puede('clientes.editar') %}<form method="post" action="/clientes/{{ cli.slug }}/contactos/{{ c.id }}/quitar" class="inline">
-            <input type="hidden" name="csrf" value="{{ csrf }}"><button class="u-b danger" type="submit" title="Quitar">✕</button></form>{% endif %}
-        </div>
-        {% else %}<p class="muted small">Sin personas cargadas.</p>{% endfor %}
-        {% if puede('clientes.editar') %}
-        <form method="post" action="/clientes/{{ cli.slug }}/contactos" class="form cols">
-          <input type="hidden" name="csrf" value="{{ csrf }}">
-          <label>Nombre<input type="text" name="nombre" placeholder="Ronan Pérez"></label>
-          <label>Correo<input type="email" name="email" placeholder="ronan@gmail.com"></label>
-          <label>WhatsApp<input type="text" name="whatsapp" placeholder="11 5555 1234"></label>
-          <button class="u-b" type="submit">Agregar persona</button>
-        </form>
-        <p class="muted small">Para correos públicos (Gmail, Hotmail…) y para WhatsApp hay que cargar a cada persona: un dominio público no se puede asociar.</p>
-        {% endif %}
-      </section>
       {% if puede('clientes.editar') or puede('clientes.eliminar') %}
       <section class="u-card">
         <h2>⚙️ Mantenimiento</h2>
@@ -258,5 +252,6 @@
         <p class="muted small" style="margin:0">«Reintentar» crea solo lo que falte en GLPI, Zabbix y MeshCentral (es seguro repetirlo). «Eliminar» quita únicamente el registro de la consola; lo que haya quedado en GLPI, Zabbix o MeshCentral se borra allí.</p>
       </section>
       {% endif %}
+    </div>
   </div>
 {% endblock %}
