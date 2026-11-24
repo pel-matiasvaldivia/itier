@@ -14,17 +14,28 @@ ROLES = {
     "admin": "Administrador (full)",
     "pm": "PM",
     "tecnico": "Técnico",
+    "tecnico_cliente": "Técnico de cliente",
 }
+
+# Roles que trabajan SOLO sobre un cliente (users.scope_client_id): no tienen cuentas en GLPI/Zabbix/Mesh de iTiers.
+DE_UN_CLIENTE = {"tecnico_cliente"}
 
 # «reportes» (horas y rentabilidad) no está en ningún rol salvo admin (= todo): maneja plata.
 _TODOS = {"tablero", "tickets", "equipos", "equipos.remoto", "clientes.ver", "m365", "gws", "activos"}
 _PM = _TODOS | {"clientes.editar", "instaladores", "descubrimiento", "curacion", "agentes", "auditoria", "bandeja", "m365.eliminar", "gws.eliminar", "activos.eliminar"}
 
+_CLIENTE = {"tickets", "equipos", "equipos.remoto", "clientes.ver", "m365", "gws", "activos"}
+
 PERMISOS = {
+    "tecnico_cliente": _CLIENTE,
     "admin": None,                      # None = todo
     "pm": _PM,
     "tecnico": _TODOS,
 }
+
+
+def es_de_un_cliente(rol: str | None) -> bool:
+    return rol in DE_UN_CLIENTE
 
 
 def rol_valido(rol: str | None) -> bool:

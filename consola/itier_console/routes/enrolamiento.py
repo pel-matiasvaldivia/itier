@@ -31,7 +31,7 @@ from .. import audit, security
 from ..deps import flash, get_db, render, require_permiso
 from ..adapters import glpi as glpi_mod, mesh as mesh_mod, zabbix as zbx_mod
 from ..deps import templates
-from ..services import ServiceError, correo, enrolamiento, onboarding
+from ..services import ServiceError, correo, enrolamiento, mesh_cliente as mesh_propio, onboarding
 
 router = APIRouter()
 
@@ -54,11 +54,12 @@ def _url_reporte_equipos(request: Request, conn: sqlite3.Connection, cli: dict, 
 
 def _mesh_en_linea(cfg, cli: dict) -> tuple[dict, str]:
     """Equipos del grupo de Mesh con su estado de conexión. Best-effort."""
-    if not (cfg.mesh_enabled and cli.get("mesh_id")):
+    ext = mesh_propio.externo(cli)
+    if not ((cfg.mesh_enabled and cli.get("mesh_id")) or ext):
         return {}, ""
     try:
-        with mesh_mod.cliente(cfg) as m:
-            return {e["nombre"]: e["conectado"] for e in m.equipos(cli["mesh_id"])}, ""
+        with mesh_mod.cliente(mesh_propio.cfg_de(cfg, cli) if ext else cfg) as m:
+            return {e["nombre"]: e["conectado"] for e in m.equipos(None if ext else cli["mesh_id"])}, ""
     except Exception as e:  # noqa: BLE001
         return {}, f"MeshCentral no respondió ({str(e)[:80]}). "
 

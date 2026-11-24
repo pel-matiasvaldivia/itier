@@ -115,6 +115,7 @@ def crear_usuario(
     rol: str | None = None,
     email: str | None = None,
     nombre: str | None = None,
+    scope_client_id: int | None = None,
 ) -> int:
     if client_id is None:
         rol = rol or ("admin" if is_admin else "tecnico")
@@ -122,9 +123,9 @@ def crear_usuario(
     else:
         rol = None
     cur = conn.execute(
-        "INSERT INTO users(username, password_hash, is_admin, must_change_pw, created_at, client_id, rol, email, nombre) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-        (username, hash_password(password), int(is_admin), int(must_change_pw), _now_iso(), client_id, rol, email, nombre),
+        "INSERT INTO users(username, password_hash, is_admin, must_change_pw, created_at, client_id, rol, email, nombre, scope_client_id) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        (username, hash_password(password), int(is_admin), int(must_change_pw), _now_iso(), client_id, rol, email, nombre, scope_client_id),
     )
     conn.commit()
     return int(cur.lastrowid)

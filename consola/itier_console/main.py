@@ -22,7 +22,7 @@ from starlette.middleware.sessions import SessionMiddleware
 from . import perf, security
 from .config import Config
 from .db import connect, init_db
-from .deps import AccesoConsola, AccesoPortal, AuthRequired, CambioClaveRequerido, PermisoDenegado, BASE, flash
+from .deps import AccesoConsola, AlcanceRedirigir, AccesoPortal, AuthRequired, CambioClaveRequerido, PermisoDenegado, BASE, flash
 from .routes import agents as r_agents
 from .routes import activos as r_activos
 from .routes import audit as r_audit
@@ -124,6 +124,10 @@ def create_app() -> FastAPI:
     @app.exception_handler(AccesoPortal)
     async def _acceso_portal(request: Request, _exc: AccesoPortal):
         return RedirectResponse("/portal", status_code=303)
+
+    @app.exception_handler(AlcanceRedirigir)
+    async def _alcance_redirigir(request: Request, exc: AlcanceRedirigir):
+        return RedirectResponse(exc.url, status_code=303)
 
     @app.exception_handler(PermisoDenegado)
     async def _permiso_denegado(request: Request, _exc: PermisoDenegado):

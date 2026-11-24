@@ -509,3 +509,6 @@ img,svg,video{max-width:100%;height:auto}
 .acciones{flex-wrap:wrap;white-space:normal}
 .l-head .acciones,.d-hero .acciones{max-width:100%}
 .acciones .u-btn,.acciones .u-b{max-width:100%}
+.u-avatar.tecnico_cliente{background:linear-gradient(135deg,#f59e0b,#d97706)}
+.u-pill.info{background:#e0f2fe;color:#075985}
+.u-pill{white-space:normal}

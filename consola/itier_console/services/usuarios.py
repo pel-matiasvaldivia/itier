@@ -65,6 +65,11 @@ def _estado(ok: str, ya: str = "") -> str:
 def _aprovisionar(conn, cfg, u: dict, clave: str) -> dict[str, str]:
     """Crea/actualiza la cuenta en GLPI, Zabbix y Mesh con `clave`. Devuelve el estado por sistema."""
     estados: dict[str, str] = {}
+    if rbac.es_de_un_cliente(u["rol"]):     # trabaja solo desde la consola y solo sobre su empresa: sin cuentas propias en los sistemas
+        estados = {"glpi": "no aplica", "zbx": "no aplica", "mesh": "no aplica"}
+        conn.execute("UPDATE users SET sync_glpi=?, sync_zbx=?, sync_mesh=? WHERE id=?", (*estados.values(), u["id"]))
+        conn.commit()
+        return estados
     nombre = u.get("nombre") or u["username"]
     if cfg.glpi_configurado:
         try:
@@ -114,7 +119,7 @@ def _correo(cfg, u: dict, clave: str, motivo: str) -> str:
 
 
 def crear(conn: sqlite3.Connection, cfg, actor: str, username: str, email: str, nombre: str, rol: str,
-          enviar: bool = False) -> tuple[int, str, dict]:
+          enviar: bool = False, cliente_id: int | None = None) -> tuple[int, str, dict]:
     """Alta en consola + GLPI + Zabbix + Mesh (+ correo de bienvenida si `enviar`).
     → (uid, clave en claro —mostrar UNA vez—, estados)."""
     username = (username or "").strip().lower()
@@ -123,8 +128,14 @@ def crear(conn: sqlite3.Connection, cfg, actor: str, username: str, email: str, 
     _validar(username, email, rol)
     if security.obtener_usuario(conn, username):
         raise ServiceError("Ya existe un usuario con ese nombre en la consola.")
+    if rbac.es_de_un_cliente(rol):
+        if not cliente_id or not conn.execute("SELECT 1 FROM clients WHERE id=?", (cliente_id,)).fetchone():
+            raise ServiceError("Elegí la empresa a la que pertenece este técnico de cliente.")
+    else:
+        cliente_id = None
     clave = generar_clave()
-    uid = security.crear_usuario(conn, username, clave, rol=rol, must_change_pw=True, email=email, nombre=nombre)
+    uid = security.crear_usuario(conn, username, clave, rol=rol, must_change_pw=True, email=email, nombre=nombre,
+                                 scope_client_id=cliente_id)
     u = _fila(conn, uid)
     estados = _aprovisionar(conn, cfg, u, clave)
     estados["correo"] = _correo(cfg, u, clave, "alta") if enviar else "no solicitado"
@@ -139,7 +150,7 @@ def reiniciar_clave(conn: sqlite3.Connection, cfg, actor: str, uid: int) -> tupl
     conn.execute("UPDATE users SET password_hash=?, must_change_pw=1, failed_count=0, locked_until=NULL WHERE id=?",
                  (security.hash_password(clave), uid))
     conn.commit()
-    if cfg.mesh_enabled:
+    if cfg.mesh_enabled and not rbac.es_de_un_cliente(u["rol"]):
         try:
             with mesh_mod.cliente(cfg) as m:
                 m.eliminar_usuario(u["username"])
@@ -175,7 +186,7 @@ def propagar_clave(conn: sqlite3.Connection, cfg, uid: int, nueva: str) -> dict[
         except AdapterError as e:
             estados["zbx"] = f"error: {e.detalle}"[:300]
     sync_mesh = (u.get("sync_mesh") or "")
-    if cfg.mesh_enabled and sync_mesh and sync_mesh != "no configurado" and not sync_mesh.startswith("error"):
+    if cfg.mesh_enabled and sync_mesh and sync_mesh not in ("no configurado",) and not sync_mesh.startswith(("error", "no aplica")):
         try:
             with mesh_mod.cliente(cfg) as m:
                 try:
@@ -198,6 +209,8 @@ def cambiar_rol(conn: sqlite3.Connection, cfg, actor: str, uid: int, rol: str) -
     u = _fila(conn, uid)
     if not rbac.rol_valido(rol):
         raise ServiceError("Rol desconocido.")
+    if rbac.es_de_un_cliente(rol) != rbac.es_de_un_cliente(u["rol"]):
+        raise ServiceError("No se puede pasar entre un usuario de iTiers y un técnico de cliente: eliminá el usuario y creá uno nuevo.")
     if u["rol"] == "admin" and rol != "admin" and _admins_activos(conn, excepto=uid) == 0:
         raise ServiceError("Tiene que quedar al menos un administrador activo.")
     conn.execute("UPDATE users SET rol=?, is_admin=? WHERE id=?", (rol, int(rol == "admin"), uid))
@@ -216,7 +229,7 @@ def cambiar_rol(conn: sqlite3.Connection, cfg, actor: str, uid: int, rol: str) -
             resultado["zbx"] = "ok"
         except AdapterError as e:
             resultado["zbx"] = f"error: {e.detalle}"[:300]
-    if cfg.mesh_enabled:
+    if cfg.mesh_enabled and not rbac.es_de_un_cliente(rol):
         try:
             with mesh_mod.cliente(cfg) as m:
                 m.cambiar_rol_usuario(u["username"], rol)
@@ -252,7 +265,7 @@ def activar(conn: sqlite3.Connection, cfg, actor: str, uid: int, activo: bool) -
             resultado["zbx"] = "ok"
         except AdapterError as e:
             resultado["zbx"] = f"error: {e.detalle}"[:300]
-    if cfg.mesh_enabled:
+    if cfg.mesh_enabled and not rbac.es_de_un_cliente(u["rol"]):
         try:
             with mesh_mod.cliente(cfg) as m:
                 m.bloquear_usuario(u["username"], not activo, u["rol"], cfg.mesh_support_group)
@@ -286,7 +299,7 @@ def eliminar(conn: sqlite3.Connection, cfg, actor: str, actor_uid: int, uid: int
             resultado["zbx"] = "ok"
         except AdapterError as e:
             resultado["zbx"] = f"error: {e.detalle}"[:300]
-    if cfg.mesh_enabled:
+    if cfg.mesh_enabled and not rbac.es_de_un_cliente(u["rol"]):
         try:
             with mesh_mod.cliente(cfg) as m:
                 m.eliminar_usuario(u["username"])

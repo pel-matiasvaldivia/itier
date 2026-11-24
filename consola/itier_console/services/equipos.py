@@ -9,6 +9,7 @@ el grupo de Mesh y el grupo de Zabbix del cliente.
 from __future__ import annotations
 
 from ..adapters import glpi as glpi_mod, mesh as mesh_mod, zabbix as zbx_mod
+from . import mesh_cliente as mesh_propio
 
 
 def evaluar(salud: dict | None, umbral: int, en_linea: bool | None = None) -> dict:
@@ -75,10 +76,11 @@ def listar(cfg, cli: dict, salud: bool = False) -> dict:
                     estado_ci = g.salud_cis([str(ci.get("id")) for ci in cis])
         except Exception:  # noqa: BLE001
             notas.append("inventario")
-    if cfg.mesh_enabled and cli.get("mesh_id"):
+    cfg_m = mesh_propio.cfg_de(cfg, cli) if mesh_propio.externo(cli) else cfg
+    if cfg_m.mesh_enabled and (cli.get("mesh_id") or mesh_propio.externo(cli)):
         try:
-            with mesh_mod.cliente(cfg) as m:
-                for e in m.equipos(cli["mesh_id"]):
+            with mesh_mod.cliente(cfg_m) as m:
+                for e in m.equipos(None if mesh_propio.externo(cli) else cli["mesh_id"]):
                     if e["nombre"]:
                         x = equipo(e["nombre"])
                         x["en_mesh"], x["en_linea"] = True, bool(e["conectado"])
@@ -97,5 +99,5 @@ def listar(cfg, cli: dict, salud: bool = False) -> dict:
         for x in por_nombre.values():
             x.update(evaluar(estado_ci.get(x.get("ci_id") or ""), cfg.alerta_disco_pct,
                              x["en_linea"] if x["en_mesh"] else None))
-            x["url_remoto"] = mesh_mod.url_remoto(cfg, x["nodeid"]) if x.get("nodeid") and cfg.mesh_url else ""
+            x["url_remoto"] = mesh_mod.url_remoto(cfg_m, x["nodeid"]) if x.get("nodeid") and cfg_m.mesh_url else ""
     return {"equipos": sorted(por_nombre.values(), key=lambda e: e["nombre"]), "proxy": proxy, "notas": notas}

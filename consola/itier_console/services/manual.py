@@ -12,6 +12,7 @@ from . import rbac
 MISION = {
     "tecnico": "Dar soporte técnico a los equipos de los clientes: resolver tickets, atender las alertas "
                "y anticiparse a los problemas antes de que el cliente los note.",
+    "tecnico_cliente": "Dar soporte a los equipos y usuarios de tu propia empresa desde iTiers: tickets, equipos, control remoto y usuarios en la nube.",
     "pm": "Llevar la operación diaria de los clientes: altas, despliegue de agentes, calidad del servicio "
           "y seguimiento del equipo técnico.",
     "admin": "Responder por la plataforma: seguridad, usuarios y roles, integraciones (GLPI, Zabbix, MeshCentral) "
@@ -33,6 +34,15 @@ RESPONSABILIDADES = {
         "Cuidar la confidencialidad de la información de los clientes: nada de capturas, copias ni comentarios fuera de los canales de trabajo.",
         "Mantener tu clave y tu segundo factor (2FA) personales: no se comparten, no se anotan.",
         "Escalar al PM lo que no puedas resolver o cualquier situación que afecte la seguridad del cliente.",
+    ],
+    "tecnico_cliente": [
+        "Atender los tickets de tu empresa y registrar en cada uno qué se hizo («Conversación»; «Nota interna» para lo que no debe ver el usuario).",
+        "Revisar la pantalla Equipos: discos llenos, antivirus apagado y equipos sin conexión; resolverlo o abrir un ticket.",
+        "Conectarte de forma remota solo con un motivo y, si hay una persona usando el equipo, avisándole antes.",
+        "Mantener al día los activos y las personas de tu empresa (altas, asignaciones y devoluciones).",
+        "Gestionar los usuarios de Microsoft 365 o Google Workspace de tu empresa cuando esté conectado.",
+        "Tu clave y tu segundo factor (2FA) son personales: no se comparten ni se anotan.",
+        "Ves únicamente los datos de tu empresa; ante cualquier duda o acceso que no reconozcas, avisá al equipo de iTiers.",
     ],
     "pm": [
         "Dar de alta a los clientes y verificar que queden completos: entidad en GLPI, grupo en Zabbix y grupo de equipos en MeshCentral.",
@@ -151,6 +161,16 @@ PROCEDIMIENTOS = [
         "«Eliminar» borra la cuenta definitivamente: preferí la baja si querés conservar el historial.",
         "En la lista, el estado por sistema te dice si algo falló al crear la cuenta; reintentá con «Reiniciar clave».",
     ]),
+    ("clientes.editar", "Conectar el servidor Mesh propio de un cliente", [
+        "Ficha del cliente → «Soporte remoto (MeshCentral)» → dirección con su dominio (ej.: https://remoto.empresa.com/cliente), usuario de servicio y clave → «Guardar y verificar».",
+        "Los equipos que ya tenían instalado el agente siguen conectados a su servidor: no se reinstala nada. iTiers los lista y abre escritorio, terminal y archivos desde ahí.",
+        "En ese Mesh creá un usuario de servicio con acceso a los grupos del cliente y permití que se muestre embebido desde la dirección de la consola.",
+    ]),
+    ("usuarios", "Dar acceso a un técnico de una empresa cliente", [
+        "Usuarios → Nuevo usuario → rol «Técnico de cliente» y elegí la empresa. No recibe cuentas en GLPI, Zabbix ni Mesh de iTiers.",
+        "Esa persona ve únicamente tickets, equipos, activos y usuarios en la nube de su empresa; nunca a otros clientes ni la administración.",
+        "Para quitarle el acceso usá «Dar de baja»: rige al instante.",
+    ]),
     ("clientes.eliminar", "Dar de baja un cliente", [
         "Solo cuando el contrato terminó y está confirmado. Ficha del cliente → «Eliminar»: borra su configuración y sus usuarios del portal.",
         "Es irreversible. Antes, exportá lo que haga falta desde GLPI.",
@@ -167,6 +187,7 @@ REGLAS = [
 
 ESCALAMIENTO = {
     "tecnico": "Dudas o problemas que no resolvés: PM. Seguridad o accesos: Administrador.",
+    "tecnico_cliente": "Dudas sobre la plataforma o accesos: equipo de iTiers.",
     "pm": "Plataforma, permisos o usuarios: Administrador.",
     "admin": "Fallas de plataforma que no podés resolver: proveedor del servicio iTiers.",
 }

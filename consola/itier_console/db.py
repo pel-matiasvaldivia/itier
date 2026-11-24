@@ -276,7 +276,7 @@ def _migrar(conn: sqlite3.Connection) -> None:
                 "glpi_rule_id", "zbx_action_id", "autoasig_detalle", "report_key", "central_key", "mesh_id"):
         if col not in ccols:
             conn.execute(f"ALTER TABLE clients ADD COLUMN {col} TEXT")
-    for col in ("m365_tenant_id", "m365_estado", "m365_detalle", "m365_dominio", "m365_nombre", "m365_conectado_at", "m365_app_id", "m365_app_secret"):
+    for col in ("m365_tenant_id", "m365_estado", "m365_detalle", "m365_dominio", "m365_nombre", "m365_conectado_at", "m365_app_id", "m365_app_secret", "mesh_url", "mesh_user", "mesh_pass"):
         if col not in ccols:
             conn.execute(f"ALTER TABLE clients ADD COLUMN {col} TEXT")
     for col in ("gws_admin", "gws_estado", "gws_detalle", "gws_dominio", "gws_conectado_at"):
@@ -297,6 +297,8 @@ def _migrar(conn: sqlite3.Connection) -> None:
     for col in ("rol", "email", "nombre", "glpi_user_id", "zbx_user_id", "sync_glpi", "sync_zbx", "sync_mesh"):
         if col not in ucols:
             conn.execute(f"ALTER TABLE users ADD COLUMN {col} TEXT")
+    if "scope_client_id" not in ucols:
+        conn.execute("ALTER TABLE users ADD COLUMN scope_client_id INTEGER")
     conn.execute("UPDATE users SET rol='admin' WHERE rol IS NULL AND client_id IS NULL AND is_admin=1")
     conn.execute("UPDATE users SET rol='tecnico' WHERE rol IS NULL AND client_id IS NULL AND is_admin=0")
     ecols = {r["name"] for r in conn.execute("PRAGMA table_info(endpoint_reports)").fetchall()}

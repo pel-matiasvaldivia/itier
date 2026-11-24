@@ -212,14 +212,15 @@ class MeshClient:
         if not self._cfg.demo:
             self._pedir({"action": "deleteuser", "userid": username}, "deleteuser")
 
-    def equipos(self, mesh_id: str) -> list[dict]:
-        """Equipos del grupo: [{nombre, conectado, nodeid}] (nodeid corto, para el enlace remoto)."""
+    def equipos(self, mesh_id: str | None) -> list[dict]:
+        """Equipos del grupo: [{nombre, conectado, nodeid}] (nodeid corto, para el enlace remoto).
+        Con `mesh_id=None` devuelve los de TODOS los grupos que ve la cuenta (servidor propio de un cliente)."""
         if self._cfg.demo:
             return list(_DEMO_EQUIPOS)
         r = self._pedir({"action": "nodes"}, "nodes")
         salida = []
         for clave, nodos in (r.get("nodes") or {}).items():
-            if id_corto(clave) != mesh_id:
+            if mesh_id is not None and id_corto(clave) != mesh_id:
                 continue
             for n in nodos:
                 salida.append({"nombre": str(n.get("name", "")).upper(), "conectado": bool(int(n.get("conn", 0)) & 1),

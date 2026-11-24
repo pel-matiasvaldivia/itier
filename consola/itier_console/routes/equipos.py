@@ -20,7 +20,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from .. import audit, perf
 from ..adapters import glpi as glpi_mod, mesh as mesh_mod
 from ..deps import flash, get_db, render, require_permiso
-from ..services import equipos as equipos_svc, onboarding
+from ..services import ServiceError, equipos as equipos_svc, mesh_cliente as mesh_propio, onboarding
 
 router = APIRouter()
 
@@ -46,6 +46,9 @@ def lista(request: Request, cliente: str = "", alertas: str = "", actualizar: st
     if actualizar:   # «Actualizar datos»: también se salta el caché de lecturas de GLPI
         glpi_mod._LECTURAS.vaciar()
     clientes = [c for c in onboarding.listar_clientes(conn) if c.get("estado") == "activo"]
+    if user.get("alcance"):
+        clientes = [c for c in clientes if c["id"] == user["alcance"]["id"]]
+        cliente = user["alcance"]["slug"]
     todos = [{"slug": c["slug"], "nombre": c["nombre"]} for c in clientes]
     if cliente:
         clientes = [c for c in clientes if c["slug"] == cliente]
@@ -77,6 +80,10 @@ def remoto(request: Request, slug: str, nodo: str, n: str = "", modo: str = "esc
            conn: sqlite3.Connection = Depends(get_db)):
     cfg = request.app.state.cfg
     cli = onboarding.obtener_cliente_por_slug(conn, slug)
+    try:
+        cfg = mesh_propio.cfg_de(cfg, cli) if cli else cfg
+    except ServiceError:
+        cli = None
     if not cli or not cfg.mesh_enabled or not mesh_mod.nodo_valido(nodo):
         flash(request, "No se puede abrir la conexión remota de ese equipo.", "error")
         return RedirectResponse("/equipos", status_code=303)

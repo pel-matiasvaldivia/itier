@@ -2,8 +2,8 @@
 {% block titulo %}Usuarios · Consola de iTiers{% endblock %}
 {# Chip de estado de un sistema: ok · error (con detalle) · no configurado #}
 {% macro chip(nombre, v) -%}
-  {%- if v is none or v == '' or v == 'no configurado' or v == 'no solicitado' -%}
-    <span class="u-chip off" title="{{ 'Sin configurar' if v == 'no configurado' else ('No enviado' if v == 'no solicitado' else 'Sin datos') }}"><i></i>{{ nombre }}</span>
+  {%- if v is none or v == '' or v == 'no configurado' or v == 'no solicitado' or v == 'no aplica' -%}
+    <span class="u-chip off" title="{{ 'No aplica a este rol' if v == 'no aplica' else 'Sin configurar' if v == 'no configurado' else ('No enviado' if v == 'no solicitado' else 'Sin datos') }}"><i></i>{{ nombre }}</span>
   {%- elif v.startswith('ok') -%}
     <span class="u-chip ok" title="{{ v }}"><i></i>{{ nombre }}{{ ' *' if v != 'ok' and not v.startswith('ok (enviado') else '' }}</span>
   {%- else -%}
@@ -79,6 +79,13 @@ Clave:   {{ nueva.clave }}</pre>
         <span class="u-rolbody"><strong><span class="u-ico admin">🛡</span>Administrador</strong>
           <p>Responde por la plataforma: usuarios, seguridad e integraciones.</p>
           <ul><li>Acceso total, incluido este ABM</li><li>Baja de clientes</li><li>GLPI Super-Admin · Zabbix Super admin</li></ul></span></label>
+      <label class="u-rolcard"><input type="radio" name="rol" value="tecnico_cliente">
+        <span class="u-rolbody"><strong><span class="u-ico tecnico">🏢</span>Técnico de cliente</strong>
+          <p>Personal de TI de una empresa cliente: opera solo lo de su empresa desde iTiers.</p>
+          <ul><li>Tickets, equipos, control remoto, activos y usuarios en la nube de su empresa</li><li>No ve a otros clientes ni la administración</li><li>Sin cuentas en GLPI, Zabbix ni Mesh de iTiers</li></ul>
+          <select class="u-sel" name="cliente" aria-label="Empresa del técnico de cliente" style="margin-top:.5rem;max-width:100%">
+            <option value="">Empresa…</option>{% for c in clientes %}<option value="{{ c.slug }}">{{ c.nombre }}</option>{% endfor %}
+          </select></span></label>
     </div>
 
     <div class="u-foot">
@@ -107,9 +114,10 @@ Clave:   {{ nueva.clave }}</pre>
         <div class="u-mid">
           <form method="post" action="/usuarios/{{ u.id }}/rol" class="inline">
             <input type="hidden" name="csrf" value="{{ csrf }}">
-            <select class="u-sel" name="rol" onchange="this.form.submit()" aria-label="Rol de {{ u.username }}">
+            {% if u.empresa %}<span class="u-pill info"><i></i>Técnico de {{ u.empresa }}</span>
+            {% else %}<select class="u-sel" name="rol" onchange="this.form.submit()" aria-label="Rol de {{ u.username }}">
               {% for k, v in roles.items() %}<option value="{{ k }}" {{ 'selected' if k == u.rol }}>{{ v }}</option>{% endfor %}
-            </select>
+            </select>{% endif %}
           </form>
           <span>
             {% if u.disabled %}<span class="u-pill off"><i></i>De baja</span>

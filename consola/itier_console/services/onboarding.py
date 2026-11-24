@@ -25,6 +25,7 @@ from datetime import datetime, timezone
 
 from .. import audit, security
 from ..adapters import AdapterError, glpi as glpi_mod, mesh as mesh_mod, zabbix as zbx_mod
+from . import mesh_cliente as mesh_propio
 from . import ServiceError, slugify
 
 
@@ -118,7 +119,7 @@ def autoasignar(conn: sqlite3.Connection, cfg, actor: str, cid: int) -> None:
     marca = f"itier-{cli['slug']}"
     rule_id, action_id = cli.get("glpi_rule_id"), cli.get("zbx_action_id")
     errores = []
-    if cfg.mesh_enabled:   # idempotente: también re-comparte el grupo con el grupo de usuarios SOPORTE
+    if cfg.mesh_enabled and not mesh_propio.externo(cli):   # idempotente: también re-comparte el grupo con el grupo de usuarios SOPORTE
         try:
             with mesh_mod.cliente(cfg) as m:
                 mesh_id = m.asegurar_grupo(marca)

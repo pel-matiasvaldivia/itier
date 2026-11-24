@@ -171,6 +171,29 @@
       </section>
       {% endif %}
       <section class="u-card">
+        <h2>🛰 Soporte remoto (MeshCentral)</h2>
+        {% if cli.mesh_url %}
+        <p class="small" style="margin:.2rem 0"><span class="l-pill ok"><i></i>Servidor propio</span> <code>{{ cli.mesh_url }}</code><br><span class="muted">usuario de servicio {{ cli.mesh_user }}</span></p>
+        <p class="muted small">Los equipos ya instalados siguen conectados a ese servidor: no se reinstala nada. iTiers los lista y abre escritorio, terminal y archivos desde ahí.</p>
+        {% else %}
+        <p class="u-lead">Usa el Mesh de iTiers (un grupo por cliente). Si {{ cli.nombre }} ya tiene su propio servidor MeshCentral, conectalo acá.</p>
+        {% endif %}
+        {% if puede('clientes.editar') %}
+        <details {{ 'open' if not cli.mesh_url else '' }}><summary class="small">{{ 'Cambiar' if cli.mesh_url else 'Conectar un' }} servidor propio</summary>
+          <form method="post" action="/clientes/{{ cli.slug }}/mesh" class="form">
+            <input type="hidden" name="csrf" value="{{ csrf }}">
+            <label>Dirección (con el dominio de Mesh, si usa uno)
+              <input type="text" name="mesh_url" value="{{ cli.mesh_url or '' }}" placeholder="https://remoto.empresa.com/cliente" required></label>
+            <label>Usuario de servicio <input type="text" name="mesh_user" value="{{ cli.mesh_user or '' }}" placeholder="itiers" autocomplete="off" required></label>
+            <label>Clave <input type="password" name="mesh_clave" autocomplete="off" placeholder="{{ '•••••••• (dejá vacío para conservarla)' if cli.mesh_pass else 'Clave del usuario' }}"></label>
+            <button class="u-b" type="submit">Guardar y verificar</button>
+          </form>
+          <p class="muted small">Creá en ese Mesh un usuario con acceso a los grupos del cliente. Para ver el escritorio dentro de iTiers, ese servidor debe permitir mostrarse embebido desde la dirección de la consola.</p>
+        </details>
+        {% if cli.mesh_url %}<form method="post" action="/clientes/{{ cli.slug }}/mesh/quitar" class="inline" onsubmit="return confirm('¿Volver al Mesh de iTiers?');"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="u-b danger" type="submit">Quitar servidor propio</button></form>{% endif %}
+        {% endif %}
+      </section>
+      <section class="u-card">
         <h2>☁️ Microsoft 365</h2>
         {% if cli.m365_estado == 'conectado' %}
         <p class="small" style="margin:.2rem 0"><span class="l-pill ok"><i></i>Conectado</span> <b>{{ cli.m365_nombre or cli.m365_tenant_id }}</b>{% if cli.m365_dominio %} · {{ cli.m365_dominio }}{% endif %}</p>

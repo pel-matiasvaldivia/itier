@@ -1334,6 +1334,56 @@ check("m365 por cliente: se usa la app del cliente en lugar de la general", _ef.
 check("m365 por cliente: un cliente sin app propia usa la general", _m365s.cfg_de(app.state.cfg, {"m365_app_id": None}) is app.state.cfg)
 check("m365 por cliente: client id inválido se rechaza", "36 caracteres" in c.post("/clientes/canal-sa/m365/aplicacion", data={"app_id": "xx", "csrf": csrf_de(c.get("/clientes/canal-sa").text)}, follow_redirects=True).text)
 
+# Mesh propio por cliente
+from itier_console.services import mesh_cliente as _mp  # noqa: E402
+from itier_console.adapters import mesh as _mm  # noqa: E402
+_pg = c.get("/clientes/canal-sa")
+check("mesh propio: la ficha ofrece conectar un servidor propio", "Soporte remoto (MeshCentral)" in _pg.text and "mesh_url" in _pg.text)
+check("mesh propio: una dirección inválida se rechaza", "tiene que ser como https" in c.post("/clientes/canal-sa/mesh", data={"mesh_url": "ftp://x", "mesh_user": "svc", "mesh_clave": "k", "csrf": csrf_de(_pg.text)}, follow_redirects=True).text)
+c.post("/clientes/canal-sa/mesh", data={"mesh_url": "https://remoto.ejemplo.com/thevines/", "mesh_user": "itiers", "mesh_clave": "clave-mesh-1", "csrf": csrf_de(_pg.text)})
+_row = dict(_db.connect(os.environ["ITIER_CONSOLE_DB"]).execute("SELECT * FROM clients WHERE slug='canal-sa'").fetchone())
+check("mesh propio: se guarda la dirección sin barra final y la clave cifrada", _row["mesh_url"] == "https://remoto.ejemplo.com/thevines" and "clave-mesh-1" not in (_row["mesh_pass"] or "") and _mp.externo(_row), _row.get("mesh_url"))
+_cm = _mp.cfg_de(app.state.cfg, _row)
+check("mesh propio: cfg_de usa el servidor y la clave del cliente", _cm.mesh_url == "https://remoto.ejemplo.com/thevines" and _cm.mesh_user == "itiers" and _cm.mesh_password == "clave-mesh-1")
+check("mesh propio: el enlace remoto conserva el dominio de Mesh", _mm.url_remoto(_cm, "ABC123@xyz", "terminal").startswith("https://remoto.ejemplo.com/thevines/?viewmode=12&gotonode=ABC123@xyz"))
+check("mesh propio: un cliente sin servidor propio usa el general", _mp.cfg_de(app.state.cfg, {"mesh_url": None}) is app.state.cfg)
+c.post("/clientes/canal-sa/mesh/quitar", data={"csrf": csrf_de(c.get("/clientes/canal-sa").text)})
+check("mesh propio: quitar vuelve al Mesh de iTiers", not _mp.externo(dict(_db.connect(os.environ["ITIER_CONSOLE_DB"]).execute("SELECT * FROM clients WHERE slug='canal-sa'").fetchone())))
+
+# Técnico de cliente: opera solo su empresa
+_pc = c.get("/usuarios")
+c.post("/clientes/nuevo", data={"nombre": "Otra Empresa SA", "csrf": csrf_de(c.get("/clientes/nuevo").text)})
+_tk = lambda cli_, tit: int(re.search(r"/tickets/(\d+)", c.post("/tickets/nuevo", data={"cliente": cli_, "titulo": tit, "contenido": "x", "prioridad": "3", "csrf": csrf_de(c.get("/tickets/nuevo").text)}).url.path).group(1))
+_t_propio, _t_ajeno = _tk("canal-sa", "Ticket de Canal"), _tk("otra-empresa-sa", "Ticket ajeno")
+_r0 = c.post("/usuarios", data={"username": "tcli", "email": "tcli@canalsa.com.ar", "nombre": "Tec Cliente", "rol": "tecnico_cliente", "cliente": "", "csrf": csrf_de(_pc.text)}, follow_redirects=True)
+check("alcance: no se crea un técnico de cliente sin empresa", "Elegí la empresa" in _r0.text)
+_r1 = c.post("/usuarios", data={"username": "tcli", "email": "tcli@canalsa.com.ar", "nombre": "Tec Cliente", "rol": "tecnico_cliente", "cliente": "canal-sa", "csrf": csrf_de(c.get("/usuarios").text)}, follow_redirects=True)
+_m = re.search(r"Clave:\s+([^\s<]+)", _r1.text)
+check("alcance: el técnico de cliente se crea sin cuentas en GLPI/Zabbix/Mesh", bool(_m) and "no aplica" in _r1.text.lower() or "No aplica" in _r1.text, _r1.text[:200])
+tcl, _ = _login_operador("tcli", _m.group(1))
+check("alcance: entra y su inicio es la ficha de SU empresa", tcl.get("/").url.path == "/clientes/canal-sa", tcl.get("/").url.path)
+check("alcance: la lista de clientes lo lleva a su ficha", tcl.get("/clientes").url.path == "/clientes/canal-sa")
+check("alcance: no ve la ficha de otro cliente", tcl.get("/clientes/otra-empresa-sa").url.path != "/clientes/otra-empresa-sa")
+check("alcance: no ve activos ni usuarios de nube de otro cliente", all(tcl.get(f"/clientes/otra-empresa-sa/{x}").url.path != f"/clientes/otra-empresa-sa/{x}" for x in ("activos", "m365", "gws", "personas")))
+check("alcance: sí ve los de su empresa", all(tcl.get(f"/clientes/canal-sa/{x}").url.path == f"/clientes/canal-sa/{x}" for x in ("activos", "m365", "personas")))
+check("alcance: su menú no lista a otros clientes", "Otra Empresa" not in tcl.get("/clientes/canal-sa").text and "Usuarios</a>" not in tcl.get("/clientes/canal-sa").text)
+_lt = tcl.get("/tickets").text
+check("alcance: la lista de tickets es solo de su empresa", "Ticket de Canal" in _lt and "Ticket ajeno" not in _lt, _lt[:100])
+check("alcance: forzar ?cliente= de otro no cambia el resultado", "Ticket ajeno" not in tcl.get("/tickets?cliente=otra-empresa-sa").text)
+check("alcance: ve su ticket", tcl.get(f"/tickets/{_t_propio}").url.path == f"/tickets/{_t_propio}")
+check("alcance: no ve un ticket ajeno", tcl.get(f"/tickets/{_t_ajeno}").url.path != f"/tickets/{_t_ajeno}")
+check("alcance: no puede responder un ticket ajeno", tcl.post(f"/tickets/{_t_ajeno}/responder", data={"texto": "hola", "csrf": csrf_de(tcl.get("/tickets/nuevo").text)}).url.path != f"/tickets/{_t_ajeno}")
+_ne = tcl.post("/tickets/nuevo", data={"cliente": "otra-empresa-sa", "titulo": "Intento cruzado", "contenido": "x", "prioridad": "3", "csrf": csrf_de(tcl.get("/tickets/nuevo").text)})
+_idn = re.search(r"/tickets/(\d+)", _ne.url.path)
+check("alcance: un ticket nuevo siempre queda en su empresa", bool(_idn) and "Intento cruzado" in tcl.get("/tickets").text and "Intento cruzado" not in c.get("/tickets?cliente=otra-empresa-sa").text)
+check("alcance: equipos solo de su empresa", "Otra Empresa" not in tcl.get("/equipos?cliente=otra-empresa-sa").text)
+check("alcance: no entra a ninguna pantalla de administración", all(tcl.get(x).url.path != x for x in ("/usuarios", "/canales", "/bandeja", "/auditoria", "/reportes/horas", "/clientes/nuevo", "/m365/aplicacion", "/clientes/canal-sa/instaladores", "/clientes/canal-sa/agentes")))
+tcl.post("/clientes/canal-sa/mesh", data={"mesh_url": "https://x.example.com", "mesh_user": "u", "mesh_clave": "k", "csrf": csrf_de(tcl.get("/clientes/canal-sa").text)})
+check("alcance: no puede editar el cliente", not _db.connect(os.environ["ITIER_CONSOLE_DB"]).execute("SELECT mesh_url FROM clients WHERE slug='canal-sa'").fetchone()["mesh_url"])
+check("alcance: el administrador ve a la empresa en la lista de usuarios", "Técnico de Canal" in c.get("/usuarios").text)
+c.post("/usuarios/%d/baja" % _db.connect(os.environ["ITIER_CONSOLE_DB"]).execute("SELECT id FROM users WHERE username='tcli'").fetchone()["id"], data={"csrf": csrf_de(c.get("/usuarios").text)})
+check("alcance: dado de baja pierde el acceso al instante", tcl.get("/tickets").url.path != "/tickets")
+
 _p = {x["email"]: dict(x) for x in _conn.execute("SELECT * FROM client_contactos WHERE client_id=? AND email IS NOT NULL", (_cid_,))}
 check("usuarios nube: se traen los que tienen licencia activa con cargo y área", "lic@clientedemo.com.ar" in _p and _p["lic@clientedemo.com.ar"]["cargo"] == "Contadora" and _p["lic@clientedemo.com.ar"]["area"] == "Finanzas"
       and _p["lic@clientedemo.com.ar"]["origen"] == "m365" and _p["ana@clientedemo.com.ar"]["origen"] == "m365" and "luis@clientedemo.com.ar" in _p)

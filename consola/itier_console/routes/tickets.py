@@ -16,14 +16,20 @@ from ..services import tickets as svc
 router = APIRouter()
 
 
-def _clientes_con_entidad(conn: sqlite3.Connection) -> list[dict]:
-    return [c for c in onboarding.listar_clientes(conn) if c.get("glpi_entity_id")]
+def _clientes_con_entidad(conn: sqlite3.Connection, user: dict | None = None) -> list[dict]:
+    """Clientes con entidad de GLPI; un usuario limitado a un cliente solo ve el suyo."""
+    cl = [c for c in onboarding.listar_clientes(conn) if c.get("glpi_entity_id")]
+    if user and user.get("alcance"):
+        cl = [c for c in cl if c["id"] == user["alcance"]["id"]]
+    return cl
 
 
 @router.get("/tickets", response_class=HTMLResponse)
 def listar(request: Request, cliente: str = "", user: dict = Depends(require_permiso("tickets")), conn: sqlite3.Connection = Depends(get_db)):
     cfg = request.app.state.cfg
-    clientes = _clientes_con_entidad(conn)
+    clientes = _clientes_con_entidad(conn, user)
+    if user.get("alcance"):
+        cliente = user["alcance"]["slug"]
     entity_id = None
     sel = None
     if cliente:
@@ -53,7 +59,7 @@ def listar(request: Request, cliente: str = "", user: dict = Depends(require_per
 
 @router.get("/tickets/nuevo", response_class=HTMLResponse)
 def nuevo_form(request: Request, user: dict = Depends(require_permiso("tickets")), conn: sqlite3.Connection = Depends(get_db)):
-    clientes = _clientes_con_entidad(conn)
+    clientes = _clientes_con_entidad(conn, user)
     return render(request, "tickets_nuevo.html", clientes=clientes)
 
 
@@ -71,6 +77,8 @@ def nuevo_post(
     if not security.verificar_csrf(request.session, csrf):
         flash(request, "Sesión expirada, reintentá.", "error")
         return RedirectResponse("/tickets/nuevo", status_code=303)
+    if user.get("alcance"):
+        cliente = user["alcance"]["slug"]
     cli = onboarding.obtener_cliente_por_slug(conn, cliente)
     if not cli or not cli.get("glpi_entity_id"):
         flash(request, "Elegí un cliente con entidad de GLPI válida.", "error")

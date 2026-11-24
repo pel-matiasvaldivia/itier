@@ -193,6 +193,44 @@ def eliminar_usuario_portal(
     return RedirectResponse(f"/clientes/{slug}", status_code=303)
 
 
+@router.post("/clientes/{slug}/mesh")
+def mesh_guardar(request: Request, slug: str, mesh_url: str = Form(""), mesh_user: str = Form(""), mesh_clave: str = Form(""),
+                 csrf: str = Form(""), user: dict = Depends(require_permiso("clientes.editar")),
+                 conn: sqlite3.Connection = Depends(get_db)):
+    """Servidor MeshCentral propio del cliente (con su dominio) y su usuario de servicio: los agentes ya instalados no se tocan."""
+    from ..adapters import mesh as mesh_mod
+    from ..services import mesh_cliente as mp
+    cli = onboarding.obtener_cliente_por_slug(conn, slug)
+    if not cli:
+        flash(request, "Cliente no encontrado.", "error")
+        return RedirectResponse("/clientes", status_code=303)
+    if security.verificar_csrf(request.session, csrf):
+        try:
+            mp.guardar(conn, request.app.state.cfg, cli["id"], mesh_url, mesh_user, mesh_clave)
+            cli = onboarding.obtener_cliente_por_slug(conn, slug)
+            with mesh_mod.cliente(mp.cfg_de(request.app.state.cfg, cli)) as m:
+                n = len(m.equipos(None))
+            audit.registrar(conn, user["user"], "mesh.propio_configurado", {"cliente": cli["nombre"], "url": cli["mesh_url"]})
+            flash(request, f"Mesh del cliente conectado: {n} equipos visibles.", "ok")
+        except (ServiceError, AdapterError) as e:
+            flash(request, "Se guardó, pero no se pudo verificar: " + (getattr(e, "mensaje", None) or getattr(e, "detalle", str(e))), "error")
+    else:
+        flash(request, "Sesión expirada, reintentá.", "error")
+    return RedirectResponse(f"/clientes/{slug}", status_code=303)
+
+
+@router.post("/clientes/{slug}/mesh/quitar")
+def mesh_quitar(request: Request, slug: str, csrf: str = Form(""), user: dict = Depends(require_permiso("clientes.editar")),
+                conn: sqlite3.Connection = Depends(get_db)):
+    from ..services import mesh_cliente as mp
+    cli = onboarding.obtener_cliente_por_slug(conn, slug)
+    if cli and security.verificar_csrf(request.session, csrf):
+        mp.quitar(conn, cli["id"])
+        audit.registrar(conn, user["user"], "mesh.propio_quitado", {"cliente": cli["nombre"]})
+        flash(request, "Se volvió al servidor Mesh de iTiers.", "ok")
+    return RedirectResponse(f"/clientes/{slug}", status_code=303)
+
+
 @router.post("/clientes/{slug}/reintentar")
 def reintentar(
     request: Request,
