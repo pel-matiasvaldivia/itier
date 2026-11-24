@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block titulo %}Usuarios · Consola de iTier{% endblock %}
+{% block titulo %}Usuarios · Consola de iTiers{% endblock %}
 {# Chip de estado de un sistema: ok · error (con detalle) · no configurado #}
 {% macro chip(nombre, v) -%}
   {%- if v is none or v == '' or v == 'no configurado' or v == 'no solicitado' -%}

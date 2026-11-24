@@ -1,6 +1,6 @@
 # 07 · Manual de operaciones y procedimientos
 
-Manual de trabajo para el **equipo que opera iTier** (proveedor de servicio) sobre
+Manual de trabajo para el **equipo que opera iTiers** (proveedor de servicio) sobre
 la plataforma. Reúne, en forma de procedimientos accionables, cómo poner en marcha
 un cliente, gestionar activos, incidentes, solicitudes, problemas y cambios, y cómo
 operar la capa agéntica con seguridad.
@@ -8,7 +8,7 @@ operar la capa agéntica con seguridad.
 | | |
 |---|---|
 | **Audiencia** | Operadores y administradores de plataforma de Pymes en Línea (NOC / mesa de servicio). Una guía breve para el cliente final está en el [§16](#16-procedimientos-de-cara-al-cliente). |
-| **Alcance** | Operación diaria de la plataforma iTier: VPS (GLPI + Zabbix) y appliances/sondas en clientes. |
+| **Alcance** | Operación diaria de la plataforma iTiers: VPS (GLPI + Zabbix) y appliances/sondas en clientes. |
 | **No cubre** | Instalación del VPS y del appliance paso a paso → ver [`deploy/`](../deploy/README.md). Diseño y decisiones → ver [ADRs](adr/). |
 | **Base normativa** | ITIL 4 (ver [03 · Mapeo ITIL 4](03-mapeo-itil4.md)) · OWASP Agentic AI 2026 (ver [04 · Seguridad y autonomía](04-seguridad-y-autonomia.md)). |
 | **Estado** | v1 · 2026. Documento vivo: se versiona en git; los cambios entran por revisión. |
@@ -206,7 +206,7 @@ a mano** salvo excepción documentada; la fuente de verdad es el descubrimiento.
 
 **Configurar el descubrimiento (paso del operador, una vez por cliente).** Los
 rangos de IP y las credenciales SNMP **no** viven en el appliance: se definen en el
-server. La vía recomendada es **desde la consola de iTier** (*Clientes → \<cliente\>
+server. La vía recomendada es **desde la consola de iTiers** (*Clientes → \<cliente\>
 → Descubrimiento de red*): cargás los rangos y la credencial SNMP y la consola los
 crea en GLPI, en la entidad del cliente. Equivale a hacer, a mano, en
 **GLPI → Administración → Inventario (plugin GlpiInventory)**:
@@ -231,7 +231,7 @@ La **criticidad de cada CI alimenta directamente el techo de autonomía** del ag
 (ver [§12](#proc-aut--niveles-de-autonomía-y-aprobaciones)). Por eso este paso es de
 seguridad, no cosmético.
 
-> **Desde la consola de iTier:** *Clientes → \<cliente\> → Criticidad (CMDB)*. La
+> **Desde la consola de iTiers:** *Clientes → \<cliente\> → Criticidad (CMDB)*. La
 > consola lista los CIs del cliente y clasificás cada uno; se guarda en el campo
 > *business criticity* de GLPI, que es la **misma fuente** que lee el agente de borde
 > (`reference/edge-agent/.../datos.py`). Una sola fuente de verdad: la CMDB.
@@ -389,7 +389,7 @@ cerrados o con solución permanente en curso.
 
 ## PROC-CHG · Cambios y remediación con playbooks
 
-> ITIL 4: *Change Enablement*. En iTier, **toda actuación sobre infraestructura es un
+> ITIL 4: *Change Enablement*. En iTiers, **toda actuación sobre infraestructura es un
 > playbook de Ansible** del catálogo firmado — nunca shell libre generado por el
 > modelo (ver [ADR-0004](adr/ADR-0004-ansible-para-remediacion.md) y
 > [ADR-0003](adr/ADR-0003-mcp-capa-de-herramientas.md)).
@@ -433,7 +433,7 @@ conservador y verificación definida.
 
 ## PROC-AUT · Niveles de autonomía y aprobaciones
 
-El corazón operativo de iTier. Detalle de diseño en
+El corazón operativo de iTiers. Detalle de diseño en
 [04 · Seguridad y autonomía](04-seguridad-y-autonomia.md) y
 [ADR-0006](adr/ADR-0006-autonomia-graduada.md).
 

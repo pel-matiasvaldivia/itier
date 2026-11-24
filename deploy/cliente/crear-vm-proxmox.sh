@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ─────────────────────────────────────────────────────────────────────────────
-# iTier — crea en Proxmox la VM del appliance de un cliente (Debian 12 cloud
+# iTiers — crea en Proxmox la VM del appliance de un cliente (Debian 12 cloud
 # image + cloud-init) y deja que el primer arranque corra el instalador.
 # Ejecutar COMO ROOT en el HOST Proxmox:
 #
@@ -42,11 +42,11 @@ SNIPDIR="$(pvesm path "$SNIP:snippets/x" 2>/dev/null | sed 's#/x$##')"
 
 IMG="/var/lib/vz/template/iso/debian-12-genericcloud-amd64.qcow2"
 if [ ! -s "$IMG" ]; then
-  echo "[iTier] Descargando Debian 12 cloud image…"
+  echo "[iTiers] Descargando Debian 12 cloud image…"
   mkdir -p "$(dirname "$IMG")"; curl -fL --retry 3 -o "$IMG" "$IMG_URL"
 fi
 
-# user-data de cloud-init: instala el agente de la VM y corre el instalador de iTier.
+# user-data de cloud-init: instala el agente de la VM y corre el instalador de iTiers.
 UD="$SNIPDIR/itier-$VMID-user.yml"
 umask 077
 {
@@ -63,7 +63,7 @@ umask 077
   echo "  - [ bash, -c, \"curl -fsSL '$URL' | bash >> /var/log/itier-instalacion.log 2>&1\" ]"
 } > "$UD"
 
-echo "[iTier] Creando la VM $VMID (itier-$NOMBRE)…"
+echo "[iTiers] Creando la VM $VMID (itier-$NOMBRE)…"
 qm create "$VMID" --name "itier-$NOMBRE" --memory "$RAM" --cores "$CORES" --cpu host \
   --net0 "virtio,bridge=$BRIDGE" --scsihw virtio-scsi-pci --agent 1 --ostype l26 \
   --serial0 socket --vga serial0 --onboot 1
@@ -76,10 +76,10 @@ qm start "$VMID"
 
 cat <<FIN
 
-[iTier] VM $VMID creada y arrancando. El instalador corre solo en el primer boot
+[iTiers] VM $VMID creada y arrancando. El instalador corre solo en el primer boot
 (tarda unos 5-10 min: descarga Docker e imágenes). Seguimiento:
   qm guest exec $VMID -- tail -n 30 /var/log/itier-instalacion.log
-La consola de iTier marca "Instalado" en Instaladores cuando termina.
+La consola de iTiers marca "Instalado" en Instaladores cuando termina.
 Por seguridad borrá el user-data (contiene el enlace de un solo uso):
   rm -f "$UD"
 FIN

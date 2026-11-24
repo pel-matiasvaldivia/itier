@@ -1,4 +1,4 @@
-# Consola de iTier (plano de control)
+# Consola de iTiers (plano de control)
 
 La web desde donde se **opera toda la plataforma** sin entrar a los dashboards de
 GLPI ni de Zabbix. Es un **backend-for-frontend (BFF)**: no reemplaza a esos

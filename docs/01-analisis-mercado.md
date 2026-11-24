@@ -1,6 +1,6 @@
 # 01 · Análisis de mercado
 
-Objetivo: decidir **qué comprar, qué integrar y qué construir** para iTier, en lugar de
+Objetivo: decidir **qué comprar, qué integrar y qué construir** para iTiers, en lugar de
 reinventar piezas que ya son commodities.
 
 ---
@@ -47,7 +47,7 @@ Es un complemento (capa de ejecución), no el núcleo.
 
 ## 2. Piezas de descubrimiento y observabilidad
 
-| Herramienta | Uso en iTier |
+| Herramienta | Uso en iTiers |
 |---|---|
 | **GLPI Agent** | Inventario nativo. Soporta remoto **sin agente** vía WinRM (Windows) y SSH (Linux/Unix), y descubrimiento SNMP barriendo rangos IP: switches, routers, impresoras, APs, teléfonos IP, UPS |
 | **Zabbix** | Eventos y métricas: SNMP, agente, IPMI, JMX, checks HTTP, low-level discovery, templates, triggers. Modelo proxy encaja perfecto con el appliance |
@@ -61,7 +61,7 @@ Es un complemento (capa de ejecución), no el núcleo.
 
 | Proyecto | Qué hace | Aplicabilidad |
 |---|---|---|
-| **HolmesGPT** (Robusta + Microsoft, CNCF Sandbox) | Agente de investigación de incidentes: bucle ReAct que recolecta contexto del stack de observabilidad y produce análisis de causa raíz. 30+ integraciones. Modo operador autónomo 24/7 | **Referencia de diseño muy fuerte.** Es lo más cercano a lo que iTier necesita, pero está centrado en Kubernetes/cloud-native. La PyME argentina tiene Windows Server, NAS y un firewall, no un cluster |
+| **HolmesGPT** (Robusta + Microsoft, CNCF Sandbox) | Agente de investigación de incidentes: bucle ReAct que recolecta contexto del stack de observabilidad y produce análisis de causa raíz. 30+ integraciones. Modo operador autónomo 24/7 | **Referencia de diseño muy fuerte.** Es lo más cercano a lo que iTiers necesita, pero está centrado en Kubernetes/cloud-native. La PyME argentina tiene Windows Server, NAS y un firewall, no un cluster |
 | **K8sGPT** (CNCF Sandbox) | Escáner basado en reglas que usa un LLM solo para explicar hallazgos | Patrón útil: **reglas deterministas primero, LLM para explicar y decidir** |
 | **Aurora (Arvo)** | AI SRE open source | Mismo sesgo cloud-native |
 
@@ -73,10 +73,10 @@ reutilizable: bucle agéntico + herramientas de observabilidad + RCA.
 
 ## 4. Estándares de interoperabilidad
 
-| Estándar | Estado (2026) | Rol en iTier |
+| Estándar | Estado (2026) | Rol en iTiers |
 |---|---|---|
 | **MCP** (Model Context Protocol) | Creado por Anthropic (nov-2024), hoy de facto. >97M descargas mensuales de SDK, >10.000 servidores en producción. Spec 2026-07-28 agrega core stateless, Extensions, Tasks, MCP Apps, hardening de autorización | **Capa de herramientas del agente.** Toda capacidad se expone como tool MCP tipada |
-| **A2A** (Agent2Agent) | Donado por Google a la Linux Foundation (jun-2025). +150 organizaciones, integrado en Azure AI Foundry / Copilot Studio y las tres nubes grandes. Spec 1.0 con Signed Agent Cards, multi-tenancy | **Fase 3.** Para que el agente de iTier hable con agentes de proveedores (ISP, fabricante de hardware, otro MSP) |
+| **A2A** (Agent2Agent) | Donado por Google a la Linux Foundation (jun-2025). +150 organizaciones, integrado en Azure AI Foundry / Copilot Studio y las tres nubes grandes. Spec 1.0 con Signed Agent Cards, multi-tenancy | **Fase 3.** Para que el agente de iTiers hable con agentes de proveedores (ISP, fabricante de hardware, otro MSP) |
 | **OpenTelemetry** | Estándar | Telemetría del propio agente (trazas del bucle, costo por decisión) |
 
 ---

@@ -1,6 +1,6 @@
-# iTier en el VPS (Fase 1 y 2)
+# iTiers en el VPS (Fase 1 y 2)
 
-Núcleo ITSM y observabilidad de iTier sobre tu propio VPS, servido detrás de un
+Núcleo ITSM y observabilidad de iTiers sobre tu propio VPS, servido detrás de un
 proxy que termina TLS. Camino recomendado: **Cloudflare Tunnel corriendo en este
 mismo VPS** (ver [Detrás de Cloudflare Tunnel](#detrás-de-cloudflare-tunnel)).
 Alternativa: NPM en otro VPS de la LAN. Corresponde a las Fases 1 y 2 del roadmap
@@ -252,7 +252,7 @@ respaldá la base.
 **¿Ya tenés un MeshCentral (p. ej. `remoto.pymesenlinea.com.ar`)?** Usalo: no levantes el contenedor de este compose.
 Saltá al paso 3 y cargá en el `.env` `ITIER_MESH_URL=https://remoto.pymesenlinea.com.ar` (si usás un *dominio* de MeshCentral
 con ruta, ej. `/cuyopack`, ponelo en la URL), una cuenta de servicio **sin 2FA** con permiso para crear grupos, y verificá que
-no tengas `lockAgentDownload` activado. Cada cliente de iTier tendrá su grupo `itier-<slug>` en ese servidor.
+no tengas `lockAgentDownload` activado. Cada cliente de iTiers tendrá su grupo `itier-<slug>` en ese servidor.
 Si no tenés uno, seguí los pasos 1-5: el compose levanta el servicio `meshcentral` con la imagen que publica
 `build-meshcentral.yml` (GHCR; si es privada, `docker login ghcr.io`). Si querés NO levantarlo, `docker compose up -d` con
 `--scale meshcentral=0`.
@@ -270,7 +270,7 @@ HTTPS/443 hacia el VPS: no hace falta túnel, VPN ni equipo central en el client
    y `ITIER_MESH_SUPPORT_GROUP=SOPORTE` (ver «Técnicos de soporte» abajo).
    `docker compose up -d` (recrea la consola y MeshCentral).
    La config de MeshCentral se reescribe sola en cada arranque desde el `.env` (no hace falta borrar volúmenes).
-   En el log tiene que aparecer `[iTier] config escrita: host=itier-mesh… puerto=4430`.
+   En el log tiene que aparecer `[iTiers] config escrita: host=itier-mesh… puerto=4430`.
 5. En la consola, ficha del cliente → **Reintentar aprovisionamiento**: crea el grupo `itier-<slug>` en MeshCentral.
    Desde ahí, **Instaladores** ya incluye el Mesh Agent en el instalador de Windows.
 

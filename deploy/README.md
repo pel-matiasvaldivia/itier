@@ -1,4 +1,4 @@
-# Despliegue de iTier
+# Despliegue de iTiers
 
 Manifiestos de despliegue para la topología real de este proyecto: el núcleo en
 un **VPS propio**, fronteado por un proxy que termina TLS, y el **agente en modo
@@ -22,7 +22,7 @@ local** en la LAN de cada cliente.
    │  (TLS Let's Encrypt)  │        │ │
    └──────────────────────┘        ▼ ▼
                         ┌───────────────────────────────────┐
-                        │  VPS de iTier  (deploy/vps/)       │
+                        │  VPS de iTiers  (deploy/vps/)       │
         IP-LAN:8884 ───▶│  glpi         (frontend)           │
         IP-LAN:8885 ───▶│  zabbix-web   (frontend)           │
         IP-LAN:8083 ───▶│  consola  (consola/) ─┐            │

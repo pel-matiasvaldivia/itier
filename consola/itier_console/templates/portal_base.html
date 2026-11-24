@@ -4,12 +4,12 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="robots" content="noindex, nofollow">
-  <title>{% block titulo %}Portal · iTier{% endblock %}</title>
+  <title>{% block titulo %}Portal · iTiers{% endblock %}</title>
   <link rel="stylesheet" href="/static/app.css?v={{ static_v('app.css') }}">
 </head>
 <body class="app">
   <header class="topbar">
-    <a class="brand" href="/portal">i<span>Tier</span> <small>portal</small></a>
+    <a class="brand" href="/portal">i<span>Tiers</span> <small>portal</small></a>
     <div class="topbar-right">
       {% if demo %}<span class="chip chip-demo">demo</span>{% endif %}
       <span class="who">{% if cli is defined and cli %}{{ cli.nombre }}{% else %}{{ user.user }}{% endif %}</span>

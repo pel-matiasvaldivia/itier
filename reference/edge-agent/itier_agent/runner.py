@@ -1,4 +1,4 @@
-"""Orquestador del bucle de eventos de iTier — el "encendido" de la Fase 3.
+"""Orquestador del bucle de eventos de iTiers — el "encendido" de la Fase 3.
 
 Toma eventos de una `FuenteDeEventos`, los **deduplica** dentro de una ventana,
 frena **tormentas** de eventos por CI, arma el disparador y lo **despacha** al
@@ -125,7 +125,7 @@ class Runner:
             if self.tickets is not None and ticket_id:
                 self.tickets.anotar(
                     ticket_id,
-                    f"iTier — triage automático. Evento {ev.origen}:{ev.id} sobre "
+                    f"iTiers — triage automático. Evento {ev.origen}:{ev.id} sobre "
                     f"{ev.host or ev.ci_id or '—'} (severidad {ev.severidad}): {ev.disparador}. "
                     "Pendiente de diagnóstico por un técnico (razonamiento del LLM no disponible).",
                 )

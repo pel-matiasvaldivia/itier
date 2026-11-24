@@ -23,13 +23,13 @@ graph TB
         EP["Endpoints<br/>Windows · macOS · Linux"]
         NET["Red<br/>switches · APs · firewall · UPS · impresoras"]
         SRV["Servidores<br/>AD · archivos · NAS · hipervisor"]
-        APP["<b>iTier Appliance</b><br/>mini-PC o VM"]
+        APP["<b>iTiers Appliance</b><br/>mini-PC o VM"]
         EP --- APP
         NET --- APP
         SRV --- APP
     end
 
-    subgraph CTRL["☁️ Plano de control iTier (SaaS del proveedor)"]
+    subgraph CTRL["☁️ Plano de control iTiers (SaaS del proveedor)"]
         FLEET["Gestión de flota<br/>enrolamiento · config · updates"]
         APRO["Cola de aprobaciones<br/>web · móvil"]
         KB["Registro de playbooks<br/>y base de conocimiento"]
@@ -59,7 +59,7 @@ graph TB
 
 ```mermaid
 graph LR
-    subgraph EDGE["iTier Appliance"]
+    subgraph EDGE["iTiers Appliance"]
         direction TB
 
         subgraph ING["Ingesta"]

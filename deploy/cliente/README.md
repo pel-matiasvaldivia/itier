@@ -1,4 +1,4 @@
-# iTier lado del cliente (modo local)
+# iTiers lado del cliente (modo local)
 
 Se despliega **una instancia por cliente**, en su propia LAN. Es la parte que,
 según el diseño (`docs/02-arquitectura.md`, ADR-0005), vive en el borde y habla
@@ -82,7 +82,7 @@ Todo sale preconfigurado de la consola: **Clientes → \<cliente\> → Instalado
    (autorregistro por metadata) que la consola crea en el alta.
 
 Al terminar, el instalador **muestra el resultado** (servicios corriendo y
-conexión con iTier, en verde/rojo) y la ventana queda abierta hasta que se
+conexión con iTiers, en verde/rojo) y la ventana queda abierta hasta que se
 presiona una tecla. También lo **reporta a la consola**: en *Instaladores →
 Equipos instalados* se ve cada equipo, si instaló bien y si ya está transmitiendo.
 
@@ -181,7 +181,7 @@ tres cosas que alimentan el CMDB de GLPI:
 > recibe del server al contactarlo. Así no hay secretos SNMP regados por cada LAN y
 > el scope de descubrimiento se maneja central.
 
-**Paso del operador, una vez por cliente — desde la consola de iTier:** en
+**Paso del operador, una vez por cliente — desde la consola de iTiers:** en
 *Clientes → \<cliente\> → Descubrimiento de red* cargás los rangos de IP y la
 credencial SNMP (v1/v2c o v3); la consola los crea en GLPI, en la entidad del
 cliente, y los deja listos para el barrido. (También se puede a mano en GLPI →

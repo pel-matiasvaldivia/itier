@@ -56,7 +56,7 @@ automática: requiere acción deliberada.
 Ninguna evidencia levanta estos techos. Nunca superan L2:
 otorgar acceso · destruir datos sin reversión verificada · tocar el controlador de
 dominio, el firewall perimetral o el sistema de backup · modificar la configuración del
-propio iTier · cualquier cosa con impacto financiero.
+propio iTiers · cualquier cosa con impacto financiero.
 
 ## Fundamentos
 

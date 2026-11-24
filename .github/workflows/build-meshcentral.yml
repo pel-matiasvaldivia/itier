@@ -1,6 +1,6 @@
 name: build-meshcentral
 
-# Construye y publica la imagen de MeshCentral de iTier a GHCR (capa fina sobre la
+# Construye y publica la imagen de MeshCentral de iTiers a GHCR (capa fina sobre la
 # imagen oficial con la versión fijada en deploy/meshcentral/Dockerfile). El VPS
 # solo hace `pull`. En pull requests solo construye, no publica.
 

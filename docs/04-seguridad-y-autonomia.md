@@ -70,14 +70,14 @@ Sin importar la evidencia acumulada:
 - Cualquier cosa que **otorgue o amplíe acceso** (permisos, grupos, membresías, roles)
 - Cualquier cosa que **destruya datos** sin reversión verificada (borrado, formateo, purga)
 - Cualquier cosa sobre un **controlador de dominio**, el firewall perimetral o el sistema de backup
-- Cualquier cosa que **modifique la configuración del propio iTier** o de sus políticas
+- Cualquier cosa que **modifique la configuración del propio iTiers** o de sus políticas
 - Cualquier cosa con **impacto financiero** (compras, renovaciones, altas de licencia)
 
 ---
 
 ## Modelo de amenazas contra ASI Top 10
 
-| ID | Riesgo | Cómo se mitiga en iTier |
+| ID | Riesgo | Cómo se mitiga en iTiers |
 |---|---|---|
 | **ASI01** | **Agent Goal Hijack** — manipulación de los objetivos del agente vía prompts, documentos envenenados, salidas de herramientas engañosas o datos externos corrompidos | Todo texto que provenga del entorno del cliente (logs, descripciones de tickets, contenido de archivos, nombres de CI, salidas de comandos) se trata como **dato no confiable**, envuelto en delimitadores y nunca como instrucción. El agente no puede alterar su propia política ni sus propias herramientas. Las instrucciones operativas viajan por el canal de sistema, no por el contenido |
 | **ASI02** | **Tool Misuse and Exploitation** — uso indebido de herramientas por un agente comprometido | Superficie MCP cerrada y tipada: sin `run_shell`, sin `execute_sql`, sin HTTP genérico. Cada tool valida sus parámetros con esquema estricto. Los playbooks son de un catálogo firmado; el agente elige por nombre, no compone comandos |

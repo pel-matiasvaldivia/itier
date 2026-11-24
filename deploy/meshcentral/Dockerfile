@@ -1,4 +1,4 @@
-# iTier — imagen de MeshCentral (soporte remoto y estado de equipos, ADR-0011).
+# iTiers — imagen de MeshCentral (soporte remoto y estado de equipos, ADR-0011).
 # Capa fina sobre la imagen oficial, con la versión FIJADA: el VPS hace `pull` de
 # nuestra imagen (GHCR) y no depende de un `latest` que cambie solo. Para
 # actualizar, subí MESH_VERSION y dejá que build-meshcentral.yml publique.
@@ -18,6 +18,6 @@ RUN chmod 755 /opt/meshcentral/itier-entrypoint.sh
 ENTRYPOINT ["/bin/bash", "/opt/meshcentral/itier-entrypoint.sh"]
 
 LABEL org.opencontainers.image.title="itier-meshcentral" \
-      org.opencontainers.image.description="MeshCentral para iTier (soporte remoto)" \
+      org.opencontainers.image.description="MeshCentral para iTiers (soporte remoto)" \
       org.opencontainers.image.source="https://github.com/pel-matiasvaldivia/itier" \
       itier.meshcentral.version="${MESH_VERSION}"

@@ -1,4 +1,4 @@
-"""Demo del bucle de iTier.
+"""Demo del bucle de iTiers.
 
     python -m itier_agent.demo
 
@@ -172,7 +172,7 @@ def demo_agente() -> None:
 
 def main() -> None:
     print("\n╔══════════════════════════════════════════════════════════════════════╗")
-    print("║  iTier — demo del esqueleto de referencia                            ║")
+    print("║  iTiers — demo del esqueleto de referencia                            ║")
     print("╚══════════════════════════════════════════════════════════════════════╝")
     demo_politicas()
     demo_auditoria()

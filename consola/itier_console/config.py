@@ -151,7 +151,7 @@ class Config:
             # TLS). Para probar en http://localhost poné ITIER_CONSOLE_COOKIE_SECURE=0.
             cookie_secure=_bool(os.environ.get("ITIER_CONSOLE_COOKIE_SECURE"), True),
             session_max_age=int(os.environ.get("ITIER_CONSOLE_SESSION_MAX_AGE", "28800")),
-            totp_issuer=os.environ.get("ITIER_CONSOLE_TOTP_ISSUER", "iTier"),
+            totp_issuer=os.environ.get("ITIER_CONSOLE_TOTP_ISSUER", "iTiers"),
             admin_user=os.environ.get("ITIER_CONSOLE_ADMIN_USER") or None,
             admin_password=os.environ.get("ITIER_CONSOLE_ADMIN_PASSWORD") or None,
             lockout_threshold=int(os.environ.get("ITIER_CONSOLE_LOCKOUT_THRESHOLD", "5")),

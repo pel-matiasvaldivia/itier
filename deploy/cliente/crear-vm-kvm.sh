@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ─────────────────────────────────────────────────────────────────────────────
-# iTier — crea en un host KVM/libvirt la VM del appliance de un cliente
+# iTiers — crea en un host KVM/libvirt la VM del appliance de un cliente
 # (Debian 12 cloud image + cloud-init) y corre el instalador en el primer arranque.
 # Ejecutar COMO ROOT en el host KVM:
 #
@@ -45,7 +45,7 @@ virsh dominfo "$VM" >/dev/null 2>&1 && { echo "Ya existe la VM $VM." >&2; exit 1
 
 BASE="$DIR/debian-12-genericcloud-amd64.qcow2"
 if [ ! -s "$BASE" ]; then
-  echo "[iTier] Descargando Debian 12 cloud image…"
+  echo "[iTiers] Descargando Debian 12 cloud image…"
   mkdir -p "$DIR"; curl -fL --retry 3 -o "$BASE" "$IMG_URL"
 fi
 DISK="$DIR/$VM.qcow2"; SEED="$DIR/$VM-seed.iso"
@@ -92,7 +92,7 @@ if command -v osinfo-query >/dev/null; then
   done
 fi
 
-echo "[iTier] Creando la VM $VM en el bridge $BRIDGE…"
+echo "[iTiers] Creando la VM $VM en el bridge $BRIDGE…"
 virt-install --name "$VM" --memory "$RAM" --vcpus "$CORES" --cpu host-passthrough \
   --disk "path=$DISK,format=qcow2,bus=virtio" --disk "path=$SEED,device=cdrom" \
   --network "bridge=$BRIDGE,model=virtio" $OSARG --import \
@@ -102,12 +102,12 @@ virsh autostart "$VM" >/dev/null
 
 cat <<FIN
 
-[iTier] VM $VM creada y arrancando. El instalador corre solo en el primer boot
+[iTiers] VM $VM creada y arrancando. El instalador corre solo en el primer boot
 (unos 5-10 min: descarga Docker e imágenes). Seguimiento:
   virsh qemu-agent-command $VM '{"execute":"guest-exec","arguments":{"path":"/usr/bin/tail","arg":["-n","30","/var/log/itier-instalacion.log"],"capture-output":true}}'
   (o entrá por SSH con --ssh-key:  ssh soporte@<IP>  y  sudo tail -f /var/log/itier-instalacion.log)
 IP de la VM:  virsh domifaddr $VM --source agent
-La consola de iTier marca "Instalado" en Instaladores cuando termina.
+La consola de iTiers marca "Instalado" en Instaladores cuando termina.
 Por seguridad borrá la imagen de arranque (contiene el enlace de un solo uso):
   virsh domblklist $VM    # (el CD-ROM es el de la ISO «-seed»)  →  virsh change-media $VM <destino> --eject --config; rm -f "$SEED"
 FIN

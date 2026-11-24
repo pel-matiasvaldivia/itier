@@ -100,7 +100,7 @@ def _cmd_list(conn, _args) -> None:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(prog="itier-console-admin", description="Administración de operadores de la consola de iTier.")
+    parser = argparse.ArgumentParser(prog="itier-console-admin", description="Administración de operadores de la consola de iTiers.")
     sub = parser.add_subparsers(dest="cmd", required=True)
 
     p = sub.add_parser("add", help="crear un operador")

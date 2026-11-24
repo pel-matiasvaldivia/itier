@@ -6,7 +6,7 @@ Cinco fases. Cada una con un criterio de salida verificable — no se avanza sin
 gantt
     dateFormat YYYY-MM
     axisFormat %b %Y
-    title Fases de iTier
+    title Fases de iTiers
 
     section F1 · Cimiento
     Appliance + CMDB + inventario     :f1, 2026-09, 3M
@@ -144,7 +144,7 @@ El agente entra, pero **no toca nada**. Solo observa y recomienda.
 
 | Iniciativa | Motivo |
 |---|---|
-| **A2A** (Agent2Agent) | Que el agente de iTier negocie con agentes de proveedores: ISP, fabricante de hardware, otro MSP. El estándar ya está en Linux Foundation con spec 1.0 y Signed Agent Cards |
+| **A2A** (Agent2Agent) | Que el agente de iTiers negocie con agentes de proveedores: ISP, fabricante de hardware, otro MSP. El estándar ya está en Linux Foundation con spec 1.0 y Signed Agent Cards |
 | **Service Level Management** | Cuando los clientes tengan SLAs formales que gestionar |
 | **Capacity & Performance** | Requiere 6+ meses de series históricas por cliente |
 | **Modelo local para pre-filtrado** | Reevaluar solo si el hardware de borde mejora sustancialmente. Hoy no cierra: un Pi 5 hace 5–15 tok/s en modelos de 1,5 B, insuficiente para un bucle con herramientas |

@@ -1,10 +1,10 @@
 #Requires -RunAsAdministrator
 <#
-  iTier - instalador para equipos Windows del cliente "@@TENANT@@"
-  Generado por la consola de iTier. Instala, en silencio y como servicios:
+  iTiers - instalador para equipos Windows del cliente "@@TENANT@@"
+  Generado por la consola de iTiers. Instala, en silencio y como servicios:
     - GLPI Agent      : inventario del equipo hacia GLPI (con el tag del cliente)
     - Mesh Agent      : soporte remoto y estado del equipo (conexion saliente por HTTPS/443)
-    - Zabbix Agent 2  : monitoreo, reportando al equipo central de iTier
+    - Zabbix Agent 2  : monitoreo, reportando al equipo central de iTiers
 
   Hay dos roles (-Rol):
     equipo  (por defecto) GLPI Agent + Zabbix Agent 2. Zabbix reporta al equipo central
@@ -24,7 +24,7 @@
 #>
 param(
   [switch]$SinMesh,
-  # IP del appliance de iTier en la LAN del cliente (donde corre el zabbix-proxy).
+  # IP del appliance de iTiers en la LAN del cliente (donde corre el zabbix-proxy).
   [ValidateSet("equipo", "central")]
   [string]$Rol = "@@ROL@@",
   [string]$ProxyHost = "@@PROXY_IP@@",
@@ -55,7 +55,7 @@ $Log        = Join-Path $LogDir "instalador.log"
 function Anotar([string]$Texto) {
   $linea = "{0} {1}" -f (Get-Date -Format "s"), $Texto
   Add-Content -Path $Log -Value $linea
-  Write-Host "[iTier] $Texto"
+  Write-Host "[iTiers] $Texto"
 }
 
 function Instalar-Msi([string]$Nombre, [string]$Url, [string[]]$Propiedades) {
@@ -214,7 +214,7 @@ if (-not $SinGlpi) {
   } catch { Anotar ("No se pudo actualizar la configuracion de GLPI Agent: " + $_.Exception.Message) }
 }
 
-# --- Verificacion: servicios corriendo y conexion con iTier -----------------
+# --- Verificacion: servicios corriendo y conexion con iTiers -----------------
 $GlpiSvc = "omitido"; $GlpiCon = "omitido"; $ZbxSvc = "omitido"; $ZbxCon = "omitido"
 Write-Host ""
 Write-Host "==================== RESULTADO DE LA INSTALACION ====================" -ForegroundColor Cyan
@@ -260,7 +260,7 @@ $Estado = "ok"
 if ($Detalle -or $Mal) { $Estado = "error" }
 if (-not $Detalle -and $GlpiCon -eq "dns_no_resuelve") { $Detalle = "El nombre del servidor de inventario no existe en DNS: $(([Uri]$GlpiServer).Host)" }
 
-# --- Aviso a la consola de iTier (best-effort) ------------------------------
+# --- Aviso a la consola de iTiers (best-effort) ------------------------------
 $Avisado = $false
 if ($ReportUrl) {
   try {

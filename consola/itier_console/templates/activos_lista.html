@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block titulo %}Activos · {{ cli.nombre }} · Consola de iTier{% endblock %}
+{% block titulo %}Activos · {{ cli.nombre }} · Consola de iTiers{% endblock %}
 {% macro agente(a) -%}
   {%- if a.glpi_id -%}
     <span class="l-pill {{ {'al_dia': 'ok', 'atrasado': 'warn', 'sin_reportar': 'bad'}.get(a.agente, 'off') }}" title="Último inventario del agente de GLPI">{{ {'al_dia': 'Reportando', 'atrasado': 'Atrasado', 'sin_reportar': 'Sin reportar'}.get(a.agente, 'Vinculado') }}</span>

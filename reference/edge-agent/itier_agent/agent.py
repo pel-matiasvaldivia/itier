@@ -1,4 +1,4 @@
-"""Bucle del agente de iTier.
+"""Bucle del agente de iTiers.
 
 El bucle corre en el appliance, dentro de la red del cliente. Solo la inferencia
 sale, a través del gateway del plano de control (ver ADR-0002).
@@ -32,7 +32,7 @@ from .tools import TOOLS, Contexto, instalar_contexto
 # ---------------------------------------------------------------------------
 
 SYSTEM_PROMPT = """\
-Sos el agente de operaciones de iTier, una plataforma de gestión de servicios de IT
+Sos el agente de operaciones de iTiers, una plataforma de gestión de servicios de IT
 (ITSM) para pequeñas y medianas empresas. Trabajás junto a un técnico humano que
 atiende varias empresas a la vez y que no tiene tiempo de leer de más.
 
@@ -58,7 +58,7 @@ servidor de archivos que sostiene el ERP no es la misma acción que sobre una im
 
 ## Sobre actuar
 
-Vos proponés; el motor de políticas de iTier decide. Cuando llamás a una herramienta de
+Vos proponés; el motor de políticas de iTiers decide. Cuando llamás a una herramienta de
 remediación, el sistema evalúa el nivel de autonomía efectivo y puede ejecutar la
 acción, encolarla para aprobación humana, dejarla como recomendación, o denegarla. Los
 cuatro resultados son respuestas válidas, no errores.

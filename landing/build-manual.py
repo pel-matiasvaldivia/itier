@@ -138,8 +138,8 @@ PLANTILLA = r"""<!doctype html>
 <meta name="color-scheme" content="light">
 <meta name="theme-color" content="#4f46e5">
 <meta name="robots" content="noindex, nofollow">
-<title>Manual de operaciones · iTier</title>
-<meta name="description" content="Manual de procesos y procedimientos para operar la plataforma iTier.">
+<title>Manual de operaciones · iTiers</title>
+<meta name="description" content="Manual de procesos y procedimientos para operar la plataforma iTiers.">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%234f46e5'/%3E%3Cstop offset='1' stop-color='%230ea5e9'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='32' height='32' rx='8' fill='url(%23g)'/%3E%3Cg fill='%23fff'%3E%3Crect x='8' y='19' width='16' height='4' rx='2'/%3E%3Crect x='10' y='13' width='12' height='4' rx='2' opacity='.8'/%3E%3Crect x='12' y='7' width='8' height='4' rx='2' opacity='.6'/%3E%3C/g%3E%3C/svg%3E">
 <style>
   :root{
@@ -253,12 +253,12 @@ PLANTILLA = r"""<!doctype html>
   <div class="topbar-in">
     <a class="brand" href="index.html">
       <svg class="mark" viewBox="0 0 32 32" aria-hidden="true"><defs><linearGradient id="lg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#4f46e5"/><stop offset="1" stop-color="#0ea5e9"/></linearGradient></defs><rect width="32" height="32" rx="8" fill="url(#lg)"/><g fill="#fff"><rect x="8" y="19" width="16" height="4" rx="2"/><rect x="10" y="13" width="12" height="4" rx="2" opacity=".82"/><rect x="12" y="7" width="8" height="4" rx="2" opacity=".6"/></g></svg>
-      iTier <small>Manual de operaciones</small>
+      iTiers <small>Manual de operaciones</small>
     </a>
     <div class="top-actions">
       <button class="toc-toggle" id="tocToggle" aria-expanded="false">Contenido ▾</button>
       <a class="hide-sm" href="index.html">← Volver al inicio</a>
-      <a class="btn hide-sm" href="mailto:matiasvaldivia@pymesenlinea.com.ar?subject=Consulta%20sobre%20iTier">Contacto</a>
+      <a class="btn hide-sm" href="mailto:matiasvaldivia@pymesenlinea.com.ar?subject=Consulta%20sobre%20iTiers">Contacto</a>
     </div>
   </div>
 </div>
@@ -275,7 +275,7 @@ PLANTILLA = r"""<!doctype html>
 
 <footer>
   <div class="foot-in">
-    <span>© 2026 iTier — una solución de Pymes en Línea.</span>
+    <span>© 2026 iTiers — una solución de Pymes en Línea.</span>
     <span><a href="index.html">itier.pymesenlinea.com.ar</a> · Documento interno de operaciones</span>
   </div>
 </footer>

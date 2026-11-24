@@ -1,4 +1,4 @@
-# iTier — lado del cliente, en modo local (una instancia por cliente).
+# iTiers — lado del cliente, en modo local (una instancia por cliente).
 #
 # Corre en la LAN de cada cliente (mini-PC x86 del appliance, o la sonda
 # Raspberry Pi del perfil reducido; ver docs/adr/ADR-0007). Cuatro piezas:

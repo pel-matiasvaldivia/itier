@@ -110,7 +110,7 @@ class MeshClient:
         completo = self._buscar(nombre)
         if not completo:
             self._pedir({"action": "createmesh", "meshname": nombre, "meshtype": 2,
-                         "desc": "Cliente iTier"}, "createmesh")
+                         "desc": "Cliente iTiers"}, "createmesh")
             completo = self._buscar(nombre)
         if not completo:
             raise AdapterError("mesh", f"se creó el grupo «{nombre}» pero no aparece en la lista")
@@ -134,7 +134,7 @@ class MeshClient:
             return gid
         try:
             r = self._pedir({"action": "createusergroup", "name": nombre,
-                             "desc": "Técnicos de soporte iTier"}, "createusergroup")
+                             "desc": "Técnicos de soporte iTiers"}, "createusergroup")
         except AdapterError as e:
             raise AdapterError("mesh", f"no se pudo crear el grupo de usuarios «{nombre}» ({e.detalle}). Creálo en MeshCentral "
                                "(Mis usuarios → Grupos de usuarios) o dale a la cuenta de servicio el permiso "
@@ -161,7 +161,7 @@ class MeshClient:
 
     # -- usuarios de plataforma (técnicos / PM / administradores) ---------------
 
-    # rol de iTier → derechos de sitio en Mesh. 64 = «no puede crear grupos de equipos»;
+    # rol de iTiers → derechos de sitio en Mesh. 64 = «no puede crear grupos de equipos»;
     # 32 = cuenta bloqueada. La cuenta de servicio necesita «Gestionar usuarios» (y ser administradora
     # completa para crear otros administradores).
     DERECHOS_SITIO = {"admin": 0xFFFFFFFF, "pm": 64, "tecnico": 64}

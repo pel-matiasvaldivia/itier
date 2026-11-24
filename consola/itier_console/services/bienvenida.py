@@ -14,7 +14,7 @@ from . import manual
 
 def _sistemas(cfg) -> list[tuple[str, str, str]]:
     """(sistema, URL, para qué) de los que están disponibles."""
-    s = [("Consola de iTier", cfg.console_public_url or "(consultá la dirección a tu administrador)",
+    s = [("Consola de iTiers", cfg.console_public_url or "(consultá la dirección a tu administrador)",
           "operación diaria: clientes, equipos, tickets y conexión remota")]
     if cfg.public_glpi_url:
         s.append(("GLPI", cfg.public_glpi_url, "tickets e inventario"))
@@ -32,11 +32,11 @@ def armar(cfg, usuario: str, nombre: str, rol: str, clave: str, motivo: str = "a
     saludo = (nombre or usuario).split(" ")[0]
     url_manual = f"{cfg.console_public_url}/manual" if cfg.console_public_url else ""
     if motivo == "reinicio":
-        asunto = "iTier: tu clave fue reiniciada"
-        intro = "Un administrador reinició tu clave de la plataforma iTier. Estos son tus nuevos datos de acceso."
+        asunto = "iTiers: tu clave fue reiniciada"
+        intro = "Un administrador reinició tu clave de la plataforma iTiers. Estos son tus nuevos datos de acceso."
     else:
-        asunto = f"Bienvenido/a a la plataforma iTier — rol {m['rol_nombre']}"
-        intro = (f"Se dio de alta tu usuario en la plataforma iTier con el rol «{m['rol_nombre']}». "
+        asunto = f"Bienvenido/a a la plataforma iTiers — rol {m['rol_nombre']}"
+        intro = (f"Se dio de alta tu usuario en la plataforma iTiers con el rol «{m['rol_nombre']}». "
                  "Estos son tus datos de acceso, tus responsabilidades y el manual de operación de tu perfil.")
     pasos_ingreso = [
         "Entrá a la consola con el usuario y la clave temporal de abajo.",

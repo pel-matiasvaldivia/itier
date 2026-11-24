@@ -1,8 +1,8 @@
 @echo off
 setlocal
-title iTier - Instalador
+title iTiers - Instalador
 rem ---------------------------------------------------------------------------
-rem  iTier - instalador para equipos Windows del cliente "@@TENANT@@"
+rem  iTiers - instalador para equipos Windows del cliente "@@TENANT@@"
 rem  Doble clic: pide permisos de administrador (UAC) una sola vez y despues
 rem  instala todo en silencio, como servicios. No contiene secretos.
 rem ---------------------------------------------------------------------------
@@ -12,7 +12,7 @@ if %errorlevel% neq 0 (
   powershell -NoProfile -ExecutionPolicy Bypass -Command "Start-Process -FilePath '%~f0' -Verb RunAs"
   exit /b 0
 )
-echo Instalando iTier. No cierre esta ventana: al terminar muestra el resultado...
+echo Instalando iTiers. No cierre esta ventana: al terminar muestra el resultado...
 powershell -NoProfile -ExecutionPolicy Bypass -Command "$s=[IO.File]::ReadAllText('%~f0'); $i=$s.LastIndexOf('#__ITIER_' + 'PS__'); & ([scriptblock]::Create($s.Substring($i)))"
 set RC=%errorlevel%
 echo.

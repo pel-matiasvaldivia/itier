@@ -1,4 +1,4 @@
-# iTier — GLPI Agent (inventario + descubrimiento de red por SNMP).
+# iTiers — GLPI Agent (inventario + descubrimiento de red por SNMP).
 #
 # No existe imagen oficial del agente de GLPI (el repo oficial publica solo el
 # SERVER, y el paquete tampoco está en los repos de Debian). La construimos desde

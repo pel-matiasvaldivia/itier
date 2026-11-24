@@ -20,7 +20,7 @@ primera encarnación: una web de operación.
 
 ## Decisión
 
-Construir la **Consola de iTier**: una web de operación que es la **cara única**
+Construir la **Consola de iTiers**: una web de operación que es la **cara única**
 de la plataforma y un **backend-for-frontend (BFF)** sobre GLPI y Zabbix. No
 reemplaza a esos sistemas —siguen siendo la fuente de verdad— sino que los
 **orquesta por sus APIs** detrás de flujos de alto nivel.
@@ -50,7 +50,7 @@ formulario lo que antes eran pasos manuales en dos sistemas.
 
 ## Fundamentos
 
-- **Un producto necesita una cara.** Vender "GLPI + Zabbix" no es vender iTier.
+- **Un producto necesita una cara.** Vender "GLPI + Zabbix" no es vender iTiers.
   La consola es donde la propuesta de valor se vuelve tangible y donde, en fases
   próximas, aterrizan la UI de propuestas (F3) y la cola de aprobaciones (F4).
 - **La identidad y la auditoría son parte del producto de seguridad.** Un MSP que

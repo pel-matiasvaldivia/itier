@@ -1,6 +1,6 @@
 #!/bin/sh
 # Arranca el GLPI Agent como daemon (solo saliente, sin httpd) apuntando al
-# endpoint del plugin GlpiInventory del server de iTier. Los RANGOS de IP y las
+# endpoint del plugin GlpiInventory del server de iTiers. Los RANGOS de IP y las
 # CREDENCIALES SNMP se definen del lado del server (GlpiInventory), no acá: el
 # agente pide su trabajo de netdiscovery/netinventory al contactar al server.
 set -eu

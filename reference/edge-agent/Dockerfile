@@ -1,4 +1,4 @@
-# Imagen del agente de borde de iTier.
+# Imagen del agente de borde de iTiers.
 #
 # Multi-arch (amd64 + arm64): corre en el mini-PC x86 del appliance estándar y
 # en la Raspberry Pi 5 del perfil sonda. Ver docs/adr/ADR-0007.

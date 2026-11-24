@@ -1,6 +1,6 @@
 name: build-openwa
 
-# Construye y publica la imagen de OpenWA de iTier a GHCR (capa fina sobre la
+# Construye y publica la imagen de OpenWA de iTiers a GHCR (capa fina sobre la
 # imagen oficial con la librería v5 fijada en deploy/openwa/Dockerfile). El VPS
 # solo hace `pull`. En pull requests solo construye, no publica.
 

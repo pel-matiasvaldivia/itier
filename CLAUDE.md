@@ -1,4 +1,4 @@
-# Reglas del proyecto iTier
+# Reglas del proyecto iTiers
 
 ## Interfaz responsiva (obligatorio en todo cambio de pantalla)
 Toda pantalla nueva o modificada de `consola/` debe verse bien en celular (390 px), tablet (820 px), laptop (1366 px) y monitor ancho (1900 px), sin scroll horizontal de la página.

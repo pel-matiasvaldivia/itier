@@ -168,7 +168,7 @@ REGLAS = [
 ESCALAMIENTO = {
     "tecnico": "Dudas o problemas que no resolvés: PM. Seguridad o accesos: Administrador.",
     "pm": "Plataforma, permisos o usuarios: Administrador.",
-    "admin": "Fallas de plataforma que no podés resolver: proveedor del servicio iTier.",
+    "admin": "Fallas de plataforma que no podés resolver: proveedor del servicio iTiers.",
 }
 
 

@@ -71,7 +71,7 @@ class FuenteZabbix:
     no hay cliente HTTP (misma disciplina que `tools.py`).
     """
 
-    # severity de Zabbix (0..5) → texto de iTier.
+    # severity de Zabbix (0..5) → texto de iTiers.
     _SEV = {
         "0": "no_clasificada", "1": "informacion", "2": "advertencia",
         "3": "media", "4": "alta", "5": "critica",

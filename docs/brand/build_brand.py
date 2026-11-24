@@ -1,4 +1,4 @@
-"""Genera los logos de iTier como SVG (texto convertido a trazos con Inter ExtraBold, licencia OFL).
+"""Genera los logos de iTiers como SVG (texto convertido a trazos con Inter ExtraBold, licencia OFL).
 Uso: python3 build_brand.py   (requiere fonttools)"""
 from fontTools.ttLib import TTFont
 from fontTools.pens.svgPathPen import SVGPathPen
@@ -34,13 +34,13 @@ def tile(r=15):
     return f'<rect width="64" height="64" rx="{r}" fill="url(#g)"/>'
 
 
-def svg(w, h, body, defs=GRAD, title="iTier"):
+def svg(w, h, body, defs=GRAD, title="iTiers"):
     return (f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {w} {h}" width="{w}" height="{h}" role="img" aria-label="{title}">'
             f'<title>{title}</title><defs>{defs}</defs>{body}</svg>\n')
 
 
 def horizontal(ink, fondo=None, mono=None):
-    d, ancho = texto("iTier", 46, 78, 47, -1)
+    d, ancho = texto("iTiers", 46, 78, 47, -1)
     cuerpo = ""
     if fondo:
         cuerpo += f'<rect width="{int(78+ancho+24)}" height="64" fill="{fondo}"/>'

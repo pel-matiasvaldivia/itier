@@ -3,7 +3,7 @@
 Decisión (ADR-0008): la consola gestiona sus propios usuarios. Las contraseñas se
 guardan con Argon2id; el segundo factor es TOTP (compatible con Google/Microsoft
 Authenticator, Aegis, etc.). Sin proveedores externos: identidad y auditoría 100%
-dentro de iTier.
+dentro de iTiers.
 """
 
 from __future__ import annotations

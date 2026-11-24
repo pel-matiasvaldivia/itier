@@ -1,4 +1,4 @@
-"""Punto de entrada de servicio del agente iTier.
+"""Punto de entrada de servicio del agente iTiers.
 
 Valida la configuración, expone un health check y, de forma **opt-in**
 (ITIER_AGENT_LOOP=1), arranca el bucle de eventos de la Fase 3
@@ -234,12 +234,12 @@ def main() -> None:
     _MODO = _arrancar_bucle(parar)
     if _MODO == "esqueleto":
         log.info(
-            "Agente iTier en modo esqueleto. Health en :%d/healthz y :%d/readyz. "
+            "Agente iTiers en modo esqueleto. Health en :%d/healthz y :%d/readyz. "
             "No se procesan eventos (activá el bucle con ITIER_AGENT_LOOP=1).",
             PUERTO, PUERTO,
         )
     else:
-        log.info("Agente iTier con bucle de eventos (modo=%s). Health en :%d.", _MODO, PUERTO)
+        log.info("Agente iTiers con bucle de eventos (modo=%s). Health en :%d.", _MODO, PUERTO)
 
     def _apagar(*_a) -> None:
         log.info("Señal de apagado recibida, cerrando.")

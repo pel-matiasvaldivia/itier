@@ -1,4 +1,4 @@
-# Consola de iTier — imagen de la web del plano de control.
+# Consola de iTiers — imagen de la web del plano de control.
 # Sin compilación nativa: argon2-cffi/segno/httpx/uvicorn traen wheels, así que
 # una imagen slim alcanza. Corre como usuario no-root; el estado vive en /data.
 FROM python:3.12-slim

@@ -239,7 +239,7 @@ Es lo que hace que el cliente número 50 se atienda mejor que el cliente número
 | Estándar | Cómo se usa |
 |---|---|
 | **ITIL 4** | Vocabulario y estructura de prácticas. No se busca certificación, se busca disciplina de proceso |
-| **ISO/IEC 20000-1** | Referencia para clientes que necesiten demostrar gestión de servicios. El modelo de datos y la auditoría de iTier son compatibles con sus requisitos de evidencia |
+| **ISO/IEC 20000-1** | Referencia para clientes que necesiten demostrar gestión de servicios. El modelo de datos y la auditoría de iTiers son compatibles con sus requisitos de evidencia |
 | **ISO/IEC 19770-1** | Modelo de ciclo de vida de activos de software para la práctica de ITAM |
 | **NIST CSF 2.0** | Marco para la postura de seguridad reportada al cliente (Identify / Protect / Detect / Respond / Recover), que se alimenta del inventario y del estado de parches |
 | **CIS Benchmarks** | Línea base de hardening del propio appliance y de las verificaciones de configuración que el agente evalúa en los CIs del cliente |

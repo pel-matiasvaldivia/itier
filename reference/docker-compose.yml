@@ -1,4 +1,4 @@
-# Forma del despliegue en el appliance de iTier.
+# Forma del despliegue en el appliance de iTiers.
 #
 # Ilustrativo: fija la topología de servicios y los límites de seguridad, no es
 # un compose listo para producción (faltan secretos reales, healthchecks

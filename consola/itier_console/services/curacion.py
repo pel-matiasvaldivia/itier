@@ -18,7 +18,7 @@ _NOMBRE_A_CLAVE = {v: k for k, v in CRITICIDADES.items()}
 
 
 def listar(cfg, cli: dict) -> list[dict]:
-    """CIs del cliente con su criticidad actual (clave iTier + nombre GLPI)."""
+    """CIs del cliente con su criticidad actual (clave iTiers + nombre GLPI)."""
     entity = cli.get("glpi_entity_id")
     if not entity:
         return []

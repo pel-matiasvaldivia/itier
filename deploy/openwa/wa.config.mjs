@@ -1,4 +1,4 @@
-// Configuración de OpenWA v5 para iTier. Todo lo variable viene de variables de entorno.
+// Configuración de OpenWA v5 para iTiers. Todo lo variable viene de variables de entorno.
 // El webhook entrega cada mensaje entrante a la consola (POST con el token en la URL).
 const url = process.env.ITIER_WEBHOOK_URL;
 const secret = process.env.ITIER_WEBHOOK_SECRET;

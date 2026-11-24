@@ -18,7 +18,7 @@ Todos los precios de API son los vigentes al 2026-08-10 y están en USD.
 
 **Modificadores que aplicamos:**
 
-| Mecanismo | Efecto | Uso en iTier |
+| Mecanismo | Efecto | Uso en iTiers |
 |---|---|---|
 | **Prompt caching — lectura** | ~0.1× el precio de input | El prefijo (system prompt + definiciones de tools) se cachea. Es el ahorro más grande del diseño |
 | **Prompt caching — escritura** | 1.25× (TTL 5 min) · 2× (TTL 1 h) | TTL de 5 min por defecto; 1 h solo en horarios de alta actividad |

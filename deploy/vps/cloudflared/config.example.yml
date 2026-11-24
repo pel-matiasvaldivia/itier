@@ -1,4 +1,4 @@
-# Ejemplo de ingress de Cloudflare Tunnel para iTier (cloudflared en ESTE VPS).
+# Ejemplo de ingress de Cloudflare Tunnel para iTiers (cloudflared en ESTE VPS).
 #
 # ⚠ TLS / nombres de host — IMPORTANTE:
 #   El certificado gratis de Cloudflare (Universal SSL) cubre el dominio y UN

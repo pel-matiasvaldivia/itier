@@ -1,4 +1,4 @@
-"""Motor de políticas de iTier.
+"""Motor de políticas de iTiers.
 
 Código determinista que decide qué puede hacer el agente. Corre FUERA del LLM:
 aunque el modelo sea secuestrado por una inyección de prompt (OWASP ASI01), no puede

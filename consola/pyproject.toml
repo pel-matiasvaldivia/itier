@@ -1,7 +1,7 @@
 [project]
 name = "itier-console"
 version = "0.1.0"
-description = "Consola de iTier — plano de control que opera GLPI y Zabbix por API (BFF)"
+description = "Consola de iTiers — plano de control que opera GLPI y Zabbix por API (BFF)"
 requires-python = ">=3.11"
 dependencies = [
     "fastapi>=0.115,<0.116",

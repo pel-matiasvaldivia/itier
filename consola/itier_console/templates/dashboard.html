@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block titulo %}Tablero · Consola de iTier{% endblock %}
+{% block titulo %}Tablero · Consola de iTiers{% endblock %}
 {% macro estado_pill(t) -%}
   {%- set s = t.status|int -%}
   <span class="l-pill {{ 'info' if s == 1 else ('warn' if s in (2, 3) else ('off' if s == 4 else ('ok' if s == 5 else 'dark'))) }}"><i></i>{{ t.estado_label }}</span>

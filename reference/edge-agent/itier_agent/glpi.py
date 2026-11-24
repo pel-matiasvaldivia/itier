@@ -21,7 +21,7 @@ import httpx
 
 from .events import Evento
 
-# severidad de iTier → urgency de GLPI (1 muy baja … 5 muy alta).
+# severidad de iTiers → urgency de GLPI (1 muy baja … 5 muy alta).
 _URGENCIA = {
     "critica": 5, "disaster": 5, "alta": 4, "media": 3,
     "advertencia": 2, "informacion": 1, "no_clasificada": 2,
@@ -192,9 +192,9 @@ class GLPITickets:
     def abrir_desde_evento(self, ev: Evento) -> str:
         """Abre el ticket del incidente y, si puede, lo vincula al CI afectado."""
         urgencia = _URGENCIA.get(ev.severidad, 3)
-        titulo = f"[iTier] {ev.disparador}"
+        titulo = f"[iTiers] {ev.disparador}"
         contenido = (
-            "Incidente detectado por el monitoreo (iTier).\n\n"
+            "Incidente detectado por el monitoreo (iTiers).\n\n"
             f"Origen: {ev.origen} · evento: {ev.id}\n"
             f"Host: {ev.host or '—'} · CI: {ev.ci_id or '—'}\n"
             f"Severidad: {ev.severidad}\n\n"

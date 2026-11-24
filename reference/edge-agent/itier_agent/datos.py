@@ -37,7 +37,7 @@ log = logging.getLogger("itier.datos")
 _NO_EJECUTOR = {"estado": "no_disponible",
                 "detalle": "El ejecutor de Ansible llega en Fase 4; esta acción no se ejecuta."}
 
-# nombre de la business criticity de GLPI (minúsculas) → criticidad de iTier.
+# nombre de la business criticity de GLPI (minúsculas) → criticidad de iTiers.
 _CRIT = [("crit", "critica"), ("alta", "alta"), ("high", "alta"),
          ("media", "media"), ("medium", "media"), ("baja", "baja"), ("low", "baja")]
 
@@ -118,7 +118,7 @@ class AdaptadorReal:
         return []
 
     def actualizar_ticket(self, ticket_id: str, diagnostico: str, plan: str, categoria: str) -> dict:
-        texto = f"Diagnóstico (iTier):\n{diagnostico}\n\nPlan propuesto:\n{plan}"
+        texto = f"Diagnóstico (iTiers):\n{diagnostico}\n\nPlan propuesto:\n{plan}"
         if categoria:
             texto += f"\n\nCategoría sugerida: {categoria}"
         try:

@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block titulo %}Horas por cliente · Consola de iTier{% endblock %}
+{% block titulo %}Horas por cliente · Consola de iTiers{% endblock %}
 {% macro usd(x) %}{% if x is none %}—{% else %}US$ {{ '%.0f'|format(x) }}{% endif %}{% endmacro %}
 {% macro ars(x) %}{% if x is none %}—{% else %}$ {{ '{:,.0f}'.format(x).replace(',', '.') }}{% endif %}{% endmacro %}
 {% block contenido %}

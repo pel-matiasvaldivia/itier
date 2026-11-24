@@ -1,4 +1,4 @@
-# iTier — Fase 1 y 2 en el VPS propio. El stack se sirve detrás de un proxy que
+# iTiers — Fase 1 y 2 en el VPS propio. El stack se sirve detrás de un proxy que
 # termina TLS: Cloudflare Tunnel en ESTE host (recomendado), o NPM en otro VPS.
 #
 # Núcleo ITSM (GLPI) + eventos/métricas (Zabbix). GLPI requiere MySQL/MariaDB
@@ -96,7 +96,7 @@ services:
       - >
         ref=$$(stat -c '%u:%g' /var/glpi);
         [ "$$ref" = "0:0" ] && ref=33:33;
-        echo "iTier: aplicando dueño $$ref a los volúmenes de GLPI";
+        echo "iTiers: aplicando dueño $$ref a los volúmenes de GLPI";
         chown -R "$$ref" /vol/files /vol/config /vol/marketplace
     volumes:
       - glpi_files:/vol/files

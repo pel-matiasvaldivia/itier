@@ -194,7 +194,7 @@ class ZabbixClient:
 
     # -- usuarios de plataforma (técnicos / PM / administradores) ---------------
 
-    # rol de iTier → tipo de rol de Zabbix (1 User · 2 Admin · 3 Super admin)
+    # rol de iTiers → tipo de rol de Zabbix (1 User · 2 Admin · 3 Super admin)
     TIPOS = {"admin": 3, "pm": 2, "tecnico": 1}
 
     def _rol_id(self, rol: str) -> str:

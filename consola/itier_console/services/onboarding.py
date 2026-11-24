@@ -162,7 +162,7 @@ def bundle_env(cfg, cli: dict) -> str:
     secretos del túnel: esos van solo en el instalador."""
     glpi = cfg.public_glpi_url or "https://itier-itsm.pymesenlinea.com.ar"
     return (
-        f"# ── iTier — cliente: {cli['nombre']} (configuración manual) ──\n"
+        f"# ── iTiers — cliente: {cli['nombre']} (configuración manual) ──\n"
         f"ITIER_TENANT={cli['slug']}\n"
         f"ITIER_GLPI_URL={glpi}\n"
         f"ZBX_TUNNEL_HOSTNAME={cfg.zbx_tunnel_hostname or 'itier-zbx.tu-dominio.com'}\n"

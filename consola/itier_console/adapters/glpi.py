@@ -288,7 +288,7 @@ class GLPIClient:
         rid = self._id_de(self._post("/RuleImportEntity", {"input": {
             "name": nombre, "sub_type": "RuleImportEntity", "match": "AND",
             "is_active": 1, "entities_id": 0, "is_recursive": 1,
-            "comment": "Creada por la consola de iTier"}}))
+            "comment": "Creada por la consola de iTiers"}}))
         if rid is None:
             raise AdapterError("GLPI", "RuleImportEntity sin id en la respuesta")
         # condition 0 = "es"
@@ -421,7 +421,7 @@ class GLPIClient:
 
     # -- usuarios de plataforma (técnicos / PM / administradores) ---------------
 
-    # rol de iTier → (nombre del perfil de GLPI, id por defecto de una instalación estándar)
+    # rol de iTiers → (nombre del perfil de GLPI, id por defecto de una instalación estándar)
     PERFILES = {"admin": ("Super-Admin", 4), "pm": ("Supervisor", 7), "tecnico": ("Technician", 6)}
 
     def _perfil_id(self, rol: str) -> int:

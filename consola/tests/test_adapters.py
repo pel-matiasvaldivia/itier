@@ -402,7 +402,7 @@ check("glpi.fijar_criticidad hace PUT con businesscriticities_id",
 # ── Autoasignación: regla GLPI por tag + autorregistro Zabbix ────────────────
 captured.clear()
 with glpi_mod.cliente(cfg) as g:
-    rid = g.asegurar_regla_tag("iTier · X", "itier-x", 42)
+    rid = g.asegurar_regla_tag("iTiers · X", "itier-x", 42)
 check("glpi.asegurar_regla_tag crea la regla", rid == 31, rid)
 crit = next((x for x in captured if x["path"].endswith("/RuleCriteria")), None)
 check("glpi: criterio tag = itier-x", crit and crit["body"]["input"]["criteria"] == "tag"
@@ -412,7 +412,7 @@ check("glpi: acción asigna la entidad", act and act["body"]["input"]["field"] =
       and act["body"]["input"]["value"] == 42)
 captured.clear()
 with zbx_mod.cliente(cfg) as z:
-    aid = z.asegurar_autoregistro("iTier · X", "itier-x", "5")
+    aid = z.asegurar_autoregistro("iTiers · X", "itier-x", "5")
 check("zbx.asegurar_autoregistro crea la acción", aid == "44", aid)
 ac = next((x for x in captured if x["body"].get("method") == "action.create"), None)
 check("zbx: autorregistro por metadata (eventsource=2, cond 24 contiene)",

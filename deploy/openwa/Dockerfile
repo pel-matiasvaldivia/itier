@@ -1,4 +1,4 @@
-# OpenWA (WhatsApp de soporte) para iTier.
+# OpenWA (WhatsApp de soporte) para iTiers.
 #
 # Por qué una imagen propia: la oficial `openwa/wa-automate` está abandonada (>1 año) y su
 # entrypoint ejecuta `bin/server.js`, que la librería v5 ya no trae; con la v4 la sesión no

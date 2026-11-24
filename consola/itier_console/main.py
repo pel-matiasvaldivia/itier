@@ -1,4 +1,4 @@
-"""Aplicación FastAPI de la consola de iTier.
+"""Aplicación FastAPI de la consola de iTiers.
 
     itier-console            # arranca uvicorn (producción tras NPM)
     python -m itier_console  # equivalente para desarrollo
@@ -74,7 +74,7 @@ def create_app() -> FastAPI:
     init_db(cfg.db_path)
     _sembrar_admin(cfg)
 
-    app = FastAPI(title="Consola de iTier", docs_url=None, redoc_url=None, openapi_url=None)
+    app = FastAPI(title="Consola de iTiers", docs_url=None, redoc_url=None, openapi_url=None)
     app.state.cfg = cfg
     from .services import canales as _canales
     _canales.iniciar_poller(cfg)
@@ -157,7 +157,7 @@ def create_app() -> FastAPI:
     app.include_router(r_audit.router)
     app.include_router(r_portal.router)
 
-    log.info("Consola de iTier lista (demo=%s, glpi=%s, zabbix=%s).",
+    log.info("Consola de iTiers lista (demo=%s, glpi=%s, zabbix=%s).",
              cfg.demo, cfg.glpi_configurado, cfg.zbx_configurado)
     return app
 

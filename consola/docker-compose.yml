@@ -1,4 +1,4 @@
-# Consola de iTier — el plano de control, detrás de NPM (que está en otro VPS).
+# Consola de iTiers — el plano de control, detrás de NPM (que está en otro VPS).
 #
 # Publica su puerto en el host (como el resto de los frontends del VPS) para que
 # NPM lo alcance por IP-LAN:puerto. Corre como no-root, FS de solo lectura + tmpfs,

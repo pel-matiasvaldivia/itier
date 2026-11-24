@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block titulo %}{{ cli.nombre }} · Consola de iTier{% endblock %}
+{% block titulo %}{{ cli.nombre }} · Consola de iTiers{% endblock %}
 {% block contenido %}
   <div class="d-hero">
     <span class="l-logo">{{ (cli.nombre.split()[0][:1] ~ (cli.nombre.split()[1][:1] if cli.nombre.split()|length > 1 else cli.nombre[1:2]))|upper }}</span>

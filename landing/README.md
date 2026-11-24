@@ -1,4 +1,4 @@
-# Landing de iTier
+# Landing de iTiers
 
 Sitio estático de una sola página (`index.html`) para
 **itier.pymesenlinea.com.ar**. Tema claro, sin dependencias externas: todo el

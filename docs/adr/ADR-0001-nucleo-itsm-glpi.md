@@ -4,7 +4,7 @@
 
 ## Contexto
 
-iTier necesita una CMDB, un sistema de tickets, gestión de activos y un catálogo de
+iTiers necesita una CMDB, un sistema de tickets, gestión de activos y un catálogo de
 servicios, corriendo dentro de la red del cliente, con multi-tenancy para el proveedor
 y una API programable para que el agente lea y escriba.
 
@@ -38,7 +38,7 @@ Adoptar **GLPI 11** como núcleo ITSM del appliance, con PostgreSQL.
 | **iTop** | Mejor modelado CMDB, pero más rígido de personalizar, comunidad menor y sin colector propio |
 | **Zammad** | Ticketing excelente, pero sin CMDB ni ITAM. Habría que sumar dos productos más |
 | **Snipe-IT + Zammad** | Dos sistemas con dos modelos de datos que reconciliar en el borde. Complejidad sin beneficio |
-| **CMDB propia** | Meses de trabajo para llegar a un subconjunto pobre de GLPI. El diferencial de iTier no está acá |
+| **CMDB propia** | Meses de trabajo para llegar a un subconjunto pobre de GLPI. El diferencial de iTiers no está acá |
 | **ServiceNow / Freshservice** | Cloud-first, precio por asiento, y los datos salen de la red del cliente. Contradice la premisa del producto |
 
 ## Consecuencias

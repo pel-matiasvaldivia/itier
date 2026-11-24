@@ -256,7 +256,7 @@ def bajar_windows(request: Request, slug: str, ext: str, rol: str = "equipo",
 
 # ── Appliance (público, por token) ───────────────────────────────────────────
 
-_RECHAZO = "echo '[iTier] Enlace de instalacion invalido, vencido o agotado. Genera uno nuevo en la consola.' >&2; exit 1\n"
+_RECHAZO = "echo '[iTiers] Enlace de instalacion invalido, vencido o agotado. Genera uno nuevo en la consola.' >&2; exit 1\n"
 
 
 @router.get("/enrolar/{token}/install.sh")

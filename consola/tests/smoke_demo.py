@@ -523,7 +523,7 @@ uid_lt = int(re.search(r'/usuarios/(\d+)/rol', c.get("/usuarios").text.split("<s
 _correo_svc.enviar = lambda cfg, dest, asunto, cuerpo, html=None: _enviados.append((dest, asunto, cuerpo, html))
 c.post(f"/usuarios/{uid_lt}/clave", data={"csrf": csrf_de(c.get("/usuarios").text)})
 check("correo: al reiniciar la clave se mandan las credenciales nuevas (sin repetir el manual)",
-      _enviados[-1][1] == "iTier: tu clave fue reiniciada" and "Clave temporal:" in _enviados[-1][2] and "MANUAL DE OPERACIONES" not in _enviados[-1][2])
+      _enviados[-1][1] == "iTiers: tu clave fue reiniciada" and "Clave temporal:" in _enviados[-1][2] and "MANUAL DE OPERACIONES" not in _enviados[-1][2])
 _correo_svc.configurado, _correo_svc.enviar = _cfg_ok, _env_ok
 # (se limpian los usuarios de prueba que sumarían administradores y falsearían las pruebas de protección)
 for _n in ("adm2", "pmgr", "sincorreo", "fallo"):

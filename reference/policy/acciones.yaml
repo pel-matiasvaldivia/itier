@@ -1,4 +1,4 @@
-# Catálogo de acciones de iTier
+# Catálogo de acciones de iTiers
 #
 # Define el nivel de autonomía BASE de cada acción y sus techos duros.
 # Versionado en git, firmado en el plano de control, verificado en el borde.
@@ -34,7 +34,7 @@ techos_duros:
   - id: autoconfiguracion
     max_nivel: L2
     descripcion: >
-      Modificación de la configuración del propio iTier o de sus políticas.
+      Modificación de la configuración del propio iTiers o de sus políticas.
 
   - id: impacto_financiero
     max_nivel: L2

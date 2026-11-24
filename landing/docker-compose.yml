@@ -1,4 +1,4 @@
-# Landing de iTier — sitio estático detrás de un proxy que termina TLS.
+# Landing de iTiers — sitio estático detrás de un proxy que termina TLS.
 #
 # Sirve index.html y manual.html con un nginx mínimo. PUBLICA su puerto en el
 # host y el proxy lo alcanza por LANDING_BIND:puerto.

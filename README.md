@@ -1,6 +1,6 @@
-# iTier — Agentic AI para ITSM en PyMEs
+# iTiers — Agentic AI para ITSM en PyMEs
 
-**iTier** es una plataforma de gestión de servicios de IT (ITSM) asistida por agentes de IA,
+**iTiers** es una plataforma de gestión de servicios de IT (ITSM) asistida por agentes de IA,
 diseñada para desplegarse **dentro de la infraestructura de cada cliente** (appliance físico o
 máquina virtual) y operada de forma centralizada por el proveedor de servicios.
 

@@ -1,10 +1,10 @@
 # 08 · Modelo operativo y de negocio
 
-Cómo se usa iTier en la práctica —quién toca qué— y el modelo comercial que lo
+Cómo se usa iTiers en la práctica —quién toca qué— y el modelo comercial que lo
 hace viable para PyMEs **sin IT on-site**. Complementa `01-analisis-mercado`,
 `05-modelo-de-costos` y `06-roadmap`.
 
-> **Tesis.** iTier **no** es "un GLPI más lindo para el cliente". Es el **cockpit
+> **Tesis.** iTiers **no** es "un GLPI más lindo para el cliente". Es el **cockpit
 > del operador** + el **agente de IA** que hace rentable el servicio gestionado,
 > y el cliente recibe una **ventana delgada** que genera confianza. Lo que se
 > vende es el **resultado gestionado**, no el software.
@@ -18,7 +18,7 @@ hace viable para PyMEs **sin IT on-site**. Complementa `01-analisis-mercado`,
    PORTAL DEL CLIENTE            ← acotado a SU empresa (tenant)
      │
      ▼
-   iTier CONSOLA (operador)      ← cockpit de tu equipo (vos + técnicos)
+   iTiers CONSOLA (operador)      ← cockpit de tu equipo (vos + técnicos)
      │  opera por API ▼                      ▲ el agente propone / actúa
    ┌───────────────┬───────────────┬─────────┴──────────┐
    │ GLPI (motor)  │ Zabbix (ojos) │ Agente IA (Fase 3+) │
@@ -30,7 +30,7 @@ hace viable para PyMEs **sin IT on-site**. Complementa `01-analisis-mercado`,
   cara del producto. Cada cliente es una **entidad** aislada: su CMDB y sus
   tickets quedan separados del resto (base del multi-tenant).
 - **Zabbix** — los **ojos** (métricas y eventos).
-- **Consola de iTier** — el **tablero del operador**. Hoy: alta de clientes,
+- **Consola de iTiers** — el **tablero del operador**. Hoy: alta de clientes,
   agentes, tickets, salud, auditoría. Con el tiempo absorbe los flujos diarios
   para que el técnico casi no toque GLPI crudo.
 - **Agente de IA** (Fase 3+) — triage, diagnóstico, recomendación y, más
@@ -64,7 +64,7 @@ Reglas:
   ayuda), scopeados a su entidad de GLPI.
 - **Mis equipos / salud** — estado de *sus* hosts (desde Zabbix), solo lectura.
 - **Reporte mensual** (Fase 5) — lo que justifica la factura.
-- **Autonomía** (Fase 4+) — ver y autorizar el nivel que iTier puede ejecutar.
+- **Autonomía** (Fase 4+) — ver y autorizar el nivel que iTiers puede ejecutar.
 
 Lo que el portal **no** hace: asignar técnicos, ver otros clientes, configurar
 nada del núcleo. Eso es del operador.

@@ -219,7 +219,7 @@ def env_completo(cfg, cli: dict) -> str:
     if not tunel_configurado(cfg):
         raise ServiceError("Falta configurar el túnel a Zabbix en la consola (ITIER_ZBX_TUNNEL_HOSTNAME y service token).")
     return (
-        f"# iTier — appliance del cliente «{cli['slug']}». Generado por la consola; no editar a mano.\n"
+        f"# iTiers — appliance del cliente «{cli['slug']}». Generado por la consola; no editar a mano.\n"
         f"ITIER_TENANT={_seguro('tenant', cli['slug'])}\n"
         f"ITIER_GLPI_URL={glpi}\n"
         f"ZBX_TUNNEL_HOSTNAME={cfg.zbx_tunnel_hostname}\n"
