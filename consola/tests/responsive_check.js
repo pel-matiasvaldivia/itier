@@ -30,7 +30,7 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
     await f('/clientes/diario-los-andes/red/chequeo', { tipo: 'router_snmp', nombre: 'Router TP-Link', destino: '192.168.1.1', community: 'lgm-ro' }); });
   let pages = { tablero: '/', clientes: '/clientes', ficha: '/clientes/diario-los-andes', equipos: '/equipos', tickets: '/tickets', activos: '/clientes/diario-los-andes/activos',
     canales: '/canales', usuarios: '/usuarios', personas: '/clientes/diario-los-andes/personas', horas: '/reportes/horas', bandeja: '/bandeja', manual: '/manual', auditoria: '/auditoria',
-    ticket: '/tickets/1042', activo_nuevo: '/clientes/diario-los-andes/activos/nuevo', m365: '/m365/aplicacion', equipo: '/clientes/diario-los-andes/equipo', red: '/clientes/diario-los-andes/red' };
+    ticket: '/tickets/1042', activo_nuevo: '/clientes/diario-los-andes/activos/nuevo', m365: '/m365/aplicacion', equipo: '/clientes/diario-los-andes/equipo', red: '/clientes/diario-los-andes/red', guardia: '/guardia' };
   if (ONLY) { const k = ONLY.split(','); pages = Object.fromEntries(Object.entries(pages).filter(([n]) => k.includes(n))); }
   for (const [name, p] of Object.entries(pages)) {
     await pg.goto(base + p); await pg.waitForLoadState('networkidle');

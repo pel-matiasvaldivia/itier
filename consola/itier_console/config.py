@@ -112,6 +112,8 @@ class Config:
     wa_hook_token: str | None = None       # secreto en la URL del webhook de OpenWA (/hooks/whatsapp/<token>)
     wa_api_url: str | None = None          # API de OpenWA (para responder: confirmaciones)
     wa_api_key: str | None = None
+    vapid_priv: str | None = None          # claves VAPID de los avisos push (se generan solas; la privada se guarda cifrada)
+    vapid_pub: str | None = None
     wa_numero: str | None = None           # número de soporte (solo para mostrarlo)
     canal_limite_hora: int = 20
     # -- Microsoft 365 (aplicación multi-tenant del MSP; se carga en la consola) -----------------

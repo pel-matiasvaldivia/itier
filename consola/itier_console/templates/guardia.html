@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+{% block titulo %}Guardia · iTiers{% endblock %}
+{% block contenido %}
+  <div class="g-head">
+    <div><h1>Guardia</h1><p class="u-sub">{{ user.user }} · lo que necesita a alguien ahora</p></div>
+    <a class="u-b" href="/guardia" title="Actualizar">↻</a>
+  </div>
+
+  <div class="g-stats">
+    <div class="g-stat {{ 'bad' if alertas else '' }}"><b>{{ alertas|length }}</b><span>Alertas de red</span></div>
+    <div class="g-stat {{ 'bad' if urgentes else '' }}"><b>{{ urgentes }}</b><span>Urgentes</span></div>
+    <div class="g-stat {{ 'warn' if nuevos else '' }}"><b>{{ nuevos }}</b><span>Sin tomar</span></div>
+  </div>
+
+  <section class="u-card g-push" id="g-push" hidden>
+    <div><b>🔔 Avisos en este teléfono</b><p class="l-mut" id="g-push-txt" style="margin:.15rem 0 0">Recibí una notificación cuando haya una caída o un ticket nuevo, aunque la app esté cerrada.</p></div>
+    <button class="u-btn" type="button" id="g-push-btn">Activar</button>
+  </section>
+
+  {% if alertas %}
+  <h2 class="g-h">🚨 Alertas de red activas</h2>
+  {% for a in alertas %}
+  <article class="g-card bad">
+    <div class="g-top"><span class="l-pill bad"><i></i>CAÍDO</span><span class="l-mut">{{ a.desde }} UTC</span></div>
+    <h3>{{ a.chequeo }}</h3>
+    <p class="l-mut">{{ a.cliente }} · <code>{{ a.destino }}</code></p>
+    <div class="g-act">
+      {% if a.ticket_id %}<a class="u-btn" href="/tickets/{{ a.ticket_id }}">Ver ticket #{{ a.ticket_id }}</a>{% endif %}
+      {% if puede('red') %}<a class="u-b" href="/clientes/{{ a.slug }}/red#alertas">Red del cliente</a>{% endif %}
+    </div>
+  </article>
+  {% endfor %}
+  {% endif %}
+
+  <h2 class="g-h">🎫 Tickets abiertos <small class="l-mut">({{ total_tickets }})</small></h2>
+  {% if error %}<div class="u-err small">No se pudo leer GLPI: {{ error }}</div>{% endif %}
+  {% for t in tickets %}
+  <article class="g-card {{ 'bad' if t.urgente else ('warn' if t.nuevo else '') }}">
+    <div class="g-top">
+      <span>{% if t.urgente %}<span class="l-pill bad"><i></i>Urgente</span> {% endif %}{% if t.nuevo %}<span class="l-pill info">Nuevo</span>{% else %}<span class="l-pill off">{{ t.estado }}</span>{% endif %}</span>
+      <span class="l-mut">#{{ t.id }} · {{ t.hace }}</span>
+    </div>
+    <h3>{{ t.titulo }}</h3>
+    {% if t.cliente %}<p class="l-mut">{{ t.cliente }}</p>{% endif %}
+    <div class="g-act">
+      <a class="u-btn" href="/tickets/{{ t.id }}#responder">Responder</a>
+      {% if t.nuevo and puedo_tomar %}<form method="post" action="/tickets/{{ t.id }}/tomar" class="inline"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="u-b" type="submit">Tomar</button></form>{% endif %}
+      <a class="u-b" href="/tickets/{{ t.id }}">Abrir</a>
+    </div>
+  </article>
+  {% else %}<div class="l-empty"><b>✅</b>Sin tickets abiertos.</div>{% endfor %}
+  {% if total_tickets > tickets|length %}<p class="l-mut" style="text-align:center"><a href="/tickets">Ver los {{ total_tickets }} tickets →</a></p>{% endif %}
+
+  <script>
+    (function () {
+      var box = document.getElementById('g-push'); if (!box) return;
+      if (!('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window)) {
+        // iPhone: solo funciona con la app instalada («Agregar a inicio»)
+        var ios = /iphone|ipad/i.test(navigator.userAgent);
+        if (ios) { box.hidden = false; document.getElementById('g-push-txt').textContent = 'En iPhone: tocá Compartir → «Agregar a pantalla de inicio», abrí la app y activá los avisos acá.'; document.getElementById('g-push-btn').hidden = true; }
+        return;
+      }
+      var btn = document.getElementById('g-push-btn'), txt = document.getElementById('g-push-txt'), csrf = {{ csrf|tojson }};
+      function b64(s) { var p = '='.repeat((4 - s.length % 4) % 4), r = atob((s + p).replace(/-/g, '+').replace(/_/g, '/')); return Uint8Array.from(r, function (c) { return c.charCodeAt(0); }); }
+      function estado() {
+        navigator.serviceWorker.ready.then(function (reg) { return reg.pushManager.getSubscription(); }).then(function (s) {
+          box.hidden = false;
+          if (Notification.permission === 'denied') { txt.textContent = 'Los avisos están bloqueados en el navegador: habilitalos en los ajustes del sitio.'; btn.hidden = true; return; }
+          btn.hidden = false; btn.textContent = s ? 'Desactivar' : 'Activar'; btn.dataset.on = s ? '1' : '';
+          if (s) txt.textContent = 'Avisos activados en este teléfono.';
+        });
+      }
+      btn.addEventListener('click', function () {
+        navigator.serviceWorker.ready.then(function (reg) {
+          if (btn.dataset.on) {
+            return reg.pushManager.getSubscription().then(function (s) {
+              if (!s) return;
+              return fetch('/push/baja', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRF': csrf }, body: JSON.stringify({ endpoint: s.endpoint }) }).then(function () { return s.unsubscribe(); });
+            }).then(estado);
+          }
+          return fetch('/push/clave').then(function (r) { return r.json(); }).then(function (k) {
+            if (!k.clave) { txt.textContent = 'Los avisos todavía no están configurados en el servidor.'; return; }
+            return Notification.requestPermission().then(function (p) {
+              if (p !== 'granted') { estado(); return; }
+              return reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64(k.clave) }).then(function (s) {
+                return fetch('/push/suscribir', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRF': csrf }, body: JSON.stringify(s.toJSON()) });
+              }).then(estado);
+            });
+          });
+        }).catch(function () { txt.textContent = 'No se pudieron activar los avisos en este equipo.'; });
+      });
+      estado();
+    })();
+  </script>
+{% endblock %}

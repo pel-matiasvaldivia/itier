@@ -484,15 +484,23 @@ def sincronizar(conn: sqlite3.Connection, cfg) -> int:
                 ticket = _abrir_ticket(cfg, cli, ch, _ts(t["desde"]))
                 conn.execute("INSERT INTO red_alertas(client_id, chequeo_id, inicio, aviso, ticket_id) VALUES (?,?,?,?,?)",
                              (cli["id"], ch["id"], _ts(t["desde"]) or _ahora(), aviso, ticket))
+                _push(conn, cfg, cli, f"🚨 CAÍDA · {cli['nombre']}", f"{ch['nombre']} ({ch['destino']}){' · ticket #' + str(ticket) if ticket else ''}",
+                      f"/tickets/{ticket}" if ticket else "/guardia", True, f"red-{ch['id']}")
             elif previo == "problema":
                 fila = conn.execute("SELECT * FROM red_alertas WHERE chequeo_id=? AND fin IS NULL ORDER BY id DESC LIMIT 1", (ch["id"],)).fetchone()
                 aviso = _aviso(cfg, cli, ch, False, _ts(t["desde"]))
+                _push(conn, cfg, cli, f"✅ Recuperado · {cli['nombre']}", f"{ch['nombre']} volvió a responder", "/guardia", False, f"red-{ch['id']}")
                 if fila:
                     conn.execute("UPDATE red_alertas SET fin=?, aviso=COALESCE(aviso,'') || ' · ' || ? WHERE id=?", (_ts(t["desde"]) or _ahora(), aviso, fila["id"]))
                     _cerrar_ticket(cfg, fila["ticket_id"], ch)
             cambios += 1
         conn.commit()
     return cambios
+
+
+def _push(conn, cfg, cli: dict, titulo: str, cuerpo: str, url: str, urgente: bool, tag: str) -> None:
+    from . import push as push_svc
+    push_svc.avisar(conn, cfg, titulo, cuerpo, url, cliente_id=cli["id"], urgente=urgente, tag=tag)
 
 
 def _abrir_ticket(cfg, cli: dict, ch: dict, desde: str) -> int | None:

@@ -232,6 +232,9 @@ def _crear_o_seguir(cfg, conn, cli: dict, canal, remitente, nombre, asunto, cuer
         conn.execute("INSERT OR REPLACE INTO ticket_origen(ticket_id, client_id, canal, remitente, created_at) VALUES (?,?,?,?,?)",
                      (ticket_id, cli["id"], canal, remitente, ahora()))
         accion = "ticket"
+        from . import push as push_svc
+        push_svc.avisar(conn, cfg, f"🎫 Nuevo ticket · {cli['nombre']}", f"#{ticket_id} {titulo} (por {canal})", f"/tickets/{ticket_id}",
+                        cliente_id=cli["id"], tag=f"ticket-{ticket_id}")
     if canal == "whatsapp":
         conn.execute("INSERT OR REPLACE INTO conversaciones(canal, remitente, ticket_id, last_at) VALUES (?,?,?,?)",
                      (canal, remitente, ticket_id, ahora()))

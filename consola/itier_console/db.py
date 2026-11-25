@@ -78,6 +78,15 @@ CREATE TABLE IF NOT EXISTS clients (
 -- Resultado que reporta cada equipo Windows al terminar su instalación
 -- (servicios corriendo + conexión). Una fila por equipo (último reporte).
 -- ── Red: barridos de hosts activos y chequeos de conectividad (Zabbix, vía el proxy del cliente) ─────
+CREATE TABLE IF NOT EXISTS push_subs (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id     INTEGER NOT NULL,
+    endpoint    TEXT    NOT NULL UNIQUE,
+    p256dh      TEXT    NOT NULL,
+    auth        TEXT    NOT NULL,
+    ua          TEXT,
+    created_at  TEXT    NOT NULL
+);
 CREATE TABLE IF NOT EXISTS red_rangos (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
     client_id   INTEGER NOT NULL,

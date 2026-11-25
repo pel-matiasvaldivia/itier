@@ -269,3 +269,16 @@ Cada pantalla consulta GLPI, Zabbix y MeshCentral. Para que no se sienta lenta:
 Para saber **dónde se pierde el tiempo**: DevTools → Network → la petición de la pantalla → *Timing* → `Server-Timing`
 (`app` = total del servidor; `glpi`, `zabbix`, `mesh` = lo que tardó cada uno y cuántas llamadas). Si `app` es bajo y la petición tarda mucho,
 la demora es de red (Cloudflare/túnel). Las pantallas que superan 1 s quedan en el log como `LENTO … (glpi=…ms/n zabbix=…)`.
+
+
+## App móvil (PWA) y avisos de guardia
+
+La consola es una **app instalable** (PWA): sin tiendas, ~sin peso extra, en iPhone y Android.
+
+- **Instalar:** Android (Chrome) → ⋮ → «Instalar app». iPhone (Safari, iOS 16.4+) → Compartir → «Agregar a pantalla de inicio».
+- **Guardia** (`/guardia`, pantalla de inicio de la app): alertas de red activas y tickets abiertos con **Responder** y **Tomar** de un toque; en el celular el menú es una barra inferior.
+- **Avisos push:** desde Guardia, «Activar avisos en este teléfono». Llegan aunque la app esté cerrada ante una caída/recuperación de red o un ticket nuevo
+  (portal, correo o WhatsApp). Usa Web Push con claves **VAPID** que el servidor genera solas (la privada se guarda cifrada en los ajustes); el aviso viaja
+  cifrado de punta a punta por el servicio push del navegador (Apple/Google/Mozilla). Requiere HTTPS (ya lo da Cloudflare).
+- Sin señal, la app muestra una pantalla propia y se reconecta sola. Los datos siempre se piden en vivo (no se guardan en el teléfono).
+- Dependencia nueva: `pywebpush` (en `pyproject.toml`).

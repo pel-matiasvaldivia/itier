@@ -92,6 +92,7 @@ RESPONSABILIDADES = {
 
 # funcionalidad → (menú, qué hace). Se filtra por el permiso necesario.
 FUNCIONES = [
+    ("tickets", "Guardia (app del celular)", "Lo primero que se abre desde el teléfono: alertas de red activas y tickets que necesitan a alguien, con Responder y Tomar de un toque, y avisos push."),
     ("red", "Red y alertas", "Equipos activos en la LAN del cliente (barrido por su proxy de Zabbix) y alertas de caída de Internet, router o interfaz WAN."),
     ("equipo.cliente", "Equipo de TI", "Invita a técnicos (o PM y administradores, según tu rol) de tu empresa, reinicia claves y da de baja."),
     ("tablero", "Tablero", "Estado de GLPI y Zabbix, cantidad de clientes y tickets recientes de un vistazo."),
@@ -199,6 +200,12 @@ PROCEDIMIENTOS = [
         "Cuando algo cae se avisa por correo a la casilla de soporte y se abre un ticket; al recuperarse, se agrega el cierre al mismo ticket.",
         "En la tabla de equipos, «Monitorear» deja un ping continuo a ese dispositivo (cámara, NVR, impresora, servidor): si deja de responder, se avisa y se abre un ticket. «A activos» lo suma al listado de activos del cliente.",
         "Para ver qué equipos están encendidos: agregá el rango (ej.: 192.168.1.0/24) y tocá «Escanear ahora». Los equipos que bloquean ping y todos los puertos no aparecen.",
+    ]),
+    ("tickets", "Instalar la app en el celular (iPhone y Android)", [
+        "No hay que bajar nada de las tiendas: abrí la consola en el navegador del teléfono y entrá con tu usuario.",
+        "Android (Chrome): menú ⋮ → «Instalar app» (o «Agregar a la pantalla principal»). iPhone (Safari): Compartir → «Agregar a pantalla de inicio». En iPhone tiene que ser Safari y hace falta iOS 16.4 o más.",
+        "Abrí la app desde el ícono, entrá a Guardia y tocá «Activar» en «Avisos en este teléfono»: te llegará una notificación cuando caiga Internet de un cliente o entre un ticket nuevo, aunque la app esté cerrada.",
+        "En una guardia: abrí la notificación → Responder o Tomar. Para dejar de recibir avisos, «Desactivar» en la misma tarjeta.",
     ]),
     ("clientes.eliminar", "Dar de baja un cliente", [
         "Solo cuando el contrato terminó y está confirmado. Ficha del cliente → «Eliminar»: borra su configuración y sus usuarios del portal.",

@@ -531,3 +531,39 @@ img,svg,video{max-width:100%;height:auto}
 tr.rform td{background:#f8faff}
 .racc{display:flex;flex-wrap:wrap;gap:.3rem;align-items:center;min-width:180px}
 .rc-if{display:flex;flex-wrap:wrap;gap:.3rem;margin:.4rem 0}.rc-prob{margin:.4rem 0;padding-left:1.1rem;font-size:.82rem;color:#991b1b}
+
+/* App móvil: barra inferior (≤900 px), áreas seguras de iPhone y objetivos táctiles de 44 px */
+.tabbar{display:none}
+@media (max-width:900px){
+  .sidebar{display:none}
+  .tabbar{display:flex;position:fixed;left:0;right:0;bottom:0;z-index:40;background:#fff;border-top:1px solid var(--line);padding:.15rem .25rem calc(.15rem + env(safe-area-inset-bottom));box-shadow:0 -4px 16px rgba(15,23,42,.06)}
+  .tabbar>a,.tabbar summary{flex:1 1 0;min-width:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.05rem;min-height:3.2rem;font-size:.7rem;font-weight:600;color:var(--muted);text-decoration:none;border-radius:12px;list-style:none;cursor:pointer}
+  .tabbar summary::-webkit-details-marker{display:none}
+  .tabbar span{font-size:1.25rem;line-height:1}
+  .tabbar>a.on{color:var(--indigo)}
+  .tab-mas{flex:1 1 0;min-width:0;position:relative}
+  .tab-panel{position:absolute;right:0;bottom:calc(100% + .4rem);min-width:190px;background:#fff;border:1px solid var(--line);border-radius:14px;box-shadow:0 12px 32px rgba(15,23,42,.18);padding:.35rem;display:flex;flex-direction:column}
+  .tab-panel a,.tab-panel button{display:block;text-align:left;padding:.75rem .9rem;border-radius:10px;font:inherit;font-weight:600;color:var(--ink);text-decoration:none;background:none;border:0;width:100%}
+  .tab-panel a:active,.tab-panel button:active{background:var(--bg)}
+  .content{padding-bottom:calc(4.6rem + env(safe-area-inset-bottom))}
+  .topbar{padding-top:env(safe-area-inset-top)}
+  .u-btn,.u-b,button,select,input:not([type=checkbox]):not([type=radio]){min-height:2.5rem}
+  input,select,textarea{font-size:16px}          /* evita el zoom automático de iOS al enfocar un campo */
+}
+
+/* Guardia (móvil primero) */
+.g-head{display:flex;justify-content:space-between;align-items:center;gap:.6rem;margin-bottom:.6rem}
+.g-head h1{margin:0}
+.g-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.5rem;margin-bottom:.8rem}
+.g-stat{background:#fff;border:1px solid var(--line);border-radius:14px;padding:.6rem .5rem;text-align:center}
+.g-stat b{display:block;font-size:1.6rem;line-height:1.1}.g-stat span{font-size:.72rem;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.03em}
+.g-stat.bad{background:#fff5f5;border-color:#fca5a5}.g-stat.bad b{color:#b91c1c}.g-stat.warn{background:#fffbeb;border-color:#fcd34d}
+.g-push{display:flex;flex-wrap:wrap;gap:.7rem;align-items:center;justify-content:space-between;margin-bottom:.8rem}
+.g-h{font-size:1.05rem;margin:1rem 0 .5rem}
+.g-card{background:#fff;border:1px solid var(--line);border-radius:16px;padding:.8rem .9rem;margin-bottom:.6rem;min-width:0}
+.g-card.bad{border-color:#fca5a5;background:#fff8f8}.g-card.warn{border-color:#fcd34d}
+.g-card h3{margin:.45rem 0 .1rem;font-size:1rem;line-height:1.3;overflow-wrap:anywhere}
+.g-top{display:flex;justify-content:space-between;align-items:center;gap:.5rem;flex-wrap:wrap}
+.g-act{display:flex;flex-wrap:wrap;gap:.45rem;margin-top:.6rem}
+.g-act .u-btn,.g-act .u-b{flex:1 1 auto;text-align:center;text-decoration:none;display:inline-flex;align-items:center;justify-content:center}
+.g-act form{flex:1 1 auto;display:flex}.g-act form button{flex:1}

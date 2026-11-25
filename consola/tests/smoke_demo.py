@@ -1481,6 +1481,8 @@ _n_ = _red.sincronizar(_cx, app.state.cfg)
 _al = _cx.execute("SELECT * FROM red_alertas WHERE client_id=?", (_cid_r,)).fetchall()
 check("vigía: una caída detectada abre una alerta con ticket", _n_ >= 1 and len(_al) == 1 and _al[0]["fin"] is None and _al[0]["ticket_id"], [dict(a) for a in _al])
 check("vigía: la pantalla marca el chequeo como CAÍDO y cuenta la alerta activa", "CAÍDO" in c.get("/clientes/canal-sa/red").text)
+_gd = c.get("/guardia")
+check("guardia: muestra la alerta de red activa con su ticket y los tickets abiertos", _gd.status_code == 200 and "Alertas de red activas" in _gd.text and "CAÍDO" in _gd.text and "Ver ticket #" in _gd.text and "Tickets abiertos" in _gd.text)
 check("vigía: no repite la alerta mientras sigue caído", _red.sincronizar(_cx, app.state.cfg) == 0 and _cx.execute("SELECT COUNT(*) n FROM red_alertas WHERE client_id=?", (_cid_r,)).fetchone()["n"] == 1)
 _zm._DEMO_RED["triggers"][_trg]["value"] = "0"
 _red.sincronizar(_cx, app.state.cfg)
@@ -1539,6 +1541,77 @@ check("vigía: al volver la interfaz cierra la alerta", _cx.execute("SELECT fin 
 _cx.close()
 c.post(f"/clientes/canal-sa/red/chequeo/{_rt_['id']}/quitar", data={"csrf": csrf_de(c.get("/clientes/canal-sa/red").text)})
 check("red: quitar el router elimina su host", "Router TP-Link" not in c.get("/clientes/canal-sa/red").text.split("Agregar un chequeo")[0])
+
+# App móvil (PWA) y avisos push
+import base64 as _b64, json as _json2  # noqa: E402
+from itier_console.services import push as _push  # noqa: E402
+_anon = TestClient(app, follow_redirects=True)
+_mf = _anon.get("/manifest.webmanifest")
+check("pwa: el manifest se sirve sin login y define la app instalable", _mf.status_code == 200 and _mf.json()["display"] == "standalone" and _mf.json()["start_url"] == "/guardia"
+      and {i["sizes"] for i in _mf.json()["icons"]} >= {"192x192", "512x512"} and any(i["purpose"] == "maskable" for i in _mf.json()["icons"]))
+check("pwa: los iconos existen", all(_anon.get(i["src"]).status_code == 200 for i in _mf.json()["icons"]) and _anon.get("/static/pwa/apple-touch-icon.png").status_code == 200)
+_sw = _anon.get("/sw.js")
+check("pwa: el service worker se sirve en la raíz, sin caché y con alcance /", _sw.status_code == 200 and "javascript" in _sw.headers["content-type"] and _sw.headers.get("service-worker-allowed") == "/"
+      and _sw.headers["cache-control"] == "no-cache" and "addEventListener('push'" in _sw.text and "notificationclick" in _sw.text)
+check("pwa: pantalla sin conexión disponible", _anon.get("/offline").status_code == 200 and "Sin conexión" in _anon.get("/offline").text)
+_bs = c.get("/clientes").text
+check("pwa: las pantallas enlazan manifest, ícono de iOS, registran el SW y traen la barra inferior móvil", all(x in _bs for x in ('rel="manifest"', "apple-touch-icon", "serviceWorker.register", 'class="tabbar"', "viewport-fit=cover", "Guardia")))
+_g0 = c.get("/guardia")
+check("guardia: abre para el administrador con el control de avisos del teléfono", _g0.status_code == 200 and "Avisos en este teléfono" in _g0.text and "Tomar" in _g0.text or "Responder" in _g0.text)
+check("guardia: un técnico de cliente ve solo su empresa", "Otra Empresa" not in tcl.get("/guardia").text and tcl.get("/guardia").status_code == 200)
+check("guardia: sin sesión pide login", _anon.get("/guardia").url.path == "/login")
+# suscripciones
+_tk = csrf_de(_g0.text)
+_clave = c.get("/push/clave").json()["clave"]
+check("push: el servidor genera claves VAPID propias y entrega la pública (65 bytes)", _clave and len(_b64.urlsafe_b64decode(_clave + "==")) == 65 and c.get("/push/clave").json()["clave"] == _clave)
+check("push: la clave privada se guarda cifrada", "BEGIN" not in str([tuple(r) for r in _db.connect(os.environ["ITIER_CONSOLE_DB"]).execute("SELECT clave, valor FROM ajustes WHERE clave='vapid_priv'")]))
+from cryptography.hazmat.primitives.asymmetric import ec as _ec
+from cryptography.hazmat.primitives import serialization as _ser
+def _sub(ep):
+    k = _ec.generate_private_key(_ec.SECP256R1()).public_key().public_bytes(_ser.Encoding.X962, _ser.PublicFormat.UncompressedPoint)
+    return {"endpoint": ep, "keys": {"p256dh": _b64.urlsafe_b64encode(k).rstrip(b"=").decode(), "auth": _b64.urlsafe_b64encode(os.urandom(16)).rstrip(b"=").decode()}}
+_s1 = _sub("https://push.example.com/send/abc1")
+check("push: suscribir sin token CSRF se rechaza", c.post("/push/suscribir", content=_json2.dumps(_s1), headers={"Content-Type": "application/json"}).status_code == 403)
+check("push: una suscripción inválida se rechaza", c.post("/push/suscribir", content=_json2.dumps({"endpoint": "http://x", "keys": {}}), headers={"Content-Type": "application/json", "X-CSRF": _tk}).status_code == 400)
+check("push: suscribir con token guarda la suscripción", c.post("/push/suscribir", content=_json2.dumps(_s1), headers={"Content-Type": "application/json", "X-CSRF": _tk}).json()["ok"]
+      and _db.connect(os.environ["ITIER_CONSOLE_DB"]).execute("SELECT COUNT(*) n FROM push_subs").fetchone()["n"] == 1)
+c.post("/push/suscribir", content=_json2.dumps(_s1), headers={"Content-Type": "application/json", "X-CSRF": _tk})
+check("push: suscribir dos veces el mismo dispositivo no duplica", _db.connect(os.environ["ITIER_CONSOLE_DB"]).execute("SELECT COUNT(*) n FROM push_subs").fetchone()["n"] == 1)
+# a quién le llega cada aviso
+_cx = _db.connect(os.environ["ITIER_CONSOLE_DB"])
+_ids = {r["username"]: r["id"] for r in _cx.execute("SELECT id, username FROM users")}
+_cid_a = _cx.execute("SELECT id FROM clients WHERE slug='canal-sa'").fetchone()["id"]
+_cid_b = _cx.execute("SELECT id FROM clients WHERE slug='otra-empresa-sa'").fetchone()["id"]
+for _u_, _ep_ in (("tcli", "https://push.example.com/send/tcli"), ("tcli2", "https://push.example.com/send/tcli2")):
+    _push.suscribir(_cx, _ids[_u_], _sub(_ep_), "t")
+_cx.execute("UPDATE users SET scope_client_id=? WHERE username='tcli2'", (_cid_b,)); _cx.commit()   # tcli2 pasa a «otra empresa»
+_cx.execute("UPDATE users SET disabled=0 WHERE username='tcli'"); _cx.commit()
+_enviados = []
+_orig_uno = _push._enviar_uno
+_push._enviar_uno = lambda cfg_, sub_, payload_: (_enviados.append((sub_["endpoint"].rsplit("/", 1)[-1], payload_["title"])) or (410 if sub_["endpoint"].endswith("tcli2") else 201))
+_n_p = _push.avisar(_cx, app.state.cfg, "🚨 CAÍDA · Canal", "Internet", "/guardia", cliente_id=_cid_a, urgente=True, en_segundo_plano=False)
+_para = {e for e, _t in _enviados}
+check("push: un aviso del cliente A llega al personal de iTiers y a los de A, no a los de otra empresa", "abc1" in _para and "tcli" in _para and "tcli2" not in _para, _para)
+_enviados.clear(); _push.avisar(_cx, app.state.cfg, "x", "y", "/guardia", cliente_id=_cid_b, en_segundo_plano=False)
+check("push: un aviso del cliente B llega a su técnico y no al de A", {e for e, _t in _enviados} >= {"abc1", "tcli2"} and "tcli" not in {e for e, _t in _enviados})
+check("push: una suscripción muerta (410) se elimina sola", _cx.execute("SELECT COUNT(*) n FROM push_subs WHERE endpoint LIKE '%tcli2'").fetchone()["n"] == 0)
+_push._enviar_uno = _orig_uno
+# cifrado real de pywebpush (sin red)
+import pywebpush as _pw  # noqa: E402
+_post = {}
+class _R:  # noqa: D401
+    status_code = 201
+    text = ""
+    ok = True
+    headers = {}
+_pw.requests.post = lambda url, data=None, headers=None, timeout=None, **k: (_post.update(url=url, data=data, headers=headers) or _R())
+_ef = _push.asegurar_claves(_cx, app.state.cfg)
+_rc = _orig_uno(_ef, {"endpoint": _s1["endpoint"], "p256dh": _s1["keys"]["p256dh"], "auth": _s1["keys"]["auth"]}, {"title": "t", "body": "b", "url": "/guardia"})
+check("push: el envío real va cifrado (aes128gcm) y firmado con VAPID", _rc == 201 and _post["headers"].get("content-encoding") == "aes128gcm" and "vapid" in _post["headers"].get("authorization", "").lower()
+      and b'"title"' not in (_post["data"] or b""), str(_post.get("headers")))
+c.post("/push/baja", content=_json2.dumps({"endpoint": _s1["endpoint"]}), headers={"Content-Type": "application/json", "X-CSRF": _tk})
+check("push: desactivar quita la suscripción", _cx.execute("SELECT COUNT(*) n FROM push_subs WHERE endpoint=?", (_s1["endpoint"],)).fetchone()["n"] == 0)
+_cx.execute("UPDATE users SET scope_client_id=? WHERE username='tcli2'", (_cid_a,)); _cx.commit(); _cx.close()
 
 _p = {x["email"]: dict(x) for x in _conn.execute("SELECT * FROM client_contactos WHERE client_id=? AND email IS NOT NULL", (_cid_,))}
 check("usuarios nube: se traen los que tienen licencia activa con cargo y área", "lic@clientedemo.com.ar" in _p and _p["lic@clientedemo.com.ar"]["cargo"] == "Contadora" and _p["lic@clientedemo.com.ar"]["area"] == "Finanzas"

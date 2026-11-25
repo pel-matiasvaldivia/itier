@@ -35,6 +35,8 @@ CAMPOS = {
     "m365_client_id": ("m365_client_id", False, str),
     "m365_client_secret": ("m365_client_secret", True, str),
     "gws_sa_json": ("gws_sa_json", True, str),
+    "vapid_priv": ("vapid_priv", True, str),
+    "vapid_pub": ("vapid_pub", False, str),
     "fx_ars_usd": ("fx_ars_usd", False, float),
     "fx_fecha": ("fx_fecha", False, str),
     "costo_plataforma_usd": ("costo_plataforma_usd", False, float),

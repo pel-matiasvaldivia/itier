@@ -2,9 +2,10 @@
 <html lang="es">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="robots" content="noindex, nofollow">
   <title>{% block titulo %}Portal · iTiers{% endblock %}</title>
+  {% include "_pwa.html" %}
   <link rel="stylesheet" href="/static/app.css?v={{ static_v('app.css') }}">
 </head>
 <body class="app">
@@ -35,5 +36,6 @@
   </div>
 
   <script src="/static/app.js?v={{ static_v('app.js') }}" defer></script>
+<script>if ('serviceWorker' in navigator) { window.addEventListener('load', function () { navigator.serviceWorker.register('/sw.js').catch(function () {}); }); }</script>
 </body>
 </html>

@@ -38,6 +38,9 @@ from .routes import gws as r_gws
 from .routes import m365 as r_m365
 from .routes import manual as r_manual
 from .routes import portal as r_portal
+from .routes import guardia as r_guardia
+from .routes import push as r_push
+from .routes import pwa as r_pwa
 from .routes import red as r_red
 from .routes import reportes as r_reportes
 from .routes import tickets as r_tickets
@@ -146,6 +149,9 @@ def create_app() -> FastAPI:
     async def healthz():
         return JSONResponse({"status": "ok"})
 
+    app.include_router(r_pwa.router)
+    app.include_router(r_guardia.router)
+    app.include_router(r_push.router)
     app.include_router(r_auth.router)
     app.include_router(r_dashboard.router)
     app.include_router(r_clients.router)

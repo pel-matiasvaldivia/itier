@@ -116,6 +116,9 @@ def nuevo_post(
     conn.execute("INSERT OR REPLACE INTO ticket_origen(ticket_id, client_id, canal, remitente, created_at) VALUES (?,?,?,?,?)",
                  (tid, cli["id"], "portal", user["user"], canales_svc.ahora()))
     conn.commit()
+    from ..services import push as push_svc
+    push_svc.avisar(conn, request.app.state.cfg, f"🎫 Nuevo ticket · {cli['nombre']}", f"#{tid} {titulo.strip()} (portal)", f"/tickets/{tid}",
+                    cliente_id=cli["id"], urgente=int(prioridad) >= 5, tag=f"ticket-{tid}")
     audit.registrar(conn, f"portal:{user['user']}", "portal.ticket.creado",
                     {"cliente": cli["nombre"], "ticket_id": tid, "titulo": titulo.strip()})
     flash(request, f"Ticket #{tid} abierto. Te vamos avisando el avance.", "ok")
