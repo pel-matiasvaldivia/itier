@@ -92,6 +92,7 @@ RESPONSABILIDADES = {
 
 # funcionalidad → (menú, qué hace). Se filtra por el permiso necesario.
 FUNCIONES = [
+    ("red", "Red y alertas", "Equipos activos en la LAN del cliente (barrido por su proxy de Zabbix) y alertas de caída de Internet, router o interfaz WAN."),
     ("equipo.cliente", "Equipo de TI", "Invita a técnicos (o PM y administradores, según tu rol) de tu empresa, reinicia claves y da de baja."),
     ("tablero", "Tablero", "Estado de GLPI y Zabbix, cantidad de clientes y tickets recientes de un vistazo."),
     ("tickets", "Tickets", "Lista, abre y asigna tickets de todos los clientes (la información vive en GLPI)."),
@@ -190,6 +191,12 @@ PROCEDIMIENTOS = [
         "Usuarios → Nuevo usuario → rol «Técnico de cliente» y elegí la empresa. No recibe cuentas en GLPI, Zabbix ni Mesh de iTiers.",
         "Esa persona ve únicamente tickets, equipos, activos y usuarios en la nube de su empresa; nunca a otros clientes ni la administración.",
         "Para quitarle el acceso usá «Dar de baja»: rige al instante.",
+    ]),
+    ("red.editar", "Vigilar Internet y la red de un cliente", [
+        "Ficha del cliente → «Red y alertas» → «Agregar un chequeo». El más útil es «Internet» (ping a 8.8.8.8 y 1.1.1.1 desde el proxy del cliente): alerta solo si fallan todos los destinos 3 veces seguidas.",
+        "Para la interfaz WAN del proveedor: tipo «Interfaz WAN del router (SNMP)» con la IP del router, el community SNMP y el índice (ifIndex) de esa interfaz; alerta cuando deja de estar «up».",
+        "Cuando algo cae se avisa por correo a la casilla de soporte y se abre un ticket; al recuperarse, se agrega el cierre al mismo ticket.",
+        "Para ver qué equipos están encendidos: agregá el rango (ej.: 192.168.1.0/24) y tocá «Escanear ahora». Los equipos que bloquean ping y todos los puertos no aparecen.",
     ]),
     ("clientes.eliminar", "Dar de baja un cliente", [
         "Solo cuando el contrato terminó y está confirmado. Ficha del cliente → «Eliminar»: borra su configuración y sus usuarios del portal.",

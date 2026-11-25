@@ -23,9 +23,14 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   await pg.fill('input[name=code]', code); await pg.click('button[type=submit]'); await pg.waitForLoadState(); console.log('tras 2FA:', pg.url());
   if (pg.url().includes('cambiar-clave')) { await pg.fill('input[name=nueva]', 'Clave-Demo-12345'); await pg.fill('input[name=repetir]', 'Clave-Demo-12345'); await pg.click('button[type=submit]'); await pg.waitForLoadState(); }
   console.log('antes de cliente:', pg.url()); await pg.goto(base + '/clientes/nuevo'); await pg.fill('input[name=nombre]', 'Diario Los Andes'); await pg.click('.content form button[type=submit], .content form .u-btn'); await pg.waitForLoadState();
+  await pg.goto(base + '/clientes/diario-los-andes/red'); await pg.waitForLoadState('networkidle');
+  await pg.evaluate(async () => { const t = document.querySelector('input[name=csrf]').value; const f = async (u, d) => fetch(u, { method: 'POST', body: new URLSearchParams({ ...d, csrf: t }) });
+    await f('/clientes/diario-los-andes/red/rango', { nombre: 'LAN oficina', iprange: '192.168.1.0/24' });
+    await f('/clientes/diario-los-andes/red/chequeo', { tipo: 'internet', nombre: '', destino: '8.8.8.8, 1.1.1.1' });
+    await f('/clientes/diario-los-andes/red/chequeo', { tipo: 'gateway', nombre: 'Router sede', destino: '192.168.1.1' }); });
   let pages = { tablero: '/', clientes: '/clientes', ficha: '/clientes/diario-los-andes', equipos: '/equipos', tickets: '/tickets', activos: '/clientes/diario-los-andes/activos',
     canales: '/canales', usuarios: '/usuarios', personas: '/clientes/diario-los-andes/personas', horas: '/reportes/horas', bandeja: '/bandeja', manual: '/manual', auditoria: '/auditoria',
-    ticket: '/tickets/1042', activo_nuevo: '/clientes/diario-los-andes/activos/nuevo', m365: '/m365/aplicacion', equipo: '/clientes/diario-los-andes/equipo' };
+    ticket: '/tickets/1042', activo_nuevo: '/clientes/diario-los-andes/activos/nuevo', m365: '/m365/aplicacion', equipo: '/clientes/diario-los-andes/equipo', red: '/clientes/diario-los-andes/red' };
   if (ONLY) { const k = ONLY.split(','); pages = Object.fromEntries(Object.entries(pages).filter(([n]) => k.includes(n))); }
   for (const [name, p] of Object.entries(pages)) {
     await pg.goto(base + p); await pg.waitForLoadState('networkidle');

@@ -50,6 +50,22 @@ ESTADO_HOST = {"0": "Monitoreado", "1": "Sin monitorear"}
 
 _DEMO_USUARIOS: dict[str, dict] = {}
 
+# ── Demo: descubrimiento de red y chequeos de conectividad (en memoria del proceso) ─────────────────────────
+_DEMO_RED: dict = {"drules": {}, "hosts": {}, "items": {}, "triggers": {}, "n": 0}
+_DEMO_DESCUBIERTOS = [
+    {"ip": "192.168.1.1", "dns": "router.lan", "estado": "up", "ultimo_up": "1764085000", "ultimo_down": "0"},
+    {"ip": "192.168.1.10", "dns": "srv-dc01.lan", "estado": "up", "ultimo_up": "1764085000", "ultimo_down": "0"},
+    {"ip": "192.168.1.23", "dns": "", "estado": "up", "ultimo_up": "1764085000", "ultimo_down": "0"},
+    {"ip": "192.168.1.57", "dns": "cecilia-pc.lan", "estado": "up", "ultimo_up": "1764084000", "ultimo_down": "0"},
+    {"ip": "192.168.1.88", "dns": "", "estado": "down", "ultimo_up": "1763900000", "ultimo_down": "1764000000"},
+]
+
+
+def _nuevo_id() -> str:
+    _DEMO_RED["n"] += 1
+    return str(7000 + _DEMO_RED["n"])
+
+
 # Token de la API reusado entre requests (user.login por cada pantalla era lento y llenaba el registro de Zabbix).
 _TOKENS = perf.Cache()
 _TOKEN_TTL_S = 900
@@ -349,6 +365,175 @@ class ZabbixClient:
             "proxyid": proxyid,
             "groups": [{"groupid": g} for g in grupos],
         })
+
+    # -- descubrimiento de red (regla de Zabbix que corre el PROXY del cliente) ----------------------
+
+    # Pings (ICMP) + puertos típicos: muchos equipos Windows no contestan ping, pero sí tienen abierto SMB/RDP/135.
+    PUERTOS_ESCANEO = "22,80,135,139,443,445,3389"
+
+    def asegurar_regla_descubrimiento(self, nombre: str, iprange: str, proxyid: str | None, delay: str = "1h") -> str:
+        """Crea (o actualiza) la regla de descubrimiento de red del cliente. Devuelve el druleid."""
+        if self.demo:
+            for k, v in _DEMO_RED["drules"].items():
+                if v["name"] == nombre:
+                    v["iprange"] = iprange
+                    return k
+            rid = _nuevo_id()
+            _DEMO_RED["drules"][rid] = {"name": nombre, "iprange": iprange, "status": "0"}
+            return rid
+        checks = [{"type": 12, "uniq": 0, "host_source": 1, "name_source": 0},
+                  {"type": 9, "ports": self.PUERTOS_ESCANEO, "uniq": 0, "host_source": 1, "name_source": 0}]
+        existentes = self._rpc("drule.get", {"filter": {"name": nombre}, "output": ["druleid"]})
+        params = {"name": nombre, "iprange": iprange, "delay": delay, "status": 0, "dchecks": checks}
+        if proxyid:
+            params["proxyid"] = proxyid
+        if existentes:
+            self._rpc("drule.update", {**params, "druleid": existentes[0]["druleid"], "dchecks": checks})
+            return existentes[0]["druleid"]
+        return self._rpc("drule.create", params)["druleids"][0]
+
+    def escanear_ahora(self, druleid: str) -> None:
+        """Pide un barrido inmediato. ⚠ Zabbix no tiene «ejecutar ahora» para estas reglas por API: se deshabilita y se
+        vuelve a habilitar, lo que reprograma el descubrimiento en el siguiente ciclo del proxy."""
+        if self.demo:
+            return
+        self._rpc("drule.update", {"druleid": druleid, "status": 1})
+        self._rpc("drule.update", {"druleid": druleid, "status": 0})
+
+    def eliminar_regla_descubrimiento(self, druleid: str) -> None:
+        if self.demo:
+            _DEMO_RED["drules"].pop(druleid, None)
+            return
+        self._rpc("drule.delete", [druleid])
+
+    def hosts_descubiertos(self, druleids: list[str]) -> list[dict]:
+        """Equipos que respondieron en los barridos: [{ip, dns, estado up|down, ultimo_up, ultimo_down, puertos}]."""
+        if not druleids:
+            return []
+        if self.demo:
+            return [dict(d, puertos=[]) for d in _DEMO_DESCUBIERTOS]
+        res = self._rpc("dhost.get", {"druleids": druleids, "output": ["dhostid", "status", "lastup", "lastdown"],
+                                       "selectDServices": ["ip", "dns", "port", "type", "status"]})
+        salida = []
+        for h in res:
+            sv = h.get("dservices") or []
+            if not sv:
+                continue
+            puertos = sorted({int(x["port"]) for x in sv if x.get("type") == "9" and x.get("status") == "0" and str(x.get("port", "")).isdigit()})
+            salida.append({"ip": sv[0].get("ip", ""), "dns": next((x.get("dns") for x in sv if x.get("dns")), ""),
+                           "estado": "up" if h.get("status") == "0" else "down",
+                           "ultimo_up": h.get("lastup", "0"), "ultimo_down": h.get("lastdown", "0"), "puertos": puertos})
+        return salida
+
+    def ips_monitoreadas(self, groupid: str | None) -> set[str]:
+        """IP de las interfaces de los hosts que ya están en Zabbix (para marcar «ya monitoreado»)."""
+        if self.demo:
+            return {"192.168.1.10"}
+        if not groupid:
+            return set()
+        res = self._rpc("host.get", {"groupids": [groupid], "output": ["hostid"], "selectInterfaces": ["ip", "useip"]})
+        return {i["ip"] for h in res for i in h.get("interfaces", []) if i.get("useip") == "1" and i.get("ip")}
+
+    # -- chequeos de conectividad (ping a Internet, gateway, interfaz WAN por SNMP, puertos TCP) -------
+
+    def asegurar_host_chequeos(self, host: str, nombre: str, groupid: str, proxyid: str | None, snmp: dict | None = None) -> tuple[str, str]:
+        """Host que agrupa los chequeos del cliente (corren en el proxy). Con `snmp` ({ip, community}) lleva interfaz SNMP del
+        router; si no, una interfaz de agente de relleno (los chequeos simples no la usan). → (hostid, interfaceid)."""
+        if self.demo:
+            for k, v in _DEMO_RED["hosts"].items():
+                if v["host"] == host:
+                    return k, k + "1"
+            hid = _nuevo_id()
+            _DEMO_RED["hosts"][hid] = {"host": host, "name": nombre}
+            return hid, hid + "1"
+        existentes = self._rpc("host.get", {"filter": {"host": host}, "output": ["hostid"], "selectInterfaces": ["interfaceid"]})
+        if existentes:
+            h = existentes[0]
+            return h["hostid"], (h.get("interfaces") or [{}])[0].get("interfaceid", "")
+        if snmp:
+            itf = {"type": 2, "main": 1, "useip": 1, "ip": snmp["ip"], "dns": "", "port": "161",
+                   "details": {"version": 2, "bulk": 1, "community": snmp["community"]}}
+        else:
+            itf = {"type": 1, "main": 1, "useip": 1, "ip": "127.0.0.1", "dns": "", "port": "10050"}
+        params = {"host": host, "name": nombre, "groups": [{"groupid": groupid}], "interfaces": [itf], "status": 0,
+                  "tags": [{"tag": "itier", "value": "red"}]}
+        if proxyid:
+            params.update({"monitored_by": 1, "proxyid": proxyid})
+        hid = self._rpc("host.create", params)["hostids"][0]
+        interfaces = self._rpc("hostinterface.get", {"hostids": [hid], "output": ["interfaceid"]})
+        return hid, (interfaces[0]["interfaceid"] if interfaces else "")
+
+    def asegurar_item(self, hostid: str, interfaceid: str, nombre: str, clave: str, tipo: str = "simple",
+                      oid: str = "", delay: str = "30s", unidades: str = "", flotante: bool = False) -> str:
+        """Item de chequeo: tipo «simple» (icmpping[...], net.tcp.service[...]) o «snmp» (con `oid`). → itemid."""
+        if self.demo:
+            for k, v in _DEMO_RED["items"].items():
+                if v["hostid"] == hostid and v["key"] == clave:
+                    return k
+            iid = _nuevo_id()
+            _DEMO_RED["items"][iid] = {"hostid": hostid, "key": clave, "name": nombre, "lastvalue": "1"}
+            return iid
+        existentes = self._rpc("item.get", {"hostids": [hostid], "filter": {"key_": clave}, "output": ["itemid"]})
+        if existentes:
+            return existentes[0]["itemid"]
+        params = {"hostid": hostid, "name": nombre, "key_": clave, "type": 20 if tipo == "snmp" else 3,
+                  "value_type": 0 if flotante else 3, "delay": delay, "interfaceid": interfaceid, "units": unidades,
+                  "tags": [{"tag": "itier", "value": "red"}]}
+        if tipo == "snmp":
+            params["snmp_oid"] = oid
+        return self._rpc("item.create", params)["itemids"][0]
+
+    def asegurar_trigger(self, descripcion: str, expresion: str, prioridad: int = 4) -> str:
+        """Trigger (alerta) con la expresión dada. Prioridad Zabbix: 2 aviso · 3 media · 4 alta · 5 desastre. → triggerid."""
+        if self.demo:
+            for k, v in _DEMO_RED["triggers"].items():
+                if v["description"] == descripcion:
+                    return k
+            tid = _nuevo_id()
+            _DEMO_RED["triggers"][tid] = {"description": descripcion, "expression": expresion, "value": "0",
+                                          "lastchange": "1764085000", "priority": str(prioridad)}
+            return tid
+        existentes = self._rpc("trigger.get", {"filter": {"description": descripcion}, "output": ["triggerid"]})
+        if existentes:
+            return existentes[0]["triggerid"]
+        return self._rpc("trigger.create", {"description": descripcion, "expression": expresion, "priority": prioridad,
+                                            "tags": [{"tag": "itier", "value": "red"}]})["triggerids"][0]
+
+    def eliminar_chequeo(self, triggerid: str | None, itemids: list[str]) -> None:
+        if self.demo:
+            _DEMO_RED["triggers"].pop(triggerid or "", None)
+            for i in itemids:
+                _DEMO_RED["items"].pop(i, None)
+            return
+        if triggerid:
+            self._rpc("trigger.delete", [triggerid])
+        if itemids:
+            self._rpc("item.delete", itemids)
+
+    def estado_alertas(self, triggerids: list[str], itemids: list[str]) -> dict:
+        """{triggers: {id: {estado 'ok'|'problema', desde, prioridad}}, items: {id: {valor, reloj}}}."""
+        if self.demo:
+            return {"triggers": {i: {"estado": "problema" if t["value"] == "1" else "ok", "desde": t["lastchange"], "prioridad": t["priority"]}
+                                 for i, t in _DEMO_RED["triggers"].items() if i in triggerids},
+                    "items": {i: {"valor": it.get("lastvalue", ""), "reloj": "1764085000"} for i, it in _DEMO_RED["items"].items() if i in itemids}}
+        trg = self._rpc("trigger.get", {"triggerids": triggerids, "output": ["triggerid", "value", "lastchange", "priority", "status"]}) if triggerids else []
+        its = self._rpc("item.get", {"itemids": itemids, "output": ["itemid", "lastvalue", "lastclock", "state"]}) if itemids else []
+        return {"triggers": {t["triggerid"]: {"estado": "problema" if t.get("value") == "1" else "ok", "desde": t.get("lastchange", "0"),
+                                              "prioridad": t.get("priority", "3"), "deshabilitado": t.get("status") == "1"} for t in trg},
+                "items": {i["itemid"]: {"valor": i.get("lastvalue", ""), "reloj": i.get("lastclock", "0"), "error": i.get("state") == "1"} for i in its}}
+
+    def historial_caidas(self, triggerids: list[str], limite: int = 30) -> list[dict]:
+        """Últimas caídas de esas alertas: [{triggerid, inicio, fin|None}] (fin = None si sigue caído)."""
+        if self.demo or not triggerids:
+            return []
+        ev = self._rpc("event.get", {"source": 0, "object": 0, "objectids": triggerids, "value": 1, "sortfield": ["clock"],
+                                     "sortorder": "DESC", "limit": limite, "output": ["eventid", "objectid", "clock", "r_eventid"]})
+        rec = [e["r_eventid"] for e in ev if e.get("r_eventid") not in (None, "", "0")]
+        cierre = {}
+        if rec:
+            for r in self._rpc("event.get", {"eventids": rec, "output": ["eventid", "clock"]}):
+                cierre[r["eventid"]] = r["clock"]
+        return [{"triggerid": e["objectid"], "inicio": e["clock"], "fin": cierre.get(e.get("r_eventid"))} for e in ev]
 
 
 def cliente(cfg) -> ZabbixClient:

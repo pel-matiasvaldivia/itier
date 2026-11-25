@@ -30,14 +30,14 @@ PUEDE_INVITAR = {
 }
 
 # «reportes» (horas y rentabilidad) no está en ningún rol salvo admin (= todo): maneja plata.
-_TODOS = {"tablero", "tickets", "equipos", "equipos.remoto", "clientes.ver", "m365", "gws", "activos"}
-_PM = _TODOS | {"clientes.editar", "instaladores", "descubrimiento", "curacion", "agentes", "auditoria", "bandeja", "m365.eliminar", "gws.eliminar", "activos.eliminar"}
+_TODOS = {"tablero", "tickets", "equipos", "equipos.remoto", "clientes.ver", "m365", "gws", "activos", "red"}
+_PM = _TODOS | {"red.editar", "clientes.editar", "instaladores", "descubrimiento", "curacion", "agentes", "auditoria", "bandeja", "m365.eliminar", "gws.eliminar", "activos.eliminar"}
 
-_CLIENTE = {"tickets", "equipos", "equipos.remoto", "clientes.ver", "m365", "gws", "activos"}
+_CLIENTE = {"tickets", "equipos", "equipos.remoto", "clientes.ver", "m365", "gws", "activos", "red"}
 
 # PM y administrador de cliente: además configuran su propia empresa (Microsoft 365, Google Workspace, Mesh, canales)
 # y gestionan a su equipo de TI. El administrador puede invitar a todos los roles de cliente; el PM, solo técnicos.
-_CLIENTE_PM = _CLIENTE | {"clientes.editar", "m365.eliminar", "gws.eliminar", "activos.eliminar", "equipo.cliente"}
+_CLIENTE_PM = _CLIENTE | {"red.editar", "clientes.editar", "m365.eliminar", "gws.eliminar", "activos.eliminar", "equipo.cliente"}
 
 PERMISOS = {
     "tecnico_cliente": _CLIENTE,

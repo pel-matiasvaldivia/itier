@@ -512,3 +512,15 @@ img,svg,video{max-width:100%;height:auto}
 .u-avatar.tecnico_cliente{background:linear-gradient(135deg,#f59e0b,#d97706)}
 .u-pill.info{background:#e0f2fe;color:#075985}
 .u-pill{white-space:normal}
+
+/* Red y alertas */
+.rchecks{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,240px),1fr));gap:.7rem;margin-top:.6rem}
+.rcheck{border:1px solid var(--line);border-radius:14px;padding:.8rem .9rem;background:#fbfcff;min-width:0}
+.rcheck.ok{border-color:#bbf7d0;background:#f6fef9}.rcheck.bad{border-color:#fca5a5;background:#fff5f5}
+.rcheck h3{font-size:1rem;margin:.5rem 0 .1rem;overflow-wrap:anywhere}
+.rc-top{display:flex;justify-content:space-between;align-items:center;gap:.5rem}
+.rc-meta{margin:.4rem 0 0;font-size:.82rem;color:var(--muted)}.rc-meta b{color:var(--ink)}
+.rtool{display:flex;flex-wrap:wrap;gap:.6rem;align-items:center;justify-content:space-between;margin:.4rem 0}
+.rranges{display:flex;flex-wrap:wrap;gap:.4rem;min-width:0}.rbtns{display:flex;flex-wrap:wrap;gap:.4rem;align-items:center}
+.rfilt{display:flex;flex-wrap:wrap;gap:.5rem;align-items:center;margin:.6rem 0}
+#r-chips{display:flex;flex-wrap:wrap;gap:.35rem}

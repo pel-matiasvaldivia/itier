@@ -1432,6 +1432,50 @@ acl.post(f"/clientes/canal-sa/equipo/{_db_().execute('SELECT id FROM users WHERE
 check("equipo TI: el administrador da de baja al PM y pierde el acceso al instante", pcl.get("/clientes/canal-sa").url.path != "/clientes/canal-sa")
 _cx = _db_(); _cx.execute("UPDATE clients SET gws_sa=NULL, gws_admin=NULL, gws_estado=NULL, gws_detalle=NULL, gws_dominio=NULL, gws_conectado_at=NULL WHERE slug='canal-sa'"); _cx.commit(); _cx.close()
 
+# Red y alertas: barrido de equipos activos y chequeos de conectividad
+from itier_console.services import red as _red  # noqa: E402
+from itier_console.adapters import zabbix as _zm  # noqa: E402
+_pr = c.get("/clientes/canal-sa/red")
+check("red: la pantalla abre para el administrador", _pr.status_code == 200 and "Red y alertas" in _pr.text and "Agregar rango" in _pr.text)
+check("red: rechaza rangos públicos o enormes",
+      all(m in c.post("/clientes/canal-sa/red/rango", data={"nombre": "x", "iprange": r_, "csrf": csrf_de(_pr.text)}, follow_redirects=True).text for r_, m in (("8.8.8.0/24", "inválido"), ("10.0.0.0/8", "demasiado grande"))))
+c.post("/clientes/canal-sa/red/rango", data={"nombre": "LAN oficina", "iprange": "192.168.1.0/24", "csrf": csrf_de(_pr.text)})
+_pr = c.get("/clientes/canal-sa/red")
+check("red: muestra los equipos del barrido, los activos y los que no responden", "192.168.1.57" in _pr.text and "Sin respuesta" in _pr.text and "Monitoreado" in _pr.text)
+check("red: «Escanear ahora» confirma", "Barrido iniciado" in c.post("/clientes/canal-sa/red/escanear", data={"csrf": csrf_de(_pr.text)}, follow_redirects=True).text)
+check("red: exporta los equipos activos a CSV", "192.168.1.57" in c.get("/clientes/canal-sa/red/hosts.csv").text and c.get("/clientes/canal-sa/red/hosts.csv").headers["content-type"].startswith("text/csv"))
+for tipo_, dest_, nom_ in (("internet", "8.8.8.8, 1.1.1.1", ""), ("gateway", "192.168.1.1", "Router sede")):
+    c.post("/clientes/canal-sa/red/chequeo", data={"tipo": tipo_, "destino": dest_, "nombre": nom_, "csrf": csrf_de(c.get("/clientes/canal-sa/red").text)})
+c.post("/clientes/canal-sa/red/chequeo", data={"tipo": "wan_snmp", "destino": "192.168.1.1", "community": "public", "ifindex": "2", "nombre": "WAN ISP", "csrf": csrf_de(c.get("/clientes/canal-sa/red").text)})
+_pr = c.get("/clientes/canal-sa/red")
+check("red: crea los chequeos de Internet, gateway y WAN por SNMP", all(x in _pr.text for x in ("Internet", "Router sede", "WAN ISP")) and "Interfaz WAN del router (SNMP)" in _pr.text)
+check("red: un destino inválido se rechaza", "inválido" in c.post("/clientes/canal-sa/red/chequeo", data={"tipo": "internet", "destino": "no es un host!", "csrf": csrf_de(_pr.text)}, follow_redirects=True).text)
+check("red: un ifIndex fuera de rango se rechaza", "ifIndex" in c.post("/clientes/canal-sa/red/chequeo", data={"tipo": "wan_snmp", "destino": "192.168.1.1", "community": "public", "ifindex": "0", "csrf": csrf_de(_pr.text)}, follow_redirects=True).text)
+# vigía: una caída abre alerta y ticket; la recuperación la cierra
+_cx = _db.connect(os.environ["ITIER_CONSOLE_DB"])
+_cid_r = _cx.execute("SELECT id FROM clients WHERE slug='canal-sa'").fetchone()["id"]
+_trg = _cx.execute("SELECT zbx_trigger FROM red_chequeos WHERE client_id=? AND tipo='internet'", (_cid_r,)).fetchone()["zbx_trigger"]
+_zm._DEMO_RED["triggers"][_trg]["value"] = "1"
+_n_ = _red.sincronizar(_cx, app.state.cfg)
+_al = _cx.execute("SELECT * FROM red_alertas WHERE client_id=?", (_cid_r,)).fetchall()
+check("vigía: una caída detectada abre una alerta con ticket", _n_ >= 1 and len(_al) == 1 and _al[0]["fin"] is None and _al[0]["ticket_id"], [dict(a) for a in _al])
+check("vigía: la pantalla marca el chequeo como CAÍDO y cuenta la alerta activa", "CAÍDO" in c.get("/clientes/canal-sa/red").text)
+check("vigía: no repite la alerta mientras sigue caído", _red.sincronizar(_cx, app.state.cfg) == 0 and _cx.execute("SELECT COUNT(*) n FROM red_alertas WHERE client_id=?", (_cid_r,)).fetchone()["n"] == 1)
+_zm._DEMO_RED["triggers"][_trg]["value"] = "0"
+_red.sincronizar(_cx, app.state.cfg)
+check("vigía: al recuperarse cierra la alerta", _cx.execute("SELECT fin FROM red_alertas WHERE client_id=?", (_cid_r,)).fetchone()["fin"] is not None)
+_cx.close()
+check("red: un técnico interno ve la pantalla pero no puede crear chequeos", ttec.get("/clientes/canal-sa/red").status_code == 200
+      and "Agregar un chequeo" not in ttec.get("/clientes/canal-sa/red").text)
+ttec.post("/clientes/canal-sa/red/chequeo", data={"tipo": "internet", "destino": "9.9.9.9", "csrf": csrf_de(ttec.get("/clientes/canal-sa/red").text)})
+check("red: el técnico no pudo crear un chequeo por POST directo", "9.9.9.9" not in c.get("/clientes/canal-sa/red").text)
+_ch_id = _db.connect(os.environ["ITIER_CONSOLE_DB"]).execute("SELECT id FROM red_chequeos WHERE tipo='gateway'").fetchone()["id"]
+c.post(f"/clientes/otra-empresa-sa/red/chequeo/{_ch_id}/quitar", data={"csrf": csrf_de(c.get("/clientes/canal-sa/red").text)})
+check("red: no se puede borrar un chequeo de otro cliente cambiando el slug", _db.connect(os.environ["ITIER_CONSOLE_DB"]).execute("SELECT 1 FROM red_chequeos WHERE id=?", (_ch_id,)).fetchone() is not None)
+check("red: el técnico de cliente ve la red de SU empresa y no la de otra", tcl2.get("/clientes/canal-sa/red").status_code == 200 and tcl2.get("/clientes/otra-empresa-sa/red").url.path != "/clientes/otra-empresa-sa/red")
+c.post(f"/clientes/canal-sa/red/chequeo/{_ch_id}/quitar", data={"csrf": csrf_de(c.get("/clientes/canal-sa/red").text)})
+check("red: se puede quitar un chequeo propio", "Router sede" not in c.get("/clientes/canal-sa/red").text)
+
 _p = {x["email"]: dict(x) for x in _conn.execute("SELECT * FROM client_contactos WHERE client_id=? AND email IS NOT NULL", (_cid_,))}
 check("usuarios nube: se traen los que tienen licencia activa con cargo y área", "lic@clientedemo.com.ar" in _p and _p["lic@clientedemo.com.ar"]["cargo"] == "Contadora" and _p["lic@clientedemo.com.ar"]["area"] == "Finanzas"
       and _p["lic@clientedemo.com.ar"]["origen"] == "m365" and _p["ana@clientedemo.com.ar"]["origen"] == "m365" and "luis@clientedemo.com.ar" in _p)

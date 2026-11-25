@@ -77,6 +77,42 @@ CREATE TABLE IF NOT EXISTS clients (
 
 -- Resultado que reporta cada equipo Windows al terminar su instalación
 -- (servicios corriendo + conexión). Una fila por equipo (último reporte).
+-- ── Red: barridos de hosts activos y chequeos de conectividad (Zabbix, vía el proxy del cliente) ─────
+CREATE TABLE IF NOT EXISTS red_rangos (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    client_id   INTEGER NOT NULL,
+    nombre      TEXT    NOT NULL,
+    iprange     TEXT    NOT NULL,              -- formato Zabbix: 192.168.1.1-254 · 192.168.1.0/24
+    drule_id    TEXT,
+    estado      TEXT,
+    created_at  TEXT    NOT NULL,
+    created_by  TEXT
+);
+CREATE TABLE IF NOT EXISTS red_chequeos (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    client_id   INTEGER NOT NULL,
+    tipo        TEXT    NOT NULL,              -- internet | gateway | wan_snmp | puerto
+    nombre      TEXT    NOT NULL,
+    destino     TEXT    NOT NULL,
+    params      TEXT,                          -- JSON (sin secretos)
+    zbx_hostid  TEXT,
+    zbx_trigger TEXT,
+    zbx_items   TEXT,                          -- ids de items separados por coma
+    estado      TEXT,                          -- ok | problema | desconocido (último visto por el vigía)
+    desde       TEXT,
+    created_at  TEXT    NOT NULL,
+    created_by  TEXT
+);
+CREATE TABLE IF NOT EXISTS red_alertas (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    client_id   INTEGER NOT NULL,
+    chequeo_id  INTEGER NOT NULL,
+    inicio      TEXT    NOT NULL,
+    fin         TEXT,
+    aviso       TEXT,                          -- resultado del aviso por correo
+    ticket_id   INTEGER
+);
+
 CREATE TABLE IF NOT EXISTS endpoint_reports (
     id            INTEGER PRIMARY KEY AUTOINCREMENT,
     client_id     INTEGER NOT NULL,

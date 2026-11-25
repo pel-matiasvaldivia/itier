@@ -261,6 +261,43 @@ def handler(request: httpx.Request) -> httpx.Response:
             return _rpc(body, [])
         if m == "proxy.create":
             return _rpc(body, {"proxyids": ["9"]})
+        if m == "drule.get":
+            return _rpc(body, [])
+        if m == "drule.create":
+            return _rpc(body, {"druleids": ["71"]})
+        if m in ("drule.update", "drule.delete"):
+            return _rpc(body, {"druleids": ["71"]})
+        if m == "dhost.get":
+            return _rpc(body, [{"dhostid": "1", "status": "0", "lastup": "1764085000", "lastdown": "0",
+                                "dservices": [{"ip": "192.168.1.5", "dns": "pc5.lan", "port": "0", "type": "12", "status": "0"},
+                                              {"ip": "192.168.1.5", "dns": "pc5.lan", "port": "445", "type": "9", "status": "0"}]},
+                               {"dhostid": "2", "status": "1", "lastup": "1763900000", "lastdown": "1764000000",
+                                "dservices": [{"ip": "192.168.1.9", "dns": "", "port": "0", "type": "12", "status": "1"}]}])
+        if m == "host.get" and (params.get("filter") or {}).get("host", "").startswith("itier-red-"):
+            return _rpc(body, [])
+        if m == "host.create":
+            return _rpc(body, {"hostids": ["601"]})
+        if m == "hostinterface.get":
+            return _rpc(body, [{"interfaceid": "701"}])
+        if m == "item.get" and (params.get("filter") or {}).get("key_"):
+            return _rpc(body, [])
+        if m == "item.get":
+            return _rpc(body, [{"itemid": "801", "lastvalue": "0.012", "lastclock": "1764085000", "state": "0"}])
+        if m == "item.create":
+            return _rpc(body, {"itemids": ["801"]})
+        if m == "trigger.get" and (params.get("filter") or {}).get("description"):
+            return _rpc(body, [])
+        if m == "trigger.get":
+            return _rpc(body, [{"triggerid": "901", "value": "1", "lastchange": "1764085000", "priority": "5", "status": "0"}])
+        if m == "trigger.create":
+            return _rpc(body, {"triggerids": ["901"]})
+        if m in ("trigger.delete", "item.delete"):
+            return _rpc(body, {})
+        if m == "event.get" and params.get("eventids"):
+            return _rpc(body, [{"eventid": "55", "clock": "1764085600"}])
+        if m == "event.get":
+            return _rpc(body, [{"eventid": "50", "objectid": "901", "clock": "1764085000", "r_eventid": "55"},
+                               {"eventid": "60", "objectid": "901", "clock": "1764090000", "r_eventid": "0"}])
         if m == "host.get":
             if params.get("hostids"):
                 return _rpc(body, [{"hostid": "501", "hostgroups": [{"groupid": "5"}]}])
@@ -398,6 +435,40 @@ check("zabbix: da lectura/escritura al grupo de hosts del cliente SIN pisar los 
 put = next((x for x in captured if x["path"].endswith("/Computer/501") and x["method"] == "PUT"), None)
 check("glpi.fijar_criticidad hace PUT con businesscriticities_id",
       put and "businesscriticities_id" in put["body"]["input"], str(put["body"]) if put else "—")
+
+# ── Zabbix: barrido de red y chequeos de conectividad ───────────────────────
+captured.clear()
+with zbx_mod.cliente(cfg) as z:
+    _dr = z.asegurar_regla_descubrimiento("itier-red-x-LAN", "192.168.1.0/24", "9")
+    _hd = z.hosts_descubiertos([_dr])
+    z.escanear_ahora(_dr)
+    _hid, _iid = z.asegurar_host_chequeos("itier-red-x", "Red · X", "5", "9")
+    _it = z.asegurar_item(_hid, _iid, "Ping a 8.8.8.8", "icmpping[8.8.8.8]")
+    _tr = z.asegurar_trigger("Sin Internet · X", "max(/itier-red-x/icmpping[8.8.8.8],#3)=0", 5)
+    _est = z.estado_alertas([_tr], [_it])
+    _hist = z.historial_caidas([_tr])
+_dc = next(x for x in captured if x["body"].get("method") == "drule.create")["body"]["params"]
+check("zbx.drule: crea la regla con iprange, proxy y checks ICMP + TCP",
+      _dr == "71" and _dc["iprange"] == "192.168.1.0/24" and _dc["proxyid"] == "9"
+      and {c["type"] for c in _dc["dchecks"]} == {12, 9} and "445" in [c for c in _dc["dchecks"] if c["type"] == 9][0]["ports"], str(_dc))
+check("zbx.drule: «escanear ahora» deshabilita y vuelve a habilitar la regla",
+      [x["body"]["params"].get("status") for x in captured if x["body"].get("method") == "drule.update"] == [1, 0])
+check("zbx.dhost: parsea activos/caídos, DNS y puertos TCP abiertos",
+      len(_hd) == 2 and _hd[0]["ip"] == "192.168.1.5" and _hd[0]["estado"] == "up" and _hd[0]["puertos"] == [445] and _hd[1]["estado"] == "down", str(_hd))
+_hc = next(x for x in captured if x["body"].get("method") == "host.create")["body"]["params"]
+check("zbx.host: el host de chequeos va en el proxy del cliente y en su grupo",
+      _hc["monitored_by"] == 1 and _hc["proxyid"] == "9" and _hc["groups"] == [{"groupid": "5"}] and _hid == "601" and _iid == "701", str(_hc))
+_ic = next(x for x in captured if x["body"].get("method") == "item.create")["body"]["params"]
+check("zbx.item: chequeo simple (tipo 3) con la clave icmpping", _ic["type"] == 3 and _ic["key_"] == "icmpping[8.8.8.8]" and _ic["interfaceid"] == "701")
+_tc = next(x for x in captured if x["body"].get("method") == "trigger.create")["body"]["params"]
+check("zbx.trigger: prioridad y expresión con 3 fallos seguidos", _tc["priority"] == 5 and "max(/itier-red-x/icmpping[8.8.8.8],#3)=0" == _tc["expression"])
+check("zbx.estado_alertas: trigger en problema y valor del item", _est["triggers"]["901"]["estado"] == "problema" and _est["items"]["801"]["valor"] == "0.012", str(_est))
+check("zbx.historial: caída cerrada con su recuperación y caída abierta", len(_hist) == 2 and _hist[0]["fin"] == "1764085600" and _hist[1]["fin"] is None, str(_hist))
+captured.clear()
+with zbx_mod.cliente(cfg) as z:
+    z.asegurar_item("601", "701", "Estado WAN 2", "wan.ifOperStatus[2]", tipo="snmp", oid="1.3.6.1.2.1.2.2.1.8.2")
+_sn = next(x for x in captured if x["body"].get("method") == "item.create")["body"]["params"]
+check("zbx.item SNMP: tipo 20 con el OID de ifOperStatus", _sn["type"] == 20 and _sn["snmp_oid"] == "1.3.6.1.2.1.2.2.1.8.2")
 
 # ── Autoasignación: regla GLPI por tag + autorregistro Zabbix ────────────────
 captured.clear()

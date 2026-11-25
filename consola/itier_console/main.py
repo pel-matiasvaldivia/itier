@@ -38,6 +38,7 @@ from .routes import gws as r_gws
 from .routes import m365 as r_m365
 from .routes import manual as r_manual
 from .routes import portal as r_portal
+from .routes import red as r_red
 from .routes import reportes as r_reportes
 from .routes import tickets as r_tickets
 from .routes import usuarios as r_usuarios
@@ -79,6 +80,8 @@ def create_app() -> FastAPI:
     app.state.cfg = cfg
     from .services import canales as _canales
     _canales.iniciar_poller(cfg)
+    from .services import red as _red
+    _red.iniciar_vigia(cfg)
 
     app.add_middleware(
         SessionMiddleware,
@@ -159,6 +162,7 @@ def create_app() -> FastAPI:
     app.include_router(r_activos.router)
     app.include_router(r_gws.router)
     app.include_router(r_equipo_cliente.router)
+    app.include_router(r_red.router)
     app.include_router(r_reportes.router)
     app.include_router(r_audit.router)
     app.include_router(r_portal.router)

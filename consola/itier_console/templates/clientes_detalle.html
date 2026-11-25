@@ -20,6 +20,7 @@
     {% if puede('descubrimiento') %}<a href="/clientes/{{ cli.slug }}/descubrimiento">📡 Descubrimiento de red</a>{% endif %}
     {% if puede('agentes') %}<a href="/clientes/{{ cli.slug }}/agentes">📈 Agentes de Zabbix</a>{% endif %}
     {% if puede('tickets') %}<a href="/tickets?cliente={{ cli.slug }}">🎫 Tickets</a>{% endif %}
+    {% if puede('red') %}<a href="/clientes/{{ cli.slug }}/red">🌐 Red y alertas</a>{% endif %}
     {% if puede('equipo.cliente') %}<a href="/clientes/{{ cli.slug }}/equipo">👥 Equipo de TI</a>{% endif %}
   </div>
 

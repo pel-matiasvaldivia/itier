@@ -1,0 +1,155 @@
+{% extends "base.html" %}
+{% block titulo %}Red y alertas · {{ cli.nombre }} · Consola de iTiers{% endblock %}
+{% block contenido %}
+  <div class="l-head">
+    <div>
+      <p class="u-sub" style="margin:0"><a href="/clientes/{{ cli.slug }}">← {{ cli.nombre }}</a></p>
+      <h1>Red y alertas</h1>
+      <p class="u-sub">Equipos activos en la red de {{ cli.nombre }} y alertas de conectividad. Lo ejecuta el proxy de Zabbix instalado en su red.</p>
+    </div>
+  </div>
+
+  {% if not tiene_proxy %}<div class="note note-bad">Este cliente todavía no tiene proxy de Zabbix. Reintentá el aprovisionamiento desde la ficha.</div>{% endif %}
+
+  <div class="u-stats">
+    <div class="u-stat {{ 'bad' if est.en_problema else '' }}"><b>{{ est.en_problema }}</b><span>Alertas activas</span></div>
+    <div class="u-stat"><b>{{ est.chequeos|length }}</b><span>Chequeos</span></div>
+    <div class="u-stat"><b>{{ activos.resumen.up }}</b><span>Equipos activos</span></div>
+    <div class="u-stat {{ 'warn' if activos.resumen.down else '' }}"><b>{{ activos.resumen.down }}</b><span>Sin respuesta</span></div>
+  </div>
+
+  <section class="u-card" id="alertas">
+    <h2>🚨 Conectividad y alertas</h2>
+    <p class="u-lead">Detecta caídas de Internet, del router o de la interfaz WAN del proveedor. Cuando algo cae, se avisa por correo y se abre un ticket; al volver, se cierra el aviso.</p>
+    {% if est.nota %}<div class="u-err small">{{ est.nota }}</div>{% endif %}
+
+    {% if est.chequeos %}
+    <div class="rchecks">
+      {% for c in est.chequeos %}
+      <div class="rcheck {{ 'bad' if c.estado_vivo == 'problema' else ('ok' if c.estado_vivo == 'ok' else '') }}">
+        <div class="rc-top">
+          <span class="l-pill {{ 'bad' if c.estado_vivo == 'problema' else ('ok' if c.estado_vivo == 'ok' else 'off') }}"><i></i>{{ 'CAÍDO' if c.estado_vivo == 'problema' else ('OK' if c.estado_vivo == 'ok' else 'Sin datos aún') }}</span>
+          {% if puede('red.editar') %}<form method="post" action="/clientes/{{ cli.slug }}/red/chequeo/{{ c.id }}/quitar" class="inline" onsubmit="return confirm('¿Eliminar este chequeo?')"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="u-b danger" type="submit" title="Eliminar">✕</button></form>{% endif %}
+        </div>
+        <h3>{{ c.nombre }}</h3>
+        <p class="l-mut">{{ tipos[c.tipo] }}<br><code>{{ c.destino }}</code></p>
+        <p class="rc-meta">{% if c.latencia_ms is not none %}<b>{{ c.latencia_ms }} ms</b> · {% endif %}{% if c.desde_txt %}{{ 'caído desde' if c.estado_vivo == 'problema' else 'sin cambios desde' }} {{ c.desde_txt }} UTC{% endif %}</p>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}<p class="muted">Todavía no hay chequeos. Creá el primero: el más útil es «Internet».</p>{% endif %}
+
+    {% if puede('red.editar') %}
+    <details style="margin-top:.9rem" {{ 'open' if not est.chequeos else '' }}><summary class="small"><b>+ Agregar un chequeo</b></summary>
+      <form method="post" action="/clientes/{{ cli.slug }}/red/chequeo" class="form cols2" id="f-chequeo">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <label>Qué vigilar
+          <select name="tipo" id="rc-tipo">{% for k, v in tipos.items() %}<option value="{{ k }}">{{ v }}</option>{% endfor %}</select></label>
+        <label>Nombre (opcional) <input type="text" name="nombre" maxlength="80" placeholder="Internet sede central"></label>
+        <label class="span-all" id="rc-dest">Destino <input type="text" name="destino" id="rc-destino" value="8.8.8.8, 1.1.1.1" placeholder="8.8.8.8, 1.1.1.1"></label>
+        <label class="rc-snmp" hidden>Community SNMP <input type="password" name="community" autocomplete="off" placeholder="public"></label>
+        <label class="rc-snmp" hidden>Índice de la interfaz WAN (ifIndex) <input type="number" name="ifindex" min="1" max="9999" placeholder="2"></label>
+        <button class="u-btn" type="submit" style="justify-self:start">Crear chequeo</button>
+      </form>
+      <p class="muted small" id="rc-ayuda">Se hace ping cada 30 segundos desde el proxy del cliente. Se alerta cuando <b>todos</b> los destinos fallan 3 veces seguidas (evita falsas alarmas).</p>
+    </details>
+    {% endif %}
+
+    {% if est.caidas %}
+    <h3 style="margin:1.1rem 0 .4rem;font-size:1rem">Últimas caídas</h3>
+    <div class="tscroll"><table class="tabla">
+      <thead><tr><th>Chequeo</th><th>Inicio (UTC)</th><th>Fin</th><th>Duración</th></tr></thead>
+      <tbody>{% for k in est.caidas %}<tr><td>{{ k.chequeo }}</td><td>{{ k.inicio }}</td><td>{{ k.fin or 'sigue caído' }}</td><td>{{ (k.minutos ~ ' min') if k.minutos is not none else '—' }}</td></tr>{% endfor %}</tbody>
+    </table></div>
+    {% endif %}
+  </section>
+
+  <section class="u-card" id="activos" style="margin-top:.95rem">
+    <h2>📡 Equipos activos en la red</h2>
+    <p class="u-lead">Barre los rangos de IP con ping y puertos típicos (SMB, RDP, HTTP, SSH). Algunos equipos no contestan ping pero sí tienen puertos abiertos; los que bloquean todo no aparecen.</p>
+    {% if activos.nota %}<div class="u-err small">{{ activos.nota }}</div>{% endif %}
+
+    <div class="rtool">
+      <div class="rranges">
+        {% for r in rangos %}<span class="l-pill info wrap">{{ r.nombre }} · <code>{{ r.iprange }}</code>
+          {% if puede('red.editar') %}<form method="post" action="/clientes/{{ cli.slug }}/red/rango/{{ r.id }}/quitar" class="inline"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="u-b danger" type="submit" title="Quitar rango" style="padding:.05rem .4rem">✕</button></form>{% endif %}</span>
+        {% else %}<span class="muted small">Sin rangos: agregá la red de la sede (ej.: 192.168.1.0/24).</span>{% endfor %}
+      </div>
+      <div class="rbtns">
+        {% if rangos %}<form method="post" action="/clientes/{{ cli.slug }}/red/escanear" class="inline"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="u-btn" type="submit">🔎 Escanear ahora</button></form>
+        <a class="u-b" href="/clientes/{{ cli.slug }}/red/hosts.csv">⬇ CSV</a>{% endif %}
+      </div>
+    </div>
+
+    {% if puede('red.editar') %}
+    <details style="margin:.6rem 0"><summary class="small"><b>+ Agregar rango</b></summary>
+      <form method="post" action="/clientes/{{ cli.slug }}/red/rango" class="form cols">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <label>Nombre <input type="text" name="nombre" maxlength="60" placeholder="LAN oficina"></label>
+        <label>Rango <input type="text" name="iprange" required placeholder="192.168.1.0/24"></label>
+        <button class="u-b" type="submit">Agregar</button>
+      </form>
+      <p class="muted small">Formatos: <code>192.168.1.0/24</code> o <code>192.168.1.1-254</code>; varios separados por coma. Solo redes privadas, hasta /22.</p>
+    </details>
+    {% endif %}
+
+    {% if activos.hosts %}
+    <div class="rfilt"><input class="u-search" type="search" id="r-buscar" placeholder="Buscar IP o nombre…" aria-label="Buscar equipo">
+      <span id="r-chips"><button type="button" class="u-b on" data-f="">Todos</button><button type="button" class="u-b" data-f="up">Activos</button><button type="button" class="u-b" data-f="down">Sin respuesta</button><button type="button" class="u-b" data-f="nomon">Sin monitorear</button></span></div>
+    <div class="tscroll"><table class="tabla" id="r-tabla">
+      <thead><tr><th>IP</th><th>Nombre</th><th>Estado</th><th>Puertos</th><th>Zabbix</th><th>Último visto</th></tr></thead>
+      <tbody>
+      {% for h in activos.hosts %}
+      <tr data-q="{{ (h.ip ~ ' ' ~ h.dns)|lower }}" data-e="{{ h.estado }}" data-m="{{ 1 if h.monitoreado else 0 }}">
+        <td><b>{{ h.ip }}</b></td><td>{{ h.dns or '—' }}</td>
+        <td>{% if h.estado == 'up' %}<span class="l-pill ok"><i></i>Activo</span>{% else %}<span class="l-pill warn"><i></i>Sin respuesta</span>{% endif %}</td>
+        <td class="l-mut">{{ h.puertos|join(', ') if h.puertos else '—' }}</td>
+        <td>{% if h.monitoreado %}<span class="l-pill ok">Monitoreado</span>{% else %}<span class="l-pill off">No</span>{% endif %}</td>
+        <td class="l-mut">{{ h.visto }}</td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table></div>
+    <div class="l-empty" id="r-vacio" hidden>Ningún equipo coincide.</div>
+    {% elif rangos %}<p class="muted">Todavía no hay resultados. Tocá «Escanear ahora» y esperá un par de minutos.</p>{% endif %}
+  </section>
+
+  <script>
+    (function () {
+      var t = document.getElementById('rc-tipo');
+      if (t) {
+        var ayuda = {
+          internet: ['8.8.8.8, 1.1.1.1', 'Se hace ping cada 30 segundos desde el proxy del cliente. Se alerta cuando <b>todos</b> los destinos fallan 3 veces seguidas.'],
+          gateway: ['192.168.1.1', 'Ping al router/gateway de la sede. Si cae, la red local del cliente no sale ni a Internet.'],
+          wan_snmp: ['192.168.1.1', 'Lee por SNMP el estado de la interfaz WAN del router (necesita SNMP habilitado, community e ifIndex de esa interfaz). Alerta cuando deja de estar «up».'],
+          puerto: ['200.1.2.3:443', 'Comprueba que un servicio TCP (VPN, web, correo) responde. Formato IP:puerto.']
+        };
+        var f = function () {
+          var a = ayuda[t.value];
+          document.getElementById('rc-destino').value = a[0];
+          document.getElementById('rc-destino').placeholder = a[0];
+          document.getElementById('rc-ayuda').innerHTML = a[1];
+          document.querySelectorAll('.rc-snmp').forEach(function (e) { e.hidden = t.value !== 'wan_snmp'; });
+        };
+        t.addEventListener('change', f);
+      }
+      var q = document.getElementById('r-buscar'), filtro = '';
+      function aplicar() {
+        var x = q ? q.value.trim().toLowerCase() : '', n = 0;
+        document.querySelectorAll('#r-tabla tbody tr').forEach(function (r) {
+          var ok = (!x || r.getAttribute('data-q').indexOf(x) >= 0) && (!filtro || (filtro === 'nomon' ? r.getAttribute('data-m') === '0' : r.getAttribute('data-e') === filtro));
+          r.hidden = !ok; if (ok) n++;
+        });
+        var v = document.getElementById('r-vacio'); if (v) v.hidden = n > 0;
+      }
+      if (q) q.addEventListener('input', aplicar);
+      document.querySelectorAll('#r-chips button').forEach(function (b) {
+        b.addEventListener('click', function () {
+          filtro = b.getAttribute('data-f');
+          document.querySelectorAll('#r-chips button').forEach(function (x) { x.classList.toggle('on', x === b); });
+          aplicar();
+        });
+      });
+    })();
+  </script>
+{% endblock %}
