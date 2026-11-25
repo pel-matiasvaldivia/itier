@@ -292,7 +292,12 @@ def handler(request: httpx.Request) -> httpx.Response:
                                 "dservices": [{"ip": "192.168.1.9", "dns": "", "port": "0", "type": "12", "status": "1"}]}])
         if m == "host.get" and params.get("hostids") == ["601"] and params.get("selectInterfaces") == ["available", "error", "type"]:
             return _rpc(body, [{"hostid": "601", "interfaces": [{"available": "1", "error": "", "type": "2"}]}])
-        if m == "host.get" and (params.get("filter") or {}).get("host", "").startswith(("itier-red-", "itier-mon-")):
+        if m == "host.get" and (params.get("filter") or {}).get("name") == ["Router 192.168.100.1 · DUP"]:
+            return _rpc(body, [{"hostid": "777", "interfaces": [{"interfaceid": "88", "ip": "192.168.100.1"}]}])
+        if m == "host.get" and (params.get("filter") or {}).get("name") == ["Router 192.168.100.2 · OTRO"]:
+            return _rpc(body, [{"hostid": "778", "interfaces": [{"interfaceid": "89", "ip": "10.9.9.9"}]}])
+        if m == "host.get" and ((params.get("filter") or {}).get("host", [""]) or [""])[0].startswith(("itier-red-", "itier-mon-")) \
+                or (m == "host.get" and (params.get("filter") or {}).get("name")):
             return _rpc(body, [])
         if m == "host.create":
             return _rpc(body, {"hostids": ["601"]})
@@ -522,6 +527,12 @@ check("zbx.router: la community no viaja en ningún otro campo", "s3cr3ta" not i
 check("zbx.router: estado con interfaces (WAN2 caída primero) y alertas de las plantillas",
       _er["disponible"] == "si" and _er["interfaces"][0] == {"nombre": "WAN2(ISP2)", "estado": "down"} and _er["interfaces"][1]["estado"] == "up"
       and _er["problemas"][0]["descripcion"].endswith("Link down"), str(_er))
+captured.clear()
+with zbx_mod.cliente(cfg) as z:
+    _dup = z.asegurar_host_router("itier-red-x-router-192-168-100-1", "Router 192.168.100.1 · DUP", "5", "9", "192.168.100.1", "c")
+    _otro = z.asegurar_host_router("itier-red-x-router-192-168-100-2", "Router 192.168.100.2 · OTRO", "5", "9", "192.168.100.2", "c")
+check("zbx.router: si ya existe un host con ese nombre visible y la misma IP lo reutiliza en vez de fallar", _dup == "777")
+check("zbx.router: un host de igual nombre visible pero de OTRA IP no se adopta (se intenta crear)", _otro != "778" and any(x["body"].get("method") == "host.create" for x in captured))
 captured.clear()
 with zbx_mod.cliente(cfg) as z:
     z.asegurar_item("601", "701", "Estado WAN 2", "wan.ifOperStatus[2]", tipo="snmp", oid="1.3.6.1.2.1.2.2.1.8.2")

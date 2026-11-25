@@ -455,10 +455,9 @@ class ZabbixClient:
             hid = _nuevo_id()
             _DEMO_RED["hosts"][hid] = {"host": host, "name": nombre, "ip": ip}
             return hid, hid + "1"
-        existentes = self._rpc("host.get", {"filter": {"host": host}, "output": ["hostid"], "selectInterfaces": ["interfaceid"]})
-        if existentes:
-            h = existentes[0]
-            return h["hostid"], (h.get("interfaces") or [{}])[0].get("interfaceid", "")
+        ya = self._host_existente(host, nombre, (snmp or {}).get("ip") or (ip if ip != "127.0.0.1" else None))
+        if ya:
+            return ya["hostid"], ya["interfaceid"]
         if snmp:
             itf = {"type": 2, "main": 1, "useip": 1, "ip": snmp["ip"], "dns": "", "port": "161",
                    "details": {"version": 2, "bulk": 1, "community": snmp["community"]}}
@@ -519,6 +518,17 @@ class ZabbixClient:
         if itemids:
             self._rpc("item.delete", itemids)
 
+    def _host_existente(self, host: str, nombre: str, ip: str | None = None) -> dict | None:
+        """Host ya creado con ese nombre técnico o ese nombre visible (de un intento anterior o cargado a mano). Si se pasa `ip`, el
+        de nombre visible solo se reutiliza cuando tiene una interfaz con esa IP. → {hostid, interfaceid}."""
+        for filtro in ({"host": [host]}, {"name": [nombre]}):
+            for h in self._rpc("host.get", {"filter": filtro, "output": ["hostid"], "selectInterfaces": ["interfaceid", "ip"]}):
+                itfs = h.get("interfaces") or []
+                if "name" in filtro and ip and itfs and not any(i.get("ip") == ip for i in itfs):
+                    continue
+                return {"hostid": h["hostid"], "interfaceid": (itfs[0].get("interfaceid", "") if itfs else "")}
+        return None
+
     # Plantillas estándar de Zabbix 7.0 para un router/switch genérico: sistema + interfaces por SNMP (IF-MIB) y latencia por ping.
     PLANTILLAS_ROUTER = ("Network Generic Device by SNMP", "ICMP Ping")
 
@@ -532,9 +542,9 @@ class ZabbixClient:
             hid = _nuevo_id()
             _DEMO_RED["hosts"][hid] = {"host": host, "name": nombre, "ip": ip, "router": True}
             return hid
-        existentes = self._rpc("host.get", {"filter": {"host": host}, "output": ["hostid"]})
-        if existentes:
-            return existentes[0]["hostid"]
+        ya = self._host_existente(host, nombre, ip)
+        if ya:
+            return ya["hostid"]
         tpl = self._rpc("template.get", {"filter": {"host": list(self.PLANTILLAS_ROUTER)}, "output": ["templateid", "host"]})
         faltan = set(self.PLANTILLAS_ROUTER) - {t["host"] for t in tpl}
         if "Network Generic Device by SNMP" in faltan:
