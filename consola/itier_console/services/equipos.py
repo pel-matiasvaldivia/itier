@@ -12,6 +12,15 @@ from ..adapters import glpi as glpi_mod, mesh as mesh_mod, zabbix as zbx_mod
 from . import mesh_cliente as mesh_propio
 
 
+# Montajes internos de contenedores y del sistema: no son discos de nadie y ensucian la lista (p. ej. /usr/sbin/docker-init).
+_PSEUDO = ("/usr/sbin/docker-init", "/etc/hosts", "/etc/hostname", "/etc/resolv.conf", "/dev", "/proc", "/sys", "/run")
+
+
+def _es_pseudo(nombre: str) -> bool:
+    n = (nombre or "")
+    return any(n == p or n.startswith(p + "/") for p in _PSEUDO)
+
+
 def evaluar(salud: dict | None, umbral: int, en_linea: bool | None = None) -> dict:
     """Discos, antivirus y alertas de UN equipo a partir de lo inventariado.
 
@@ -23,6 +32,8 @@ def evaluar(salud: dict | None, umbral: int, en_linea: bool | None = None) -> di
     discos, alertas = [], []
     antivirus = (salud or {}).get("antivirus") or []
     for d in (salud or {}).get("discos") or []:
+        if _es_pseudo(d.get("nombre", "")):
+            continue
         total, libre = int(d.get("total_mb") or 0), int(d.get("libre_mb") or 0)
         if total <= 0:
             continue
@@ -31,8 +42,12 @@ def evaluar(salud: dict | None, umbral: int, en_linea: bool | None = None) -> di
                        "libre_gb": round(libre / 1024, 1), "alerta": pct >= umbral})
         if pct >= umbral:
             alertas.append(("alta" if pct >= 95 else "media", f"Disco {d['nombre']} al {pct} % ({round(libre / 1024, 1)} GB libres)"))
+    montajes = [d["nombre"] for d in (salud or {}).get("discos") or [] if d.get("nombre")]
+    unix = bool(montajes) and all(n.startswith("/") for n in montajes)   # Linux/macOS (p. ej. el appliance): el antivirus no aplica
     if not (salud or {}).get("inventariado"):
         av_estado = "sin_datos"
+    elif unix and not antivirus:
+        av_estado = "no_aplica"
     elif not antivirus:
         av_estado = "ninguno"
         alertas.append(("media", "No se detectó antivirus"))

@@ -50,7 +50,7 @@
             <div class="l-disks">
               {% for d in e.discos %}
               <div class="l-disk" title="{{ d.libre_gb }} GB libres de {{ d.total_gb }} GB">
-                <code>{{ d.nombre }}</code>
+                <code title="{{ d.nombre }}">{{ d.nombre }}</code>
                 <div class="l-bar {{ 'bad' if d.alerta else ('warn' if d.pct >= umbral - 10 else '') }}"><i style="width:{{ [d.pct, 100] | min }}%"></i></div>
                 <b>{{ d.pct }}%</b>
               </div>
@@ -62,6 +62,7 @@
             {% if e.av_estado == 'on' %}<span class="l-pill ok"><i></i>ON</span>
             {% elif e.av_estado == 'off' %}<span class="l-pill bad"><i></i>OFF</span>
             {% elif e.av_estado == 'ninguno' %}<span class="l-pill warn"><i></i>Ninguno</span>
+            {% elif e.av_estado == 'no_aplica' %}<span class="muted small" title="Equipo Linux/macOS: no se evalúa antivirus">No aplica</span>
             {% else %}<span class="muted small">sin datos</span>{% endif %}
           </td>
           <td>

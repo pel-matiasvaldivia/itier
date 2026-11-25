@@ -257,8 +257,8 @@ body.auth{background:linear-gradient(135deg,#eef2ff,#e0f2fe);min-height:100vh}
 .l-empty b{display:block;font-size:2rem;margin-bottom:.4rem}
 /* barras de uso de disco */
 .l-disks{display:flex;flex-direction:column;gap:.45rem;min-width:170px}
-.l-disk{display:grid;grid-template-columns:2.2rem 1fr 2.6rem;align-items:center;gap:.5rem;font-size:.8rem}
-.l-disk code{background:none;color:var(--muted);padding:0}
+.l-disk{display:grid;grid-template-columns:minmax(3.2rem,6.5rem) minmax(5rem,1fr) 2.6rem;align-items:center;gap:.5rem;font-size:.8rem}
+.l-disk code{background:none;color:var(--muted);padding:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
 .l-bar{height:.55rem;background:#e2e8f0;border-radius:999px;overflow:hidden}
 .l-bar i{display:block;height:100%;background:linear-gradient(90deg,#34d399,#10b981);border-radius:999px}
 .l-bar.warn i{background:linear-gradient(90deg,#fbbf24,#f59e0b)}

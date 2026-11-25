@@ -1510,5 +1510,13 @@ html = c.get("/login").text
 r = c.post("/login", data={"username": "admin", "password": "mala", "csrf": csrf_de(html)})
 check("contraseña incorrecta NO avanza a 2FA", r.url.path == "/login", r.url.path)
 
+# Equipos: el appliance Linux no genera falsas alertas de antivirus ni muestra montajes internos de Docker
+from itier_console.services.equipos import evaluar as _ev
+_lin = _ev({"inventariado": True, "antivirus": [], "discos": [
+    {"nombre": "/usr/sbin/docker-init", "total_mb": 1000, "libre_mb": 100}, {"nombre": "/", "total_mb": 100000, "libre_mb": 80000}]}, 90)
+check("equipos: un Linux sin antivirus no alerta y no muestra /usr/sbin/docker-init", _lin["av_estado"] == "no_aplica" and not _lin["alertas"] and [d["nombre"] for d in _lin["discos"]] == ["/"], _lin)
+_win = _ev({"inventariado": True, "antivirus": [], "discos": [{"nombre": "C:", "total_mb": 1000, "libre_mb": 500}]}, 90)
+check("equipos: un Windows sin antivirus sí alerta", _win["av_estado"] == "ninguno" and any("antivirus" in a[1].lower() for a in _win["alertas"]))
+
 print("\nRESULTADO:", "TODO OK" if not fails else f"{len(fails)} FALLAS: {fails}")
 sys.exit(1 if fails else 0)
