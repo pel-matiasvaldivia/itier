@@ -19,6 +19,7 @@
       </nav>
       <span class="muted small">Tocá <strong>Conectar</strong> dentro de la vista. La primera vez iniciá sesión en Mesh con tu usuario de técnico. Registrá en el ticket el motivo.</span>
       <span style="margin-left:auto;display:flex;gap:.45rem">
+        <button class="u-b" type="button" id="btn-ir" title="Si Mesh te dejó en la lista de equipos, volvé a abrir este">↻ Ir al equipo</button>
         <button class="u-b" type="button" id="btn-full">⛶ Pantalla completa</button>
         <a class="u-b" href="{{ src }}" target="_blank" rel="noopener" style="text-decoration:none">↗ Otra pestaña</a>
       </span>
@@ -28,6 +29,15 @@
   <script>
     (function () {
       var caja = document.getElementById('remoto'), b = document.getElementById('btn-full');
+      // Al iniciar sesión, MeshCentral te lleva a su inicio y pierde el enlace al equipo (queda la lista de grupos).
+      // Si el marco carga una segunda página (login → inicio), volvemos a abrir el equipo una sola vez, ya con la sesión activa.
+      var marco = document.getElementById('marco'), destino = {{ src|tojson }}, cargas = 0, reabierto = false;
+      function irAlEquipo() { try { marco.contentWindow.location.replace(destino); } catch (e) { marco.src = destino; } }
+      marco.addEventListener('load', function () {
+        cargas += 1;
+        if (cargas === 2 && !reabierto) { reabierto = true; irAlEquipo(); }
+      });
+      document.getElementById('btn-ir').addEventListener('click', function () { reabierto = true; irAlEquipo(); });
       b.addEventListener('click', function () {
         if (document.fullscreenElement) { document.exitFullscreen(); } else if (caja.requestFullscreen) { caja.requestFullscreen(); }
       });
