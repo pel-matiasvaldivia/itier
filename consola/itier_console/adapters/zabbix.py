@@ -529,8 +529,9 @@ class ZabbixClient:
                 return {"hostid": h["hostid"], "interfaceid": (itfs[0].get("interfaceid", "") if itfs else "")}
         return None
 
-    # Plantillas estándar de Zabbix 7.0 para un router/switch genérico: sistema + interfaces por SNMP (IF-MIB) y latencia por ping.
-    PLANTILLAS_ROUTER = ("Network Generic Device by SNMP", "ICMP Ping")
+    # Plantilla estándar de Zabbix 7.0 para un router/switch genérico: sistema + interfaces por SNMP (IF-MIB). Ya trae sus propios
+    # chequeos ICMP (ping, pérdida, latencia): vincular además «ICMP Ping» falla por claves duplicadas (icmpping).
+    PLANTILLAS_ROUTER = ("Network Generic Device by SNMP",)
 
     def asegurar_host_router(self, host: str, nombre: str, groupid: str, proxyid: str | None, ip: str, community: str) -> str:
         """Router o switch por SNMP v2c con las plantillas genéricas (descubre solo las interfaces y alerta cuando una cae).
@@ -546,8 +547,7 @@ class ZabbixClient:
         if ya:
             return ya["hostid"]
         tpl = self._rpc("template.get", {"filter": {"host": list(self.PLANTILLAS_ROUTER)}, "output": ["templateid", "host"]})
-        faltan = set(self.PLANTILLAS_ROUTER) - {t["host"] for t in tpl}
-        if "Network Generic Device by SNMP" in faltan:
+        if not tpl:
             raise AdapterError("Zabbix", "no existe la plantilla «Network Generic Device by SNMP» en este Zabbix")
         params = {"host": host, "name": nombre, "groups": [{"groupid": groupid}], "status": 0,
                   "interfaces": [{"type": 2, "main": 1, "useip": 1, "ip": ip, "dns": "", "port": "161",

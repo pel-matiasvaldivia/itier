@@ -269,7 +269,7 @@ def handler(request: httpx.Request) -> httpx.Response:
         if m == "action.get":
             return _rpc(body, [])
         if m == "template.get" and "Network Generic Device by SNMP" in ((params.get("filter") or {}).get("host") or []):
-            return _rpc(body, [{"templateid": "10186", "host": "Network Generic Device by SNMP"}, {"templateid": "10564", "host": "ICMP Ping"}])
+            return _rpc(body, [{"templateid": "10186", "host": "Network Generic Device by SNMP"}])
         if m == "template.get":
             return _rpc(body, [{"templateid": "10081"}])
         if m == "action.create":
@@ -519,9 +519,9 @@ with zbx_mod.cliente(cfg) as z:
     _hr = z.asegurar_host_router("itier-red-x-router-192-168-0-1", "Router 192.168.0.1 · X", "5", "9", "192.168.0.1", "s3cr3ta")
     _er = z.estado_router("601")
 _rh = next(x for x in captured if x["body"].get("method") == "host.create")["body"]["params"]
-check("zbx.router: host SNMP v2c en el proxy con las plantillas genéricas y la community como macro secreta",
+check("zbx.router: host SNMP v2c en el proxy con UNA sola plantilla (la genérica ya trae ICMP: dos darían claves duplicadas) y la community como macro secreta",
       _hr == "601" and _rh["interfaces"][0]["type"] == 2 and _rh["interfaces"][0]["details"]["community"] == "{$SNMP_COMMUNITY}"
-      and {t["templateid"] for t in _rh["templates"]} == {"10186", "10564"} and _rh["macros"] == [{"macro": "{$SNMP_COMMUNITY}", "value": "s3cr3ta", "type": 1}]
+      and [t["templateid"] for t in _rh["templates"]] == ["10186"] and _rh["templates"] == [{"templateid": "10186"}] and _rh["macros"] == [{"macro": "{$SNMP_COMMUNITY}", "value": "s3cr3ta", "type": 1}]
       and _rh["monitored_by"] == 1 and _rh["proxyid"] == "9", str(_rh))
 check("zbx.router: la community no viaja en ningún otro campo", "s3cr3ta" not in str({k: v for k, v in _rh.items() if k != "macros"}))
 check("zbx.router: estado con interfaces (WAN2 caída primero) y alertas de las plantillas",

@@ -152,7 +152,7 @@
         var ayuda = {
           internet: ['8.8.8.8, 1.1.1.1', 'Se hace ping cada 30 segundos desde el proxy del cliente. Se alerta cuando <b>todos</b> los destinos fallan 3 veces seguidas.'],
           gateway: ['192.168.1.1', 'Ping al router/gateway de la sede. Si cae, la red local del cliente no sale ni a Internet.'],
-          router_snmp: ['192.168.1.1', 'Agrega el router o switch con las plantillas estándar de Zabbix (<i>Network Generic Device by SNMP</i> + <i>ICMP Ping</i>): descubre solo todas sus interfaces (WAN y LAN), mide uptime y latencia y alerta cuando una interfaz cae o el equipo deja de responder por SNMP. Necesita SNMP habilitado en el equipo (community de lectura).'],
+          router_snmp: ['192.168.1.1', 'Agrega el router o switch con la plantilla estándar de Zabbix <i>Network Generic Device by SNMP</i>: descubre solo todas sus interfaces (WAN y LAN), mide uptime, ping y latencia y alerta cuando una interfaz cae o el equipo deja de responder por SNMP. Necesita SNMP habilitado en el equipo (community de lectura).'],
           wan_snmp: ['192.168.1.1', 'Lee por SNMP el estado de la interfaz WAN del router (necesita SNMP habilitado, community e ifIndex de esa interfaz). Alerta cuando deja de estar «up».'],
           puerto: ['200.1.2.3:443', 'Comprueba que un servicio TCP (VPN, web, correo) responde. Formato IP:puerto.']
         };
