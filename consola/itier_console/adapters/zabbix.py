@@ -519,6 +519,56 @@ class ZabbixClient:
         if itemids:
             self._rpc("item.delete", itemids)
 
+    # Plantillas estándar de Zabbix 7.0 para un router/switch genérico: sistema + interfaces por SNMP (IF-MIB) y latencia por ping.
+    PLANTILLAS_ROUTER = ("Network Generic Device by SNMP", "ICMP Ping")
+
+    def asegurar_host_router(self, host: str, nombre: str, groupid: str, proxyid: str | None, ip: str, community: str) -> str:
+        """Router o switch por SNMP v2c con las plantillas genéricas (descubre solo las interfaces y alerta cuando una cae).
+        La community queda como macro secreta del host ({$SNMP_COMMUNITY}), no en la consola. → hostid."""
+        if self.demo:
+            for k, v in _DEMO_RED["hosts"].items():
+                if v["host"] == host:
+                    return k
+            hid = _nuevo_id()
+            _DEMO_RED["hosts"][hid] = {"host": host, "name": nombre, "ip": ip, "router": True}
+            return hid
+        existentes = self._rpc("host.get", {"filter": {"host": host}, "output": ["hostid"]})
+        if existentes:
+            return existentes[0]["hostid"]
+        tpl = self._rpc("template.get", {"filter": {"host": list(self.PLANTILLAS_ROUTER)}, "output": ["templateid", "host"]})
+        faltan = set(self.PLANTILLAS_ROUTER) - {t["host"] for t in tpl}
+        if "Network Generic Device by SNMP" in faltan:
+            raise AdapterError("Zabbix", "no existe la plantilla «Network Generic Device by SNMP» en este Zabbix")
+        params = {"host": host, "name": nombre, "groups": [{"groupid": groupid}], "status": 0,
+                  "interfaces": [{"type": 2, "main": 1, "useip": 1, "ip": ip, "dns": "", "port": "161",
+                                  "details": {"version": 2, "bulk": 1, "community": "{$SNMP_COMMUNITY}"}}],
+                  "templates": [{"templateid": t["templateid"]} for t in tpl],
+                  "macros": [{"macro": "{$SNMP_COMMUNITY}", "value": community, "type": 1}],
+                  "tags": [{"tag": "itier", "value": "red"}]}
+        if proxyid:
+            params.update({"monitored_by": 1, "proxyid": proxyid})
+        return self._rpc("host.create", params)["hostids"][0]
+
+    def estado_router(self, hostid: str) -> dict:
+        """{disponible: 'si'|'no'|'desconocido', error, problemas: [{descripcion, prioridad, desde}], interfaces: [{nombre, estado up|down|otro}]}."""
+        if self.demo:
+            return {"disponible": "si", "error": "", "problemas": list(_DEMO_RED.get("router_problemas", [])),
+                    "interfaces": [{"nombre": "WAN1 (ISP principal)", "estado": "up"}, {"nombre": "WAN2 (ISP respaldo)", "estado": "down"}, {"nombre": "LAN", "estado": "up"}]}
+        h = self._rpc("host.get", {"hostids": [hostid], "output": ["hostid"], "selectInterfaces": ["available", "error", "type"]})
+        itf = next((i for i in (h[0].get("interfaces") if h else []) if i.get("type") == "2"), {})
+        disp = {"1": "si", "2": "no"}.get(itf.get("available"), "desconocido")
+        trg = self._rpc("trigger.get", {"hostids": [hostid], "only_true": 1, "monitored": 1, "min_severity": 2, "skipDependent": 1,
+                                        "output": ["triggerid", "description", "priority", "lastchange"], "expandDescription": 1})
+        its = self._rpc("item.get", {"hostids": [hostid], "search": {"name": "Operational status"}, "output": ["itemid", "name", "lastvalue", "key_"]})
+        interfaces = []
+        for i in its:
+            nombre = i.get("name", "").replace(": Operational status", "").replace("Interface ", "", 1)
+            interfaces.append({"nombre": nombre, "estado": {"1": "up", "2": "down"}.get(i.get("lastvalue"), "otro")})
+        interfaces.sort(key=lambda x: (x["estado"] != "down", x["nombre"]))
+        return {"disponible": disp, "error": itf.get("error", ""),
+                "problemas": [{"descripcion": t["description"], "prioridad": t.get("priority", "3"), "desde": t.get("lastchange", "0")} for t in trg],
+                "interfaces": interfaces}
+
     def eliminar_host(self, hostid: str) -> None:
         """Quita el host (y con él sus items y alertas)."""
         if self.demo:

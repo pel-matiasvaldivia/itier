@@ -27,7 +27,7 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   await pg.evaluate(async () => { const t = document.querySelector('input[name=csrf]').value; const f = async (u, d) => fetch(u, { method: 'POST', body: new URLSearchParams({ ...d, csrf: t }) });
     await f('/clientes/diario-los-andes/red/rango', { nombre: 'LAN oficina', iprange: '192.168.1.0/24' });
     await f('/clientes/diario-los-andes/red/chequeo', { tipo: 'internet', nombre: '', destino: '8.8.8.8, 1.1.1.1' });
-    await f('/clientes/diario-los-andes/red/chequeo', { tipo: 'gateway', nombre: 'Router sede', destino: '192.168.1.1' }); });
+    await f('/clientes/diario-los-andes/red/chequeo', { tipo: 'router_snmp', nombre: 'Router TP-Link', destino: '192.168.1.1', community: 'lgm-ro' }); });
   let pages = { tablero: '/', clientes: '/clientes', ficha: '/clientes/diario-los-andes', equipos: '/equipos', tickets: '/tickets', activos: '/clientes/diario-los-andes/activos',
     canales: '/canales', usuarios: '/usuarios', personas: '/clientes/diario-los-andes/personas', horas: '/reportes/horas', bandeja: '/bandeja', manual: '/manual', auditoria: '/auditoria',
     ticket: '/tickets/1042', activo_nuevo: '/clientes/diario-los-andes/activos/nuevo', m365: '/m365/aplicacion', equipo: '/clientes/diario-los-andes/equipo', red: '/clientes/diario-los-andes/red' };

@@ -33,6 +33,11 @@
         </div>
         <h3>{{ c.nombre }}</h3>
         <p class="l-mut">{{ tipos[c.tipo] }}<br><code>{{ c.destino }}</code></p>
+        {% if c.tipo == 'router_snmp' %}
+        {% if c.problemas_txt %}<ul class="rc-prob">{% for t in c.problemas_txt %}<li>{{ t }}</li>{% endfor %}</ul>{% endif %}
+        {% if c.interfaces %}<div class="rc-if">{% for i in c.interfaces %}<span class="l-pill {{ 'ok' if i.estado == 'up' else ('bad' if i.estado == 'down' else 'off') }} wrap" title="{{ i.nombre }}"><i></i>{{ i.nombre }}</span>{% endfor %}</div>
+        {% else %}<p class="l-mut" style="margin:.3rem 0">Las interfaces aparecen cuando Zabbix termina de descubrirlas (unos minutos).</p>{% endif %}
+        {% endif %}
         <p class="rc-meta">{% if c.latencia_ms is not none %}<b>{{ c.latencia_ms }} ms</b> · {% endif %}{% if c.desde_txt %}{{ 'caído desde' if c.estado_vivo == 'problema' else 'sin cambios desde' }} {{ c.desde_txt }} UTC{% endif %}</p>
       </div>
       {% endfor %}
@@ -47,8 +52,8 @@
           <select name="tipo" id="rc-tipo">{% for k, v in tipos_crear.items() %}<option value="{{ k }}">{{ v }}</option>{% endfor %}</select></label>
         <label>Nombre (opcional) <input type="text" name="nombre" maxlength="80" placeholder="Internet sede central"></label>
         <label class="span-all" id="rc-dest">Destino <input type="text" name="destino" id="rc-destino" value="8.8.8.8, 1.1.1.1" placeholder="8.8.8.8, 1.1.1.1"></label>
-        <label class="rc-snmp" hidden>Community SNMP <input type="password" name="community" autocomplete="off" placeholder="public"></label>
-        <label class="rc-snmp" hidden>Índice de la interfaz WAN (ifIndex) <input type="number" name="ifindex" min="1" max="9999" placeholder="2"></label>
+        <label class="rc-snmp rc-comm" hidden>Community SNMP <input type="password" name="community" autocomplete="off" placeholder="public"></label>
+        <label class="rc-snmp rc-ifx" hidden>Índice de la interfaz WAN (ifIndex) <input type="number" name="ifindex" min="1" max="9999" placeholder="2"></label>
         <button class="u-btn" type="submit" style="justify-self:start">Crear chequeo</button>
       </form>
       <p class="muted small" id="rc-ayuda">Se hace ping cada 30 segundos desde el proxy del cliente. Se alerta cuando <b>todos</b> los destinos fallan 3 veces seguidas (evita falsas alarmas).</p>
@@ -147,6 +152,7 @@
         var ayuda = {
           internet: ['8.8.8.8, 1.1.1.1', 'Se hace ping cada 30 segundos desde el proxy del cliente. Se alerta cuando <b>todos</b> los destinos fallan 3 veces seguidas.'],
           gateway: ['192.168.1.1', 'Ping al router/gateway de la sede. Si cae, la red local del cliente no sale ni a Internet.'],
+          router_snmp: ['192.168.1.1', 'Agrega el router o switch con las plantillas estándar de Zabbix (<i>Network Generic Device by SNMP</i> + <i>ICMP Ping</i>): descubre solo todas sus interfaces (WAN y LAN), mide uptime y latencia y alerta cuando una interfaz cae o el equipo deja de responder por SNMP. Necesita SNMP habilitado en el equipo (community de lectura).'],
           wan_snmp: ['192.168.1.1', 'Lee por SNMP el estado de la interfaz WAN del router (necesita SNMP habilitado, community e ifIndex de esa interfaz). Alerta cuando deja de estar «up».'],
           puerto: ['200.1.2.3:443', 'Comprueba que un servicio TCP (VPN, web, correo) responde. Formato IP:puerto.']
         };
@@ -155,7 +161,8 @@
           document.getElementById('rc-destino').value = a[0];
           document.getElementById('rc-destino').placeholder = a[0];
           document.getElementById('rc-ayuda').innerHTML = a[1];
-          document.querySelectorAll('.rc-snmp').forEach(function (e) { e.hidden = t.value !== 'wan_snmp'; });
+          document.querySelectorAll('.rc-comm').forEach(function (e) { e.hidden = !(t.value === 'wan_snmp' || t.value === 'router_snmp'); });
+          document.querySelectorAll('.rc-ifx').forEach(function (e) { e.hidden = t.value !== 'wan_snmp'; });
         };
         t.addEventListener('change', f);
       }

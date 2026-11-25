@@ -268,6 +268,8 @@ def handler(request: httpx.Request) -> httpx.Response:
             return _rpc(body, {"groupids": ["5"]})
         if m == "action.get":
             return _rpc(body, [])
+        if m == "template.get" and "Network Generic Device by SNMP" in ((params.get("filter") or {}).get("host") or []):
+            return _rpc(body, [{"templateid": "10186", "host": "Network Generic Device by SNMP"}, {"templateid": "10564", "host": "ICMP Ping"}])
         if m == "template.get":
             return _rpc(body, [{"templateid": "10081"}])
         if m == "action.create":
@@ -288,18 +290,25 @@ def handler(request: httpx.Request) -> httpx.Response:
                                               {"ip": "192.168.1.5", "dns": "pc5.lan", "port": "445", "type": "8", "status": "0"}]},
                                {"dhostid": "2", "status": "1", "lastup": "1763900000", "lastdown": "1764000000",
                                 "dservices": [{"ip": "192.168.1.9", "dns": "", "port": "0", "type": "12", "status": "1"}]}])
+        if m == "host.get" and params.get("hostids") == ["601"] and params.get("selectInterfaces") == ["available", "error", "type"]:
+            return _rpc(body, [{"hostid": "601", "interfaces": [{"available": "1", "error": "", "type": "2"}]}])
         if m == "host.get" and (params.get("filter") or {}).get("host", "").startswith(("itier-red-", "itier-mon-")):
             return _rpc(body, [])
         if m == "host.create":
             return _rpc(body, {"hostids": ["601"]})
         if m == "hostinterface.get":
             return _rpc(body, [{"interfaceid": "701"}])
+        if m == "item.get" and (params.get("search") or {}).get("name") == "Operational status":
+            return _rpc(body, [{"itemid": "1", "name": "Interface WAN1(ISP): Operational status", "lastvalue": "1", "key_": "net.if.status[ifOperStatus.1]"},
+                               {"itemid": "2", "name": "Interface WAN2(ISP2): Operational status", "lastvalue": "2", "key_": "net.if.status[ifOperStatus.2]"}])
         if m == "item.get" and (params.get("filter") or {}).get("key_"):
             return _rpc(body, [])
         if m == "item.get":
             return _rpc(body, [{"itemid": "801", "lastvalue": "0.012", "lastclock": "1764085000", "state": "0"}])
         if m == "item.create":
             return _rpc(body, {"itemids": ["801"]})
+        if m == "trigger.get" and params.get("only_true"):
+            return _rpc(body, [{"triggerid": "5", "description": "Interface WAN2(ISP2): Link down", "priority": "3", "lastchange": "1764085000"}])
         if m == "trigger.get" and (params.get("filter") or {}).get("description"):
             return _rpc(body, [])
         if m == "trigger.get":
@@ -500,6 +509,19 @@ _hm = next(x for x in captured if x["body"].get("method") == "host.create")["bod
 check("zbx.host: un dispositivo monitoreado lleva su IP en la interfaz y se usa icmpping sin parámetros",
       _hm["interfaces"][0]["ip"] == "192.168.1.23" and next(x for x in captured if x["body"].get("method") == "item.create")["body"]["params"]["key_"] == "icmpping")
 check("zbx.host: eliminar_host borra el host", any(x["body"].get("method") == "host.delete" and x["body"]["params"] == ["601"] for x in captured))
+captured.clear()
+with zbx_mod.cliente(cfg) as z:
+    _hr = z.asegurar_host_router("itier-red-x-router-192-168-0-1", "Router 192.168.0.1 · X", "5", "9", "192.168.0.1", "s3cr3ta")
+    _er = z.estado_router("601")
+_rh = next(x for x in captured if x["body"].get("method") == "host.create")["body"]["params"]
+check("zbx.router: host SNMP v2c en el proxy con las plantillas genéricas y la community como macro secreta",
+      _hr == "601" and _rh["interfaces"][0]["type"] == 2 and _rh["interfaces"][0]["details"]["community"] == "{$SNMP_COMMUNITY}"
+      and {t["templateid"] for t in _rh["templates"]} == {"10186", "10564"} and _rh["macros"] == [{"macro": "{$SNMP_COMMUNITY}", "value": "s3cr3ta", "type": 1}]
+      and _rh["monitored_by"] == 1 and _rh["proxyid"] == "9", str(_rh))
+check("zbx.router: la community no viaja en ningún otro campo", "s3cr3ta" not in str({k: v for k, v in _rh.items() if k != "macros"}))
+check("zbx.router: estado con interfaces (WAN2 caída primero) y alertas de las plantillas",
+      _er["disponible"] == "si" and _er["interfaces"][0] == {"nombre": "WAN2(ISP2)", "estado": "down"} and _er["interfaces"][1]["estado"] == "up"
+      and _er["problemas"][0]["descripcion"].endswith("Link down"), str(_er))
 captured.clear()
 with zbx_mod.cliente(cfg) as z:
     z.asegurar_item("601", "701", "Estado WAN 2", "wan.ifOperStatus[2]", tipo="snmp", oid="1.3.6.1.2.1.2.2.1.8.2")

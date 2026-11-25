@@ -530,3 +530,4 @@ img,svg,video{max-width:100%;height:auto}
 .rtipo-l{white-space:nowrap;font-weight:600}
 tr.rform td{background:#f8faff}
 .racc{display:flex;flex-wrap:wrap;gap:.3rem;align-items:center;min-width:180px}
+.rc-if{display:flex;flex-wrap:wrap;gap:.3rem;margin:.4rem 0}.rc-prob{margin:.4rem 0;padding-left:1.1rem;font-size:.82rem;color:#991b1b}

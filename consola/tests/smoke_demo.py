@@ -1521,6 +1521,24 @@ check("red: «A activos» crea el activo con el tipo correcto (notebook / otro),
 _pm = c.get("/clientes/canal-sa/red")
 check("red: lo que ya está en activos lo muestra y no vuelve a ofrecer el botón", _pm.text.count("En activos") >= 2)
 check("red: pasar dos veces el mismo dispositivo a activos se rechaza", "Ya existe" in c.post("/clientes/canal-sa/red/a-activos", data={"ip": "192.168.1.57", "nombre": "CECILIA-PC", "tipo": "Notebook", "csrf": csrf_de(_pm.text)}, follow_redirects=True).text)
+# Red: router/switch por SNMP con las plantillas genéricas de Zabbix
+c.post("/clientes/canal-sa/red/chequeo", data={"tipo": "router_snmp", "destino": "192.168.0.1", "community": "mi-comunidad", "nombre": "Router TP-Link", "csrf": csrf_de(c.get("/clientes/canal-sa/red").text)})
+_pr = c.get("/clientes/canal-sa/red")
+check("red: crea el router por SNMP y muestra el estado de sus interfaces", "Router TP-Link" in _pr.text and "WAN1 (ISP principal)" in _pr.text and "WAN2 (ISP respaldo)" in _pr.text and "mi-comunidad" not in _pr.text)
+check("red: la community SNMP no se guarda en la base de la consola", "mi-comunidad" not in str([tuple(r) for r in _db.connect(os.environ["ITIER_CONSOLE_DB"]).execute("SELECT * FROM red_chequeos")]))
+check("red: community inválida se rechaza", "Community" in c.post("/clientes/canal-sa/red/chequeo", data={"tipo": "router_snmp", "destino": "192.168.0.2", "community": "con espacios!", "csrf": csrf_de(_pr.text)}, follow_redirects=True).text)
+_cx = _db.connect(os.environ["ITIER_CONSOLE_DB"])
+_rt_ = _cx.execute("SELECT * FROM red_chequeos WHERE tipo='router_snmp'").fetchone()
+_zm._DEMO_RED["router_problemas"] = [{"descripcion": "Interface WAN2: Link down", "prioridad": "3", "desde": "1764085000"}]
+_n2 = _red.sincronizar(_cx, app.state.cfg)
+_al2 = _cx.execute("SELECT * FROM red_alertas WHERE chequeo_id=?", (_rt_["id"],)).fetchone()
+check("vigía: una interfaz del router que cae abre alerta y ticket", _n2 >= 1 and _al2 is not None and _al2["ticket_id"] and _al2["fin"] is None)
+check("red: la tarjeta del router muestra el problema", "Interface WAN2: Link down" in c.get("/clientes/canal-sa/red").text and "CAÍDO" in c.get("/clientes/canal-sa/red").text)
+_zm._DEMO_RED["router_problemas"] = []; _red.sincronizar(_cx, app.state.cfg)
+check("vigía: al volver la interfaz cierra la alerta", _cx.execute("SELECT fin FROM red_alertas WHERE chequeo_id=?", (_rt_["id"],)).fetchone()["fin"] is not None)
+_cx.close()
+c.post(f"/clientes/canal-sa/red/chequeo/{_rt_['id']}/quitar", data={"csrf": csrf_de(c.get("/clientes/canal-sa/red").text)})
+check("red: quitar el router elimina su host", "Router TP-Link" not in c.get("/clientes/canal-sa/red").text.split("Agregar un chequeo")[0])
 
 _p = {x["email"]: dict(x) for x in _conn.execute("SELECT * FROM client_contactos WHERE client_id=? AND email IS NOT NULL", (_cid_,))}
 check("usuarios nube: se traen los que tienen licencia activa con cargo y área", "lic@clientedemo.com.ar" in _p and _p["lic@clientedemo.com.ar"]["cargo"] == "Contadora" and _p["lic@clientedemo.com.ar"]["area"] == "Finanzas"

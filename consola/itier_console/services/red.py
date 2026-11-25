@@ -26,6 +26,7 @@ TIPOS = {
     "gateway": "Router / gateway (ping)",
     "wan_snmp": "Interfaz WAN del router (SNMP)",
     "puerto": "Servicio TCP (puerto abierto)",
+    "router_snmp": "Router o switch por SNMP (todas sus interfaces)",
     "dispositivo": "Dispositivo monitoreado (ping)",     # se crea desde la tabla de equipos con «Monitorear»
 }
 _RE_HOST = re.compile(r"^(?=.{1,253}$)([A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?)(\.[A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*$")
@@ -254,7 +255,15 @@ def crear_chequeo(conn, cfg, cli: dict, actor: str, tipo: str, nombre: str, dest
     items: list[str] = []
     try:
         with zbx_mod.cliente(cfg) as z:
-            if tipo in ("internet", "gateway", "puerto"):
+            if tipo == "router_snmp":
+                ip = destino_valido(destino)
+                comm = (extra.get("community") or "").strip()
+                if not _RE_COMM.match(comm):
+                    raise ServiceError("Community SNMP inválido (letras, números y . _ @ + -).")
+                host = _host_red(cli, "-router-" + ip.replace(".", "-"))
+                hid = z.asegurar_host_router(host, f"Router {ip} · {cli['nombre']}", gid, pid, ip, comm)
+                tid, destino_txt, params = None, ip, {"host": host}
+            elif tipo in ("internet", "gateway", "puerto"):
                 host = _host_red(cli)
                 hid, iid = z.asegurar_host_chequeos(host, f"Red · {cli['nombre']}", gid, pid)
                 if tipo == "internet":
@@ -303,7 +312,8 @@ def crear_chequeo(conn, cfg, cli: dict, actor: str, tipo: str, nombre: str, dest
                 items.append(z.asegurar_item(hid, iid, f"Estado de la interfaz WAN {idx}", k, tipo="snmp", oid=f"1.3.6.1.2.1.2.2.1.8.{idx}"))
                 expr, desc, destino_txt, prio = f"last(/{host}/{k})<>1", f"Interfaz WAN caída · {cli['nombre']} ({ip} if{idx})", ip, 4
                 params = {"ifindex": idx}
-            tid = z.asegurar_trigger(desc, expr, prio)
+            if tipo != "router_snmp":
+                tid = z.asegurar_trigger(desc, expr, prio)
     except AdapterError as e:
         raise ServiceError(f"No se pudo crear el chequeo en Zabbix: {e.detalle}")
     cur = conn.execute("INSERT INTO red_chequeos(client_id, tipo, nombre, destino, params, zbx_hostid, zbx_trigger, zbx_items, estado, created_at, created_by) "
@@ -360,7 +370,7 @@ def quitar_chequeo(conn, cfg, cli: dict, chid: int) -> None:
         return
     try:
         with zbx_mod.cliente(cfg) as z:
-            if c["tipo"] == "dispositivo" and c["zbx_hostid"]:
+            if c["tipo"] in ("dispositivo", "router_snmp") and c["zbx_hostid"]:
                 z.eliminar_host(c["zbx_hostid"])        # el host era solo de este dispositivo
             else:
                 z.eliminar_chequeo(c["zbx_trigger"], [i for i in (c["zbx_items"] or "").split(",") if i])
@@ -368,6 +378,22 @@ def quitar_chequeo(conn, cfg, cli: dict, chid: int) -> None:
         pass
     conn.execute("DELETE FROM red_chequeos WHERE id = ?", (chid,))
     conn.commit()
+
+
+def _router(cfg, c: dict) -> dict:
+    """Estado vivo de un router/switch por SNMP: problema si no responde por SNMP o alguna alerta de sus plantillas está activa."""
+    try:
+        with zbx_mod.cliente(cfg) as z:
+            r = z.estado_router(c["zbx_hostid"])
+    except AdapterError:
+        return {"estado_vivo": c["estado"] or "desconocido", "desde_txt": c["desde"] or "", "latencia_ms": None, "interfaces": [], "problemas_txt": []}
+    probs = [p["descripcion"] for p in r["problemas"]]
+    if r["disponible"] == "no":
+        probs.insert(0, "No responde por SNMP" + (f": {r['error'][:80]}" if r["error"] else ""))
+    est = "problema" if probs else ("ok" if r["disponible"] == "si" else "desconocido")
+    desde = max((int(p["desde"]) for p in r["problemas"] if str(p["desde"]).isdigit()), default=0)
+    return {"estado_vivo": est, "desde_txt": _ts(desde) if desde else (c["desde"] or ""), "latencia_ms": None,
+            "interfaces": r["interfaces"], "problemas_txt": probs}
 
 
 def estado(conn, cfg, cli: dict) -> dict:
@@ -384,6 +410,10 @@ def estado(conn, cfg, cli: dict) -> dict:
             nota = f"Zabbix no respondió: {e.detalle[:120]}"
     nombre_de = {c["zbx_trigger"]: c["nombre"] for c in lista}
     for c in lista:
+        if c["tipo"] == "router_snmp":
+            r = _router(cfg, c)
+            c.update(r)
+            continue
         t = vivos["triggers"].get(c["zbx_trigger"])
         c["estado_vivo"] = t["estado"] if t else (c["estado"] or "desconocido")
         c["desde_txt"] = _ts(t["desde"]) if t else (c["desde"] or "")
@@ -406,12 +436,14 @@ def estado(conn, cfg, cli: dict) -> dict:
 # ── vigía: avisa cuando un chequeo cae o se recupera ────────────────────────────────────────────
 
 def _aviso(cfg, cli: dict, ch: dict, cayo: bool, desde: str) -> str:
+    desde = desde or _ahora()[:16].replace("T", " ")
     from . import correo
     if not (cfg.soporte_email and correo.configurado(cfg)):
         return "sin correo configurado"
     asunto = f"[Red] {'CAÍDA' if cayo else 'Recuperado'}: {ch['nombre']} · {cli['nombre']}"
     cuerpo = (f"{'Se detectó una caída' if cayo else 'Se recuperó el servicio'} en {cli['nombre']}.\n\nChequeo: {ch['nombre']} ({TIPOS.get(ch['tipo'], ch['tipo'])})\n"
               f"Destino: {ch['destino']}\nDesde: {desde} UTC\n"
+              + (f"Detalle: {ch['_detalle']}\n" if ch.get("_detalle") else "")
               + (f"\nVer en la consola: {cfg.console_public_url}/clientes/{cli['slug']}/red\n" if cfg.console_public_url else ""))
     try:
         correo.enviar(cfg, cfg.soporte_email, asunto, cuerpo)
@@ -434,13 +466,19 @@ def sincronizar(conn: sqlite3.Connection, cfg) -> int:
             log.info("Vigía de red: Zabbix no respondió para %s: %s", cli["slug"], e)
             continue
         for ch in lista:
+            if ch["tipo"] == "router_snmp":                      # no tiene un trigger propio: se mira el host entero
+                r = _router(cfg, ch)
+                if r["estado_vivo"] == "desconocido":
+                    continue
+                vivos[ch["zbx_trigger"]] = {"estado": r["estado_vivo"], "desde": 0, "deshabilitado": False, "detalle": "; ".join(r["problemas_txt"])}
             t = vivos.get(ch["zbx_trigger"])
             if not t or t.get("deshabilitado"):
                 continue
+            ch["_detalle"] = t.get("detalle", "")
             nuevo, previo = t["estado"], ch["estado"] or "desconocido"
             if nuevo == previo:
                 continue
-            conn.execute("UPDATE red_chequeos SET estado=?, desde=? WHERE id=?", (nuevo, _ts(t["desde"]), ch["id"]))
+            conn.execute("UPDATE red_chequeos SET estado=?, desde=? WHERE id=?", (nuevo, _ts(t["desde"]) or _ahora()[:16].replace("T", " "), ch["id"]))
             if nuevo == "problema":
                 aviso = _aviso(cfg, cli, ch, True, _ts(t["desde"]))
                 ticket = _abrir_ticket(cfg, cli, ch, _ts(t["desde"]))
@@ -463,7 +501,7 @@ def _abrir_ticket(cfg, cli: dict, ch: dict, desde: str) -> int | None:
     try:
         from . import tickets as tickets_svc
         return tickets_svc.crear(cfg, f"[Red] Caída: {ch['nombre']}", f"Alerta automática de iTiers.\n\nCliente: {cli['nombre']}\nChequeo: {ch['nombre']}\n"
-                                 f"Destino: {ch['destino']}\nDesde: {desde} UTC", int(cli["glpi_entity_id"]), priority=5)
+                                 f"Destino: {ch['destino']}\nDesde: {desde} UTC" + (f"\nDetalle: {ch['_detalle']}" if ch.get("_detalle") else ""), int(cli["glpi_entity_id"]), priority=5)
     except Exception as e:  # noqa: BLE001
         log.info("Vigía de red: no se pudo abrir el ticket: %s", e)
         return None
