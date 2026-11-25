@@ -1496,6 +1496,31 @@ check("red: no se puede borrar un chequeo de otro cliente cambiando el slug", _d
 check("red: el técnico de cliente ve la red de SU empresa y no la de otra", tcl2.get("/clientes/canal-sa/red").status_code == 200 and tcl2.get("/clientes/otra-empresa-sa/red").url.path != "/clientes/otra-empresa-sa/red")
 c.post(f"/clientes/canal-sa/red/chequeo/{_ch_id}/quitar", data={"csrf": csrf_de(c.get("/clientes/canal-sa/red").text)})
 check("red: se puede quitar un chequeo propio", "Router sede" not in c.get("/clientes/canal-sa/red").text)
+# Red: botones «Monitorear» y «A activos» en la tabla de equipos
+_pm = c.get("/clientes/canal-sa/red")
+check("red: la tabla ofrece Monitorear y A activos por equipo", "Monitorear" in _pm.text and "A activos" in _pm.text)
+c.post("/clientes/canal-sa/red/monitorear", data={"ip": "192.168.1.23", "nombre": "CamPatio7", "csrf": csrf_de(_pm.text)})
+_pm = c.get("/clientes/canal-sa/red")
+check("red: «Monitorear» crea un chequeo del dispositivo y la IP pasa a figurar como monitoreada", "CamPatio7" in _pm.text and "Dispositivo monitoreado (ping)" in _pm.text)
+check("red: no se puede monitorear dos veces la misma IP", "ya se está monitoreando" in c.post("/clientes/canal-sa/red/monitorear", data={"ip": "192.168.1.23", "csrf": csrf_de(_pm.text)}, follow_redirects=True).text)
+check("red: IP inválida al monitorear se rechaza", "IP inválida" in c.post("/clientes/canal-sa/red/monitorear", data={"ip": "999.1.1.1", "csrf": csrf_de(_pm.text)}, follow_redirects=True).text)
+_cx = _db.connect(os.environ["ITIER_CONSOLE_DB"])
+_dev = _cx.execute("SELECT * FROM red_chequeos WHERE tipo='dispositivo' AND destino='192.168.1.23'").fetchone()
+_zm._DEMO_RED["triggers"][_dev["zbx_trigger"]]["value"] = "1"
+_red.sincronizar(_cx, app.state.cfg)
+check("red: el dispositivo monitoreado genera alerta y ticket si deja de responder", _cx.execute("SELECT ticket_id FROM red_alertas WHERE chequeo_id=?", (_dev["id"],)).fetchone()["ticket_id"])
+_zm._DEMO_RED["triggers"][_dev["zbx_trigger"]]["value"] = "0"; _red.sincronizar(_cx, app.state.cfg); _cx.close()
+c.post(f"/clientes/canal-sa/red/chequeo/{_dev['id']}/quitar", data={"csrf": csrf_de(c.get("/clientes/canal-sa/red").text)})
+check("red: quitar el monitoreo lo elimina", "CamPatio7" not in c.get("/clientes/canal-sa/red").text)
+c.post("/clientes/canal-sa/red/a-activos", data={"ip": "192.168.1.57", "nombre": "CECILIA-PC", "tipo": "Notebook", "fabricante": "Lenovo", "csrf": csrf_de(c.get("/clientes/canal-sa/red").text)})
+c.post("/clientes/canal-sa/red/a-activos", data={"ip": "192.168.1.60", "nombre": "HP-LASER-ADM", "tipo": "Impresora", "fabricante": "HP", "csrf": csrf_de(c.get("/clientes/canal-sa/red").text)})
+_acts = {r["etiqueta"]: dict(r) for r in _db.connect(os.environ["ITIER_CONSOLE_DB"]).execute("SELECT * FROM activos WHERE client_id=(SELECT id FROM clients WHERE slug='canal-sa')")}
+check("red: «A activos» crea el activo con el tipo correcto (notebook / otro), marca y la IP en las notas",
+      _acts.get("CECILIA-PC", {}).get("tipo") == "notebook" and _acts["CECILIA-PC"]["marca"] == "Lenovo" and "192.168.1.57" in (_acts["CECILIA-PC"]["notas"] or "")
+      and _acts.get("HP-LASER-ADM", {}).get("tipo") == "otro", str(_acts.keys()))
+_pm = c.get("/clientes/canal-sa/red")
+check("red: lo que ya está en activos lo muestra y no vuelve a ofrecer el botón", _pm.text.count("En activos") >= 2)
+check("red: pasar dos veces el mismo dispositivo a activos se rechaza", "Ya existe" in c.post("/clientes/canal-sa/red/a-activos", data={"ip": "192.168.1.57", "nombre": "CECILIA-PC", "tipo": "Notebook", "csrf": csrf_de(_pm.text)}, follow_redirects=True).text)
 
 _p = {x["email"]: dict(x) for x in _conn.execute("SELECT * FROM client_contactos WHERE client_id=? AND email IS NOT NULL", (_cid_,))}
 check("usuarios nube: se traen los que tienen licencia activa con cargo y área", "lic@clientedemo.com.ar" in _p and _p["lic@clientedemo.com.ar"]["cargo"] == "Contadora" and _p["lic@clientedemo.com.ar"]["area"] == "Finanzas"

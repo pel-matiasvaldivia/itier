@@ -288,7 +288,7 @@ def handler(request: httpx.Request) -> httpx.Response:
                                               {"ip": "192.168.1.5", "dns": "pc5.lan", "port": "445", "type": "8", "status": "0"}]},
                                {"dhostid": "2", "status": "1", "lastup": "1763900000", "lastdown": "1764000000",
                                 "dservices": [{"ip": "192.168.1.9", "dns": "", "port": "0", "type": "12", "status": "1"}]}])
-        if m == "host.get" and (params.get("filter") or {}).get("host", "").startswith("itier-red-"):
+        if m == "host.get" and (params.get("filter") or {}).get("host", "").startswith(("itier-red-", "itier-mon-")):
             return _rpc(body, [])
         if m == "host.create":
             return _rpc(body, {"hostids": ["601"]})
@@ -306,6 +306,8 @@ def handler(request: httpx.Request) -> httpx.Response:
             return _rpc(body, [{"triggerid": "901", "value": "1", "lastchange": "1764085000", "priority": "5", "status": "0"}])
         if m == "trigger.create":
             return _rpc(body, {"triggerids": ["901"]})
+        if m == "host.delete":
+            return _rpc(body, {"hostids": ["601"]})
         if m in ("trigger.delete", "item.delete"):
             return _rpc(body, {})
         if m == "event.get" and params.get("eventids"):
@@ -489,6 +491,15 @@ _tc = next(x for x in captured if x["body"].get("method") == "trigger.create")["
 check("zbx.trigger: prioridad y expresión con 3 fallos seguidos", _tc["priority"] == 5 and "max(/itier-red-x/icmpping[8.8.8.8],#3)=0" == _tc["expression"])
 check("zbx.estado_alertas: trigger en problema y valor del item", _est["triggers"]["901"]["estado"] == "problema" and _est["items"]["801"]["valor"] == "0.012", str(_est))
 check("zbx.historial: caída cerrada con su recuperación y caída abierta", len(_hist) == 2 and _hist[0]["fin"] == "1764085600" and _hist[1]["fin"] is None, str(_hist))
+captured.clear()
+with zbx_mod.cliente(cfg) as z:
+    z.asegurar_host_chequeos("itier-mon-x-192-168-1-23", "Cámara (192.168.1.23)", "5", "9", ip="192.168.1.23")
+    z.asegurar_item("601", "701", "Ping a Cámara", "icmpping")
+    z.eliminar_host("601")
+_hm = next(x for x in captured if x["body"].get("method") == "host.create")["body"]["params"]
+check("zbx.host: un dispositivo monitoreado lleva su IP en la interfaz y se usa icmpping sin parámetros",
+      _hm["interfaces"][0]["ip"] == "192.168.1.23" and next(x for x in captured if x["body"].get("method") == "item.create")["body"]["params"]["key_"] == "icmpping")
+check("zbx.host: eliminar_host borra el host", any(x["body"].get("method") == "host.delete" and x["body"]["params"] == ["601"] for x in captured))
 captured.clear()
 with zbx_mod.cliente(cfg) as z:
     z.asegurar_item("601", "701", "Estado WAN 2", "wan.ifOperStatus[2]", tipo="snmp", oid="1.3.6.1.2.1.2.2.1.8.2")

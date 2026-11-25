@@ -44,7 +44,7 @@
       <form method="post" action="/clientes/{{ cli.slug }}/red/chequeo" class="form cols2" id="f-chequeo">
         <input type="hidden" name="csrf" value="{{ csrf }}">
         <label>Qué vigilar
-          <select name="tipo" id="rc-tipo">{% for k, v in tipos.items() %}<option value="{{ k }}">{{ v }}</option>{% endfor %}</select></label>
+          <select name="tipo" id="rc-tipo">{% for k, v in tipos_crear.items() %}<option value="{{ k }}">{{ v }}</option>{% endfor %}</select></label>
         <label>Nombre (opcional) <input type="text" name="nombre" maxlength="80" placeholder="Internet sede central"></label>
         <label class="span-all" id="rc-dest">Destino <input type="text" name="destino" id="rc-destino" value="8.8.8.8, 1.1.1.1" placeholder="8.8.8.8, 1.1.1.1"></label>
         <label class="rc-snmp" hidden>Community SNMP <input type="password" name="community" autocomplete="off" placeholder="public"></label>
@@ -112,7 +112,12 @@
         <td class="l-mut">{{ h.puertos|join(', ') if h.puertos else '—' }}</td>
         <td>{% if h.monitoreado %}<span class="l-pill ok">Monitoreado</span>{% else %}<span class="l-pill off">No</span>{% endif %}</td>
         <td class="l-mut">{{ h.visto }}</td>
-        <td>{% if puede('red') %}<button type="button" class="u-b r-edit" data-ip="{{ h.ip }}">Identificar</button>{% endif %}</td>
+        <td class="racc">
+          {% if puede('red') %}<button type="button" class="u-b r-edit" data-ip="{{ h.ip }}">Identificar</button>{% endif %}
+          {% if puede('red.editar') and h.estado == 'up' and not h.monitoreado %}<form method="post" action="/clientes/{{ cli.slug }}/red/monitorear" class="inline"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="ip" value="{{ h.ip }}"><input type="hidden" name="nombre" value="{{ h.nombre }}"><button class="u-b" type="submit" title="Ping continuo con alerta si deja de responder">👁 Monitorear</button></form>{% endif %}
+          {% if puede('activos') and not h.en_activos and h.tipo != 'Sin identificar' %}<form method="post" action="/clientes/{{ cli.slug }}/red/a-activos" class="inline"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="ip" value="{{ h.ip }}"><input type="hidden" name="nombre" value="{{ h.nombre }}"><input type="hidden" name="tipo" value="{{ h.tipo }}"><input type="hidden" name="fabricante" value="{{ h.fabricante }}"><button class="u-b" type="submit" title="Agregar al listado de activos del cliente">📦 A activos</button></form>{% endif %}
+          {% if h.en_activos %}<span class="l-pill ok" title="Ya está en el listado de activos">En activos</span>{% endif %}
+        </td>
       </tr>
       {% if puede('red') %}
       <tr class="rform" data-ip="{{ h.ip }}" hidden><td colspan="9">

@@ -435,7 +435,7 @@ class ZabbixClient:
     def ips_monitoreadas(self, groupid: str | None) -> set[str]:
         """IP de las interfaces de los hosts que ya están en Zabbix (para marcar «ya monitoreado»)."""
         if self.demo:
-            return {"192.168.1.10"}
+            return {"192.168.1.10"} | {h["ip"] for h in _DEMO_RED["hosts"].values() if h.get("ip") and h["ip"] != "127.0.0.1"}
         if not groupid:
             return set()
         res = self._rpc("host.get", {"groupids": [groupid], "output": ["hostid"], "selectInterfaces": ["ip", "useip"]})
@@ -443,15 +443,17 @@ class ZabbixClient:
 
     # -- chequeos de conectividad (ping a Internet, gateway, interfaz WAN por SNMP, puertos TCP) -------
 
-    def asegurar_host_chequeos(self, host: str, nombre: str, groupid: str, proxyid: str | None, snmp: dict | None = None) -> tuple[str, str]:
+    def asegurar_host_chequeos(self, host: str, nombre: str, groupid: str, proxyid: str | None, snmp: dict | None = None,
+                               ip: str = "127.0.0.1") -> tuple[str, str]:
         """Host que agrupa los chequeos del cliente (corren en el proxy). Con `snmp` ({ip, community}) lleva interfaz SNMP del
-        router; si no, una interfaz de agente de relleno (los chequeos simples no la usan). → (hostid, interfaceid)."""
+        router; si no, una interfaz de agente con `ip` (127.0.0.1 de relleno, o la IP del dispositivo que se monitorea con
+        la clave `icmpping` sin parámetros). → (hostid, interfaceid)."""
         if self.demo:
             for k, v in _DEMO_RED["hosts"].items():
                 if v["host"] == host:
                     return k, k + "1"
             hid = _nuevo_id()
-            _DEMO_RED["hosts"][hid] = {"host": host, "name": nombre}
+            _DEMO_RED["hosts"][hid] = {"host": host, "name": nombre, "ip": ip}
             return hid, hid + "1"
         existentes = self._rpc("host.get", {"filter": {"host": host}, "output": ["hostid"], "selectInterfaces": ["interfaceid"]})
         if existentes:
@@ -461,7 +463,7 @@ class ZabbixClient:
             itf = {"type": 2, "main": 1, "useip": 1, "ip": snmp["ip"], "dns": "", "port": "161",
                    "details": {"version": 2, "bulk": 1, "community": snmp["community"]}}
         else:
-            itf = {"type": 1, "main": 1, "useip": 1, "ip": "127.0.0.1", "dns": "", "port": "10050"}
+            itf = {"type": 1, "main": 1, "useip": 1, "ip": ip, "dns": "", "port": "10050"}
         params = {"host": host, "name": nombre, "groups": [{"groupid": groupid}], "interfaces": [itf], "status": 0,
                   "tags": [{"tag": "itier", "value": "red"}]}
         if proxyid:
@@ -516,6 +518,13 @@ class ZabbixClient:
             self._rpc("trigger.delete", [triggerid])
         if itemids:
             self._rpc("item.delete", itemids)
+
+    def eliminar_host(self, hostid: str) -> None:
+        """Quita el host (y con él sus items y alertas)."""
+        if self.demo:
+            _DEMO_RED["hosts"].pop(hostid, None)
+            return
+        self._rpc("host.delete", [hostid])
 
     def estado_alertas(self, triggerids: list[str], itemids: list[str]) -> dict:
         """{triggers: {id: {estado 'ok'|'problema', desde, prioridad}}, items: {id: {valor, reloj}}}."""

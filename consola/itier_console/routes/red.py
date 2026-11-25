@@ -46,7 +46,7 @@ def ver(request: Request, slug: str, user: dict = Depends(require_permiso("red")
         return RedirectResponse("/clientes", status_code=303)
     cfg = request.app.state.cfg
     return render(request, "red.html", cli=cli, rangos=svc.rangos(conn, cli["id"]), activos=svc.hosts_activos(conn, cfg, cli),
-                  est=svc.estado(conn, cfg, cli), tipos=svc.TIPOS, tipos_disp=svc.red_tipos.TIPOS, tiene_proxy=bool(cli.get("zbx_proxy_id")))
+                  est=svc.estado(conn, cfg, cli), tipos=svc.TIPOS, tipos_crear={k: v for k, v in svc.TIPOS.items() if k != "dispositivo"}, tipos_disp=svc.red_tipos.TIPOS, tiene_proxy=bool(cli.get("zbx_proxy_id")))
 
 
 @router.post("/clientes/{slug}/red/escanear")
@@ -72,6 +72,34 @@ def dispositivo(request: Request, slug: str, ip: str = Form(""), nombre: str = F
             svc.guardar_dispositivo(conn, cli["id"], user["user"], ip, nombre, tipo, fabricante, notas)
             audit.registrar(conn, user["user"], "red.dispositivo_identificado", {"cliente": cli["nombre"], "ip": ip.strip(), "tipo": tipo})
             flash(request, f"{ip.strip()} identificado.", "ok")
+        except ServiceError as e:
+            flash(request, e.mensaje, "error")
+    return _volver(slug, "#activos")
+
+
+@router.post("/clientes/{slug}/red/monitorear")
+def monitorear(request: Request, slug: str, ip: str = Form(""), nombre: str = Form(""), csrf: str = Form(""),
+               user: dict = Depends(require_permiso("red.editar")), conn: sqlite3.Connection = Depends(get_db)):
+    cli = _cli(conn, slug)
+    if cli and _csrf(request, csrf):
+        try:
+            svc.monitorear(conn, request.app.state.cfg, cli, user["user"], ip, nombre)
+            audit.registrar(conn, user["user"], "red.dispositivo_monitoreado", {"cliente": cli["nombre"], "ip": ip.strip()})
+            flash(request, f"{ip.strip()} en monitoreo: si deja de responder se avisa y se abre un ticket.", "ok")
+        except ServiceError as e:
+            flash(request, e.mensaje, "error")
+    return _volver(slug, "#activos")
+
+
+@router.post("/clientes/{slug}/red/a-activos")
+def a_activos(request: Request, slug: str, ip: str = Form(""), nombre: str = Form(""), tipo: str = Form(""), fabricante: str = Form(""),
+              csrf: str = Form(""), user: dict = Depends(require_permiso("activos")), conn: sqlite3.Connection = Depends(get_db)):
+    cli = _cli(conn, slug)
+    if cli and _csrf(request, csrf):
+        try:
+            svc.a_activos(conn, cli, user["user"], ip, nombre, tipo, fabricante)
+            audit.registrar(conn, user["user"], "red.dispositivo_a_activos", {"cliente": cli["nombre"], "ip": ip.strip(), "tipo": tipo})
+            flash(request, f"{ip.strip()} agregado a los activos de {cli['nombre']}.", "ok")
         except ServiceError as e:
             flash(request, e.mensaje, "error")
     return _volver(slug, "#activos")

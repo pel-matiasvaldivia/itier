@@ -26,6 +26,7 @@ TIPOS = {
     "gateway": "Router / gateway (ping)",
     "wan_snmp": "Interfaz WAN del router (SNMP)",
     "puerto": "Servicio TCP (puerto abierto)",
+    "dispositivo": "Dispositivo monitoreado (ping)",     # se crea desde la tabla de equipos con «Monitorear»
 }
 _RE_HOST = re.compile(r"^(?=.{1,253}$)([A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?)(\.[A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*$")
 _RE_COMM = re.compile(r"^[A-Za-z0-9._@+-]{1,64}$")
@@ -211,6 +212,8 @@ def hosts_activos(conn, cfg, cli: dict) -> dict:
         nota = f"Zabbix no respondió: {e.detalle[:120]}"
     glpi_ip, por_nombre = _conocidos(cfg, cli)
     manuales = dispositivos_manuales(conn, cli["id"])
+    act = [(r["etiqueta"].lower(), r["notas"] or "") for r in conn.execute("SELECT etiqueta, notas FROM activos WHERE client_id=? AND estado != 'de_baja'", (cli["id"],))]
+    mon = {r["destino"] for r in conn.execute("SELECT destino FROM red_chequeos WHERE client_id=? AND tipo='dispositivo'", (cli["id"],))}
     for h in lista:
         h["monitoreado"] = h["ip"] in monitoreadas
         h["visto"] = _ts(h.get("ultimo_up")) if h["estado"] == "down" else "ahora"
@@ -219,6 +222,8 @@ def hosts_activos(conn, cfg, cli: dict) -> dict:
         conocido = por_nombre.get(corto) or por_nombre.get(((glpi_ip.get(h["ip"]) or {}).get("nombre") or "").upper())
         h.update(red_tipos.clasificar(h, glpi_ip.get(h["ip"]), manuales.get(h["ip"]), conocido))
         h["notas"] = (manuales.get(h["ip"]) or {}).get("notas", "")
+        h["en_activos"] = any(f"IP {h['ip']}" in n or (h.get("nombre") and e == h["nombre"].lower()) for e, n in act)
+        h["monitoreo_propio"] = h["ip"] in mon
         h["icono"] = red_tipos.ICONOS.get(h["tipo"], "❔")
     lista.sort(key=lambda h: _ip_clave(h["ip"]))
     up = sum(1 for h in lista if h["estado"] == "up")
@@ -308,13 +313,57 @@ def crear_chequeo(conn, cfg, cli: dict, actor: str, tipo: str, nombre: str, dest
     return int(cur.lastrowid)
 
 
+def monitorear(conn, cfg, cli: dict, actor: str, ip: str, nombre: str = "") -> int:
+    """Un clic desde la tabla de equipos: ping continuo a esa IP desde el proxy del cliente, con alerta (y aviso/ticket) si deja de responder."""
+    try:
+        ipaddress.IPv4Address((ip or "").strip())
+    except ipaddress.AddressValueError:
+        raise ServiceError("IP inválida.")
+    ip = ip.strip()
+    _necesita_proxy(cli)
+    if not cli.get("zbx_hostgroup_id"):
+        raise ServiceError("El cliente no tiene grupo de hosts en Zabbix.")
+    if conn.execute("SELECT 1 FROM red_chequeos WHERE client_id=? AND tipo='dispositivo' AND destino=?", (cli["id"], ip)).fetchone():
+        raise ServiceError(f"{ip} ya se está monitoreando.")
+    etiqueta = (nombre or "").strip()[:80] or ip
+    host = f"itier-mon-{cli['slug']}-{ip.replace('.', '-')}"[:128]
+    try:
+        with zbx_mod.cliente(cfg) as z:
+            hid, iid = z.asegurar_host_chequeos(host, f"{etiqueta} ({ip})", cli["zbx_hostgroup_id"], cli["zbx_proxy_id"], ip=ip)
+            items = [z.asegurar_item(hid, iid, f"Ping a {etiqueta}", "icmpping"),
+                     z.asegurar_item(hid, iid, f"Latencia a {etiqueta}", "icmppingsec", unidades="s", flotante=True)]
+            tid = z.asegurar_trigger(f"Sin respuesta · {cli['nombre']} · {etiqueta} ({ip})", f"max(/{host}/icmpping,#3)=0", 3)
+    except AdapterError as e:
+        raise ServiceError(f"No se pudo monitorear en Zabbix: {e.detalle}")
+    cur = conn.execute("INSERT INTO red_chequeos(client_id, tipo, nombre, destino, params, zbx_hostid, zbx_trigger, zbx_items, estado, created_at, created_by) "
+                       "VALUES (?,?,?,?,?,?,?,?,?,?,?)", (cli["id"], "dispositivo", etiqueta, ip, json.dumps({"host": host}), hid, tid, ",".join(items), "desconocido", _ahora(), actor))
+    conn.commit()
+    return int(cur.lastrowid)
+
+
+_TIPO_ACTIVO = {"Notebook": "notebook", "Desktop": "desktop", "PC Windows": "desktop", "Celular/Tablet": "celular"}
+
+
+def a_activos(conn, cli: dict, actor: str, ip: str, nombre: str, tipo: str, fabricante: str) -> int:
+    """Pasa un dispositivo identificado de la red al listado de activos del cliente. Los que no son PC/notebook/celular van como «Otro»."""
+    from . import activos as activos_svc
+    ip = (ip or "").strip()
+    tipo = tipo if tipo and tipo != "Sin identificar" else "Otro"
+    etiqueta = (nombre or "").strip()[:80] or f"{tipo}-{ip}"
+    return activos_svc.crear(conn, cli["id"], actor, {"tipo": _TIPO_ACTIVO.get(tipo, "otro"), "etiqueta": etiqueta, "marca": (fabricante or "").strip()[:60],
+                                                       "notas": f"Detectado en la red: {tipo} · IP {ip}"})
+
+
 def quitar_chequeo(conn, cfg, cli: dict, chid: int) -> None:
     c = conn.execute("SELECT * FROM red_chequeos WHERE id = ? AND client_id = ?", (chid, cli["id"])).fetchone()
     if not c:
         return
     try:
         with zbx_mod.cliente(cfg) as z:
-            z.eliminar_chequeo(c["zbx_trigger"], [i for i in (c["zbx_items"] or "").split(",") if i])
+            if c["tipo"] == "dispositivo" and c["zbx_hostid"]:
+                z.eliminar_host(c["zbx_hostid"])        # el host era solo de este dispositivo
+            else:
+                z.eliminar_chequeo(c["zbx_trigger"], [i for i in (c["zbx_items"] or "").split(",") if i])
     except AdapterError:
         pass
     conn.execute("DELETE FROM red_chequeos WHERE id = ?", (chid,))

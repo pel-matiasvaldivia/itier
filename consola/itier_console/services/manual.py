@@ -196,6 +196,7 @@ PROCEDIMIENTOS = [
         "Ficha del cliente → «Red y alertas» → «Agregar un chequeo». El más útil es «Internet» (ping a 8.8.8.8 y 1.1.1.1 desde el proxy del cliente): alerta solo si fallan todos los destinos 3 veces seguidas.",
         "Para la interfaz WAN del proveedor: tipo «Interfaz WAN del router (SNMP)» con la IP del router, el community SNMP y el índice (ifIndex) de esa interfaz; alerta cuando deja de estar «up».",
         "Cuando algo cae se avisa por correo a la casilla de soporte y se abre un ticket; al recuperarse, se agrega el cierre al mismo ticket.",
+        "En la tabla de equipos, «Monitorear» deja un ping continuo a ese dispositivo (cámara, NVR, impresora, servidor): si deja de responder, se avisa y se abre un ticket. «A activos» lo suma al listado de activos del cliente.",
         "Para ver qué equipos están encendidos: agregá el rango (ej.: 192.168.1.0/24) y tocá «Escanear ahora». Los equipos que bloquean ping y todos los puertos no aparecen.",
     ]),
     ("clientes.eliminar", "Dar de baja un cliente", [
