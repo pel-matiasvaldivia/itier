@@ -29,6 +29,50 @@ def conectado(cli: dict) -> bool:
     return bool(cli.get("gws_admin")) and cli.get("gws_estado") == "conectado"
 
 
+def sa_propia(cli: dict) -> bool:
+    return bool(cli.get("gws_sa"))
+
+
+def cfg_de(cfg, cli: dict):
+    """Config con la cuenta de servicio de Google de ESTE cliente (cada empresa autoriza la suya); si no tiene, la general."""
+    import dataclasses
+    from . import ajustes
+    if not sa_propia(cli):
+        return cfg
+    try:
+        sa = ajustes._fernet(cfg).decrypt(cli["gws_sa"].encode()).decode()
+    except Exception:  # noqa: BLE001
+        raise ServiceError("No se pudo leer la cuenta de servicio guardada de este cliente; cargala de nuevo.")
+    return dataclasses.replace(cfg, gws_sa_json=sa)
+
+
+def guardar_sa(conn: sqlite3.Connection, cfg, cli_id: int, clave_json: str) -> dict:
+    from . import ajustes
+    try:
+        sa = gws_mod.parsear_cuenta_servicio((clave_json or "").strip())
+    except ValueError as e:
+        raise ServiceError(f"La clave no se guardó: {e}")
+    conn.execute("UPDATE clients SET gws_sa=? WHERE id=?", (ajustes._fernet(cfg).encrypt(clave_json.strip().encode()).decode(), cli_id))
+    conn.commit()
+    return {"email": sa["client_email"], "client_id": sa["client_id"]}
+
+
+def quitar_sa(conn: sqlite3.Connection, cli_id: int) -> None:
+    conn.execute("UPDATE clients SET gws_sa=NULL WHERE id=?", (cli_id,))
+    conn.commit()
+
+
+def sa_info(cfg) -> dict | None:
+    """Datos públicos de la cuenta de servicio vigente (nunca la clave privada)."""
+    if not getattr(cfg, "gws_sa_json", None):
+        return None
+    try:
+        sa = gws_mod.parsear_cuenta_servicio(cfg.gws_sa_json)
+        return {"email": sa["client_email"], "client_id": sa["client_id"]}
+    except ValueError:
+        return None
+
+
 def marcar(conn: sqlite3.Connection, cli_id: int, **campos) -> None:
     permitidos = {"gws_admin", "gws_estado", "gws_detalle", "gws_dominio", "gws_conectado_at"}
     campos = {k: v for k, v in campos.items() if k in permitidos}
@@ -40,7 +84,7 @@ def verificar_conexion(conn: sqlite3.Connection, cfg, cli: dict, admin: str | No
     """Prueba la delegación leyendo los dominios; deja el estado del cliente en «conectado» o «error»."""
     admin = admin_valido(admin or cli.get("gws_admin") or "")
     try:
-        d = gws_mod.cliente(cfg, admin).dominios()
+        d = gws_mod.cliente(cfg_de(cfg, cli), admin).dominios()
     except AdapterError as e:
         marcar(conn, cli["id"], gws_admin=admin, gws_estado="error", gws_detalle=e.detalle[:400])
         raise
@@ -73,7 +117,7 @@ def crear(cfg, cli: dict, doms: dict, *, nombre: str, apellido: str, usuario: st
     if enviar_a.strip():
         enviar_a = correo.validar_email(enviar_a)
     clave = generar_clave()
-    creado = gws_mod.cliente(cfg, cli["gws_admin"]).crear_usuario(
+    creado = gws_mod.cliente(cfg_de(cfg, cli), cli["gws_admin"]).crear_usuario(
         email=email, nombre=nombre, apellido=apellido, clave=clave, cargo=(cargo or "").strip(), departamento=(departamento or "").strip())
     estado = "no solicitado"
     if enviar_a:

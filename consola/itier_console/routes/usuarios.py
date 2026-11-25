@@ -47,17 +47,19 @@ def lista(request: Request, user: dict = Depends(require_permiso("usuarios")), c
     por_id = {c["id"]: c["nombre"] for c in clientes}
     for u in lista_u:
         u["empresa"] = por_id.get(u.get("scope_client_id")) if rbac.es_de_un_cliente(u["rol"]) else None
-    return render(request, "usuarios.html", clientes=clientes, usuarios=lista_u, resumen=resumen, roles={k: v for k, v in rbac.ROLES.items() if k not in rbac.DE_UN_CLIENTE}, nueva=nueva, yo=user["uid"],
+    return render(request, "usuarios.html", clientes=clientes, usuarios=lista_u, resumen=resumen, roles={k: v for k, v in rbac.ROLES.items() if k not in rbac.DE_UN_CLIENTE}, roles_cliente=rbac.ROLES, nueva=nueva, yo=user["uid"],
                   cfg_glpi=request.app.state.cfg.glpi_configurado, cfg_zbx=request.app.state.cfg.zbx_configurado,
                   cfg_mesh=request.app.state.cfg.mesh_enabled, smtp=correo.configurado(request.app.state.cfg))
 
 
 @router.post("/usuarios")
 def alta(request: Request, username: str = Form(""), email: str = Form(""), nombre: str = Form(""),
-         rol: str = Form("tecnico"), cliente: str = Form(""), enviar: str = Form(""), csrf: str = Form(""), user: dict = Depends(require_permiso("usuarios")),
+         rol: str = Form("tecnico"), rol_cliente: str = Form("tecnico_cliente"), cliente: str = Form(""), enviar: str = Form(""), csrf: str = Form(""), user: dict = Depends(require_permiso("usuarios")),
          conn: sqlite3.Connection = Depends(get_db)):
     if not _csrf(request, csrf):
         return RedirectResponse("/usuarios", status_code=303)
+    if rol == "tecnico_cliente" and rol_cliente in rbac.DE_UN_CLIENTE:
+        rol = rol_cliente
     try:
         from ..services import onboarding
         cli = onboarding.obtener_cliente_por_slug(conn, cliente) if cliente else None

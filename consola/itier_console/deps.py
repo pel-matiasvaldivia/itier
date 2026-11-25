@@ -110,6 +110,8 @@ _RE_CLIENTE = re.compile(r"^/clientes/([^/]+)(/.*)?$")
 _RE_EQUIPO = re.compile(r"^/equipos/([^/]+)/")
 _RE_TICKET = re.compile(r"^/tickets/(\d+)(/|$)")
 _SUBPANTALLAS_CLIENTE = {"activos", "personas", "m365", "gws"}
+# Solo para roles con permiso de editar su empresa (PM / administrador de cliente): configuración de la ficha y su equipo de TI.
+_SUBPANTALLAS_EDITAR = {"portal-usuarios", "dominios", "contactos", "mesh", "equipo"}
 _GENERALES = ("/tickets", "/equipos", "/manual", "/cambiar-clave", "/logout", "/activos/plantilla.csv")
 
 
@@ -124,9 +126,12 @@ def _guardia_alcance(request: Request, u: dict) -> None:
     m = _RE_CLIENTE.match(path)
     if m:
         resto = (m.group(2) or "").strip("/")
-        if m.group(1) != a["slug"] or (resto and resto.split("/")[0] not in _SUBPANTALLAS_CLIENTE):
+        permitidas = _SUBPANTALLAS_CLIENTE | (_SUBPANTALLAS_EDITAR if rbac.puede(u.get("rol"), "clientes.editar") else set())
+        if m.group(1) != a["slug"] or (resto and resto.split("/")[0] not in permitidas):
             raise PermisoDenegado()
         return
+    if path == "/m365/consentimiento" and rbac.puede(u.get("rol"), "clientes.editar"):
+        return                                   # vuelta de Microsoft: el slug sale de la sesión iniciada desde su propia ficha
     m = _RE_EQUIPO.match(path)
     if m and m.group(1) != a["slug"]:
         raise PermisoDenegado()

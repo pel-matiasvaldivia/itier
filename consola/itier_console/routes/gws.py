@@ -93,9 +93,13 @@ def conectar(request: Request, slug: str, admin: str = Form(""), csrf: str = For
         return _fuera(request)
     if not _csrf(request, csrf):
         return RedirectResponse(f"/clientes/{slug}", status_code=303)
-    cfg = _cfg(request, conn)
+    try:
+        cfg = svc.cfg_de(_cfg(request, conn), cli)
+    except ServiceError as e:
+        flash(request, e.mensaje, "error")
+        return RedirectResponse(f"/clientes/{slug}", status_code=303)
     if not cfg.demo and not cfg.gws_configurado:
-        flash(request, "Primero un administrador tiene que cargar la cuenta de servicio de Google.", "error")
+        flash(request, "Primero cargá la cuenta de servicio de Google de esta empresa (tarjeta Google Workspace de la ficha).", "error")
         return RedirectResponse(f"/clientes/{slug}", status_code=303)
     try:
         d = svc.verificar_conexion(conn, cfg, cli, admin)
@@ -104,6 +108,34 @@ def conectar(request: Request, slug: str, admin: str = Form(""), csrf: str = For
         return RedirectResponse(f"/clientes/{slug}", status_code=303)
     audit.registrar(conn, user["user"], "gws.conectado", {"cliente": cli["nombre"], "admin": admin.strip().lower(), "dominio": d["principal"]})
     flash(request, f"Dominio «{d['principal']}» conectado.", "ok")
+    return RedirectResponse(f"/clientes/{slug}", status_code=303)
+
+
+@router.post("/clientes/{slug}/gws/cuenta-servicio")
+def sa_cliente(request: Request, slug: str, clave_json: str = Form(""), csrf: str = Form(""),
+               user: dict = Depends(require_permiso("clientes.editar")), conn: sqlite3.Connection = Depends(get_db)):
+    """Cuenta de servicio de Google propia de la empresa (la que autoriza en su Admin console)."""
+    cli = _cli(conn, slug)
+    if not cli:
+        return _fuera(request)
+    if _csrf(request, csrf):
+        try:
+            info = svc.guardar_sa(conn, request.app.state.cfg, cli["id"], clave_json)
+            audit.registrar(conn, user["user"], "gws.cuenta_servicio_cliente", {"cliente": cli["nombre"], "cuenta": info["email"], "client_id": info["client_id"]})
+            flash(request, f"Cuenta de servicio guardada ({info['email']}). Autorizala en la Admin console de Google y conectá el dominio.", "ok")
+        except ServiceError as e:
+            flash(request, e.mensaje, "error")
+    return RedirectResponse(f"/clientes/{slug}", status_code=303)
+
+
+@router.post("/clientes/{slug}/gws/cuenta-servicio/quitar")
+def sa_cliente_quitar(request: Request, slug: str, csrf: str = Form(""), user: dict = Depends(require_permiso("clientes.editar")),
+                      conn: sqlite3.Connection = Depends(get_db)):
+    cli = _cli(conn, slug)
+    if cli and _csrf(request, csrf):
+        svc.quitar_sa(conn, cli["id"])
+        audit.registrar(conn, user["user"], "gws.cuenta_servicio_cliente_quitada", {"cliente": cli["nombre"]})
+        flash(request, "Se quitó la cuenta de servicio propia de esta empresa.", "ok")
     return RedirectResponse(f"/clientes/{slug}", status_code=303)
 
 
@@ -145,7 +177,11 @@ def _contexto(request, conn, slug):
     if not svc.conectado(cli):
         flash(request, "Este cliente todavía no tiene el dominio de Google Workspace conectado.", "error")
         return None, None, None
-    cfg = _cfg(request, conn)
+    try:
+        cfg = svc.cfg_de(_cfg(request, conn), cli)
+    except ServiceError as e:
+        flash(request, e.mensaje, "error")
+        return None, None, None
     return cli, cfg, gws_mod.cliente(cfg, cli["gws_admin"])
 
 

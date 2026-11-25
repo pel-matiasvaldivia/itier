@@ -549,7 +549,7 @@ def _usuarios_origen(cfg, cli: dict) -> tuple[list[dict], list[dict], dict]:
             errores["m365"] = e.detalle
     if cli.get("gws_admin") and cli.get("gws_estado") == "conectado":
         try:
-            todos = gws_mod.cliente(cfg, cli["gws_admin"]).listar_usuarios()
+            todos = gws_mod.cliente(__import__("itier_console.services.gws", fromlist=["cfg_de"]).cfg_de(cfg, cli), cli["gws_admin"]).listar_usuarios()
             act = [u for u in todos if not u["suspendido"] and not u["archivado"] and u["email"]]
             lic += [{"origen": "gws", "origen_id": u["id"], "email": u["email"].lower(), "nombre": u["nombre"] or u["email"].split("@")[0],
                      "cargo": u["cargo"], "area": u["departamento"]} for u in act]

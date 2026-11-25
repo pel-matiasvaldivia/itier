@@ -13,6 +13,8 @@ MISION = {
     "tecnico": "Dar soporte técnico a los equipos de los clientes: resolver tickets, atender las alertas "
                "y anticiparse a los problemas antes de que el cliente los note.",
     "tecnico_cliente": "Dar soporte a los equipos y usuarios de tu propia empresa desde iTiers: tickets, equipos, control remoto y usuarios en la nube.",
+    "pm_cliente": "Coordinar el área de TI de tu empresa en iTiers: configurar Microsoft 365 o Google Workspace, sumar técnicos y gestionar los usuarios.",
+    "admin_cliente": "Responder por la cuenta de tu empresa en iTiers: servicios conectados, accesos de tu equipo de TI y usuarios en la nube.",
     "pm": "Llevar la operación diaria de los clientes: altas, despliegue de agentes, calidad del servicio "
           "y seguimiento del equipo técnico.",
     "admin": "Responder por la plataforma: seguridad, usuarios y roles, integraciones (GLPI, Zabbix, MeshCentral) "
@@ -44,6 +46,23 @@ RESPONSABILIDADES = {
         "Tu clave y tu segundo factor (2FA) son personales: no se comparten ni se anotan.",
         "Ves únicamente los datos de tu empresa; ante cualquier duda o acceso que no reconozcas, avisá al equipo de iTiers.",
     ],
+    "pm_cliente": [
+        "Conectar y mantener Microsoft 365 o Google Workspace de tu empresa (ficha de la empresa) y gestionar sus usuarios: altas, licencias, bajas y claves.",
+        "Invitar a técnicos de tu empresa (pantalla Equipo de TI) y darlos de baja apenas dejan de operar.",
+        "Cuidar los canales de tu empresa: dominios de correo y personas autorizadas a pedir soporte.",
+        "Hacer seguimiento de los tickets y de las alertas de tu empresa.",
+        "Tu clave y tu segundo factor (2FA) son personales: no se comparten ni se anotan.",
+        "Ves únicamente los datos de tu empresa; ante cualquier duda o acceso que no reconozcas, avisá al equipo de iTiers.",
+    ],
+    "admin_cliente": [
+        "Conectar y mantener Microsoft 365 o Google Workspace de tu empresa (ficha de la empresa) y gestionar sus usuarios: altas, licencias, bajas y claves.",
+        "Invitar a técnicos de tu empresa (pantalla Equipo de TI) y darlos de baja apenas dejan de operar.",
+        "Cuidar los canales de tu empresa: dominios de correo y personas autorizadas a pedir soporte.",
+        "Invitar y administrar también a otros PM y administradores de tu empresa, con mínimo privilegio.",
+        "Custodiar los datos de acceso de Microsoft 365 y Google Workspace de tu empresa y rotarlos ante cualquier sospecha.",
+        "Tu clave y tu segundo factor (2FA) son personales: no se comparten ni se anotan.",
+        "Ante un incidente de seguridad o un acceso que no reconozcas, avisá de inmediato al equipo de iTiers.",
+    ],
     "pm": [
         "Dar de alta a los clientes y verificar que queden completos: entidad en GLPI, grupo en Zabbix y grupo de equipos en MeshCentral.",
         "Desplegar los agentes en los equipos de cada cliente y confirmar que reporten (inventario y soporte remoto en línea).",
@@ -73,6 +92,7 @@ RESPONSABILIDADES = {
 
 # funcionalidad → (menú, qué hace). Se filtra por el permiso necesario.
 FUNCIONES = [
+    ("equipo.cliente", "Equipo de TI", "Invita a técnicos (o PM y administradores, según tu rol) de tu empresa, reinicia claves y da de baja."),
     ("tablero", "Tablero", "Estado de GLPI y Zabbix, cantidad de clientes y tickets recientes de un vistazo."),
     ("tickets", "Tickets", "Lista, abre y asigna tickets de todos los clientes (la información vive en GLPI)."),
     ("equipos", "Equipos", "Todos los equipos con su conexión, discos, antivirus y alertas; filtrable por cliente y por alertas."),
@@ -188,6 +208,8 @@ REGLAS = [
 ESCALAMIENTO = {
     "tecnico": "Dudas o problemas que no resolvés: PM. Seguridad o accesos: Administrador.",
     "tecnico_cliente": "Dudas sobre la plataforma o accesos: equipo de iTiers.",
+    "pm_cliente": "Dudas sobre la plataforma o accesos: equipo de iTiers.",
+    "admin_cliente": "Fallas de plataforma o incidentes de seguridad: equipo de iTiers.",
     "pm": "Plataforma, permisos o usuarios: Administrador.",
     "admin": "Fallas de plataforma que no podés resolver: proveedor del servicio iTiers.",
 }

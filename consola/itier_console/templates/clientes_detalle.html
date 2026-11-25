@@ -20,6 +20,7 @@
     {% if puede('descubrimiento') %}<a href="/clientes/{{ cli.slug }}/descubrimiento">📡 Descubrimiento de red</a>{% endif %}
     {% if puede('agentes') %}<a href="/clientes/{{ cli.slug }}/agentes">📈 Agentes de Zabbix</a>{% endif %}
     {% if puede('tickets') %}<a href="/tickets?cliente={{ cli.slug }}">🎫 Tickets</a>{% endif %}
+    {% if puede('equipo.cliente') %}<a href="/clientes/{{ cli.slug }}/equipo">👥 Equipo de TI</a>{% endif %}
   </div>
 
   {% if cli.estado != 'activo' %}
@@ -249,12 +250,25 @@
             <input type="email" name="admin" value="{{ cli.gws_admin or '' }}" placeholder="soporte-itier@empresa.com.ar" required></label>
           <button class="u-btn" type="submit">Conectar dominio</button>
         </form>
-        <p class="muted small">Antes, el cliente tiene que autorizar la delegación en todo el dominio con los datos de <a href="/gws/aplicacion">esta pantalla</a>{% if not puede('gws.app') %} (pedíselos a un administrador){% endif %}.</p>
+        {% if gws_info %}
+        <p class="muted small" style="margin-top:.6rem">Antes de conectar, el <b>super administrador de Google</b> autoriza esta cuenta en la Admin console → Seguridad → Acceso y control de datos → Controles de API → Delegación en todo el dominio:</p>
+        <p class="small" style="margin:.2rem 0"><b>ID de cliente:</b> <code>{{ gws_info.client_id }}</code><br><b>Cuenta:</b> <code>{{ gws_info.email }}</code></p>
+        <details><summary class="small">Alcances OAuth a autorizar</summary><pre class="codeblock">{{ gws_scopes|join(',\n') }}</pre></details>
+        {% else %}<p class="muted small" style="margin-top:.6rem">Primero cargá la cuenta de servicio de Google de esta empresa (clave JSON).</p>{% endif %}
+        <details {{ 'open' if not gws_info else '' }} style="margin-top:.4rem"><summary class="small">{{ 'Cambiar' if cli.gws_sa else 'Cargar' }} la cuenta de servicio de esta empresa</summary>
+          <form method="post" action="/clientes/{{ cli.slug }}/gws/cuenta-servicio" class="form">
+            <input type="hidden" name="csrf" value="{{ csrf }}">
+            <label>Clave JSON de la cuenta de servicio <textarea name="clave_json" rows="4" autocomplete="off" placeholder='{"type": "service_account", ...}' required></textarea></label>
+            <button class="u-b" type="submit">Guardar</button>
+          </form>
+          <p class="muted small">Se crea en la Google Cloud de la empresa (API Admin SDK habilitada). Se guarda cifrada y no se vuelve a mostrar.</p>
+          {% if cli.gws_sa %}<form method="post" action="/clientes/{{ cli.slug }}/gws/cuenta-servicio/quitar" class="inline" onsubmit="return confirm('¿Quitar la cuenta de servicio propia?');"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="u-b danger" type="submit">Quitar</button></form>{% endif %}
+        </details>
         {% else %}<p class="muted small">Pedile a un PM o administrador que conecte el dominio.</p>{% endif %}
         {% endif %}
         {% if puede('gws.app') %}<p class="muted small" style="margin-top:.6rem"><a href="/gws/aplicacion">Configurar la cuenta de servicio de Google</a></p>{% endif %}
       </section>
-      {% if puede('clientes.editar') or puede('clientes.eliminar') %}
+      {% if (puede('clientes.editar') or puede('clientes.eliminar')) and not user.alcance %}
       <section class="u-card">
         <h2>⚙️ Mantenimiento</h2>
         <div class="d-meta" style="gap:.5rem;margin:.5rem 0 .4rem">

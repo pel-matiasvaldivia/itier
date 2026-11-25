@@ -25,7 +25,7 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   console.log('antes de cliente:', pg.url()); await pg.goto(base + '/clientes/nuevo'); await pg.fill('input[name=nombre]', 'Diario Los Andes'); await pg.click('.content form button[type=submit], .content form .u-btn'); await pg.waitForLoadState();
   let pages = { tablero: '/', clientes: '/clientes', ficha: '/clientes/diario-los-andes', equipos: '/equipos', tickets: '/tickets', activos: '/clientes/diario-los-andes/activos',
     canales: '/canales', usuarios: '/usuarios', personas: '/clientes/diario-los-andes/personas', horas: '/reportes/horas', bandeja: '/bandeja', manual: '/manual', auditoria: '/auditoria',
-    ticket: '/tickets/1042', activo_nuevo: '/clientes/diario-los-andes/activos/nuevo', m365: '/m365/aplicacion' };
+    ticket: '/tickets/1042', activo_nuevo: '/clientes/diario-los-andes/activos/nuevo', m365: '/m365/aplicacion', equipo: '/clientes/diario-los-andes/equipo' };
   if (ONLY) { const k = ONLY.split(','); pages = Object.fromEntries(Object.entries(pages).filter(([n]) => k.includes(n))); }
   for (const [name, p] of Object.entries(pages)) {
     await pg.goto(base + p); await pg.waitForLoadState('networkidle');

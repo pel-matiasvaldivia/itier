@@ -80,9 +80,12 @@ Clave:   {{ nueva.clave }}</pre>
           <p>Responde por la plataforma: usuarios, seguridad e integraciones.</p>
           <ul><li>Acceso total, incluido este ABM</li><li>Baja de clientes</li><li>GLPI Super-Admin · Zabbix Super admin</li></ul></span></label>
       <label class="u-rolcard"><input type="radio" name="rol" value="tecnico_cliente">
-        <span class="u-rolbody"><strong><span class="u-ico tecnico">🏢</span>Técnico de cliente</strong>
-          <p>Personal de TI de una empresa cliente: opera solo lo de su empresa desde iTiers.</p>
-          <ul><li>Tickets, equipos, control remoto, activos y usuarios en la nube de su empresa</li><li>No ve a otros clientes ni la administración</li><li>Sin cuentas en GLPI, Zabbix ni Mesh de iTiers</li></ul>
+        <span class="u-rolbody"><strong><span class="u-ico tecnico">🏢</span>Personal de TI de un cliente</strong>
+          <p>Opera solo lo de su empresa desde iTiers. Un administrador de cliente puede después invitar a su propio equipo.</p>
+          <ul><li>Técnico: tickets, equipos, control remoto, activos y usuarios en la nube</li><li>PM / Administrador: además configuran Microsoft 365, Google Workspace y canales, e invitan colaboradores</li><li>No ven a otros clientes ni la administración · sin cuentas en GLPI, Zabbix ni Mesh de iTiers</li></ul>
+          <select class="u-sel" name="rol_cliente" aria-label="Rol dentro de la empresa" style="margin-top:.5rem;max-width:100%">
+            <option value="tecnico_cliente">Técnico de cliente</option><option value="pm_cliente">PM de cliente</option><option value="admin_cliente">Administrador de cliente</option>
+          </select>
           <select class="u-sel" name="cliente" aria-label="Empresa del técnico de cliente" style="margin-top:.5rem;max-width:100%">
             <option value="">Empresa…</option>{% for c in clientes %}<option value="{{ c.slug }}">{{ c.nombre }}</option>{% endfor %}
           </select></span></label>
@@ -114,7 +117,7 @@ Clave:   {{ nueva.clave }}</pre>
         <div class="u-mid">
           <form method="post" action="/usuarios/{{ u.id }}/rol" class="inline">
             <input type="hidden" name="csrf" value="{{ csrf }}">
-            {% if u.empresa %}<span class="u-pill info"><i></i>Técnico de {{ u.empresa }}</span>
+            {% if u.empresa %}<span class="u-pill info"><i></i>{{ roles_cliente[u.rol] }} · {{ u.empresa }}</span>
             {% else %}<select class="u-sel" name="rol" onchange="this.form.submit()" aria-label="Rol de {{ u.username }}">
               {% for k, v in roles.items() %}<option value="{{ k }}" {{ 'selected' if k == u.rol }}>{{ v }}</option>{% endfor %}
             </select>{% endif %}

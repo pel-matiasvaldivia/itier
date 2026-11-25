@@ -31,6 +31,7 @@
       <a href="/clientes/{{ user.alcance.slug }}" class="{{ 'on' if ruta.startswith('/clientes') else '' }}">{{ user.alcance.nombre }}</a>
       {% if puede('equipos') %}<a href="/equipos" class="{{ 'on' if ruta.startswith('/equipos') else '' }}">Equipos</a>{% endif %}
       {% if puede('tickets') %}<a href="/tickets" class="{{ 'on' if ruta.startswith('/tickets') else '' }}">Tickets</a>{% endif %}
+      {% if puede('equipo.cliente') %}<a href="/clientes/{{ user.alcance.slug }}/equipo" class="{{ 'on' if ruta.endswith('/equipo') else '' }}">Equipo de TI</a>{% endif %}
       <a href="/manual" class="{{ 'on' if ruta.startswith('/manual') else '' }}">Manual</a>
       {% else %}
       {% if puede('tablero') %}<a href="/" class="{{ 'on' if ruta == '/' else '' }}">Tablero</a>{% endif %}

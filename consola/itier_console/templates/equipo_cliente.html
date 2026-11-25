@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% block titulo %}Equipo de TI · {{ cli.nombre }} · Consola de iTiers{% endblock %}
+{% block contenido %}
+  <div class="l-head">
+    <div>
+      <p class="u-sub" style="margin:0"><a href="/clientes/{{ cli.slug }}">← {{ cli.nombre }}</a></p>
+      <h1>Equipo de TI</h1>
+      <p class="u-sub">Las personas de {{ cli.nombre }} que operan iTiers. Solo ven los datos de su empresa.</p>
+    </div>
+  </div>
+
+  {% if nueva %}
+  <section class="u-cred">
+    <h2>{{ '✅ Invitación creada' if nueva.motivo == 'alta' else '🔑 Clave reiniciada' }} · {{ nueva.usuario }}</h2>
+    <p class="u-sub">Estos datos se muestran <strong>una sola vez</strong> y no se guardan. Entregáselos por un canal seguro.</p>
+    <div class="u-cred-grid">
+      <div class="u-cred-box"><span>Usuario</span><div>{{ nueva.usuario }}</div></div>
+      <div class="u-cred-box"><span>Clave temporal</span><div>{{ nueva.clave }}</div></div>
+      <button class="u-b" type="button" data-copy="#cred-equipo">Copiar usuario y clave</button>
+    </div>
+    <pre class="u-sr" id="cred-equipo">Usuario: {{ nueva.usuario }}
+Clave:   {{ nueva.clave }}</pre>
+    {% if nueva.estados.get('correo') %}<p class="small">Correo: {{ nueva.estados.correo }}</p>{% endif %}
+    <div class="u-warn">La clave es temporal: en el primer ingreso se pide cambiarla y activar el segundo factor (2FA).</div>
+  </section>
+  {% endif %}
+
+  <form class="u-card" method="post" action="/clientes/{{ cli.slug }}/equipo">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <h2>➕ Invitar a alguien del equipo</h2>
+    <div class="form cols2" style="margin-top:.5rem">
+      <label>Usuario <input name="username" required pattern="[a-z0-9][a-z0-9._-]{2,31}" placeholder="jperez" autocomplete="off"></label>
+      <label>Nombre y apellido <input name="nombre" placeholder="Juan Pérez" autocomplete="off"></label>
+      <label>Correo <input type="email" name="email" required placeholder="jperez@{{ cli.slug }}.com" autocomplete="off"></label>
+      <label>Rol
+        <select name="rol">{% for k, v in roles_dar %}<option value="{{ k }}">{{ v }}</option>{% endfor %}</select></label>
+      <label class="span-all" style="flex-direction:row;align-items:center;gap:.5rem">
+        <input type="checkbox" name="enviar" value="1" {{ 'checked' if smtp else 'disabled' }} style="width:auto">
+        <span>Enviar por correo las credenciales y el manual de su rol {% if not smtp %}<small class="muted">(SMTP sin configurar: copiá la clave al crear)</small>{% endif %}</span></label>
+      <button class="u-btn span-all" type="submit" style="justify-self:start">Invitar</button>
+    </div>
+    <p class="muted small">Técnico: opera tickets, equipos, activos y usuarios en la nube. PM: además configura Microsoft 365, Google Workspace y los canales de la empresa. Administrador: además invita y administra a otros PM y administradores.</p>
+  </form>
+
+  <section class="u-card">
+    <h2>Personas con acceso</h2>
+    <div class="urows">
+      {% for u in miembros %}
+      <div class="urow">
+        <div class="u-id"><strong>{{ u.nombre or u.username }}</strong>{% if u.id == yo %} <span class="u-me">vos</span>{% endif %}
+          <span class="muted small">{{ u.username }}{{ ' · ' ~ u.email if u.email }}</span>
+          <span>
+            {% if u.disabled %}<span class="l-pill off"><i></i>De baja</span>
+            {% elif u.must_change_pw %}<span class="l-pill warn"><i></i>Debe cambiar la clave</span>
+            {% else %}<span class="l-pill ok"><i></i>Activo</span>{% endif %}
+            <span class="l-pill info">{{ roles_todos[u.rol] }}</span>
+          </span>
+          <span class="muted small">Último ingreso: {{ u.last_login or 'nunca' }}</span></div>
+        {% if u.id != yo and u.rol in gestionables %}
+        <form method="post" action="/clientes/{{ cli.slug }}/equipo/{{ u.id }}/rol" class="inline">
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          <select class="u-sel" name="rol" onchange="this.form.submit()" aria-label="Rol de {{ u.username }}">
+            {% for k, v in roles_dar %}<option value="{{ k }}" {{ 'selected' if k == u.rol }}>{{ v }}</option>{% endfor %}
+          </select></form>
+        <div class="acciones">
+          <form method="post" action="/clientes/{{ cli.slug }}/equipo/{{ u.id }}/clave" class="inline" onsubmit="return confirm('¿Reiniciar la clave de {{ u.username }}?')"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="u-b" type="submit">Reiniciar clave</button></form>
+          {% if u.disabled %}<form method="post" action="/clientes/{{ cli.slug }}/equipo/{{ u.id }}/alta" class="inline"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="u-b" type="submit">Activar</button></form>
+          {% else %}<form method="post" action="/clientes/{{ cli.slug }}/equipo/{{ u.id }}/baja" class="inline" onsubmit="return confirm('¿Dar de baja a {{ u.username }}? Pierde el acceso al instante.')"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="u-b" type="submit">Dar de baja</button></form>{% endif %}
+          <form method="post" action="/clientes/{{ cli.slug }}/equipo/{{ u.id }}/eliminar" class="inline" onsubmit="return confirm('¿Eliminar definitivamente a {{ u.username }}?')"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="u-b danger" type="submit">Eliminar</button></form>
+        </div>
+        {% endif %}
+      </div>
+      {% else %}<p class="muted">Todavía no hay nadie. Invitá a la primera persona.</p>{% endfor %}
+    </div>
+  </section>
+{% endblock %}

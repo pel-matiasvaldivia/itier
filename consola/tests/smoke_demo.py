@@ -1380,9 +1380,57 @@ check("alcance: equipos solo de su empresa", "Otra Empresa" not in tcl.get("/equ
 check("alcance: no entra a ninguna pantalla de administración", all(tcl.get(x).url.path != x for x in ("/usuarios", "/canales", "/bandeja", "/auditoria", "/reportes/horas", "/clientes/nuevo", "/m365/aplicacion", "/clientes/canal-sa/instaladores", "/clientes/canal-sa/agentes")))
 tcl.post("/clientes/canal-sa/mesh", data={"mesh_url": "https://x.example.com", "mesh_user": "u", "mesh_clave": "k", "csrf": csrf_de(tcl.get("/clientes/canal-sa").text)})
 check("alcance: no puede editar el cliente", not _db.connect(os.environ["ITIER_CONSOLE_DB"]).execute("SELECT mesh_url FROM clients WHERE slug='canal-sa'").fetchone()["mesh_url"])
-check("alcance: el administrador ve a la empresa en la lista de usuarios", "Técnico de Canal" in c.get("/usuarios").text)
+check("alcance: el administrador ve a la empresa en la lista de usuarios", "Técnico de cliente · Canal" in c.get("/usuarios").text)
 c.post("/usuarios/%d/baja" % _db.connect(os.environ["ITIER_CONSOLE_DB"]).execute("SELECT id FROM users WHERE username='tcli'").fetchone()["id"], data={"csrf": csrf_de(c.get("/usuarios").text)})
 check("alcance: dado de baja pierde el acceso al instante", tcl.get("/tickets").url.path != "/tickets")
+
+# PM y administrador de cliente: configuran su empresa e invitan a su equipo de TI
+_db_ = lambda: _db.connect(os.environ["ITIER_CONSOLE_DB"])
+_alta = lambda u, rol_c, cli_: c.post("/usuarios", data={"username": u, "email": u + "@canalsa.com.ar", "nombre": u, "rol": "tecnico_cliente", "rol_cliente": rol_c, "cliente": cli_, "csrf": csrf_de(c.get("/usuarios").text)}, follow_redirects=True)
+_clave_de = lambda r: re.search(r"Clave:\s+([^\s<]+)", r.text).group(1)
+_ra = _alta("acli", "admin_cliente", "canal-sa")
+acl, _ = _login_operador("acli", _clave_de(_ra))
+check("equipo TI: el administrador de cliente entra a Equipo de TI de su empresa", acl.get("/clientes/canal-sa/equipo").url.path == "/clientes/canal-sa/equipo")
+check("equipo TI: no entra al de otra empresa", acl.get("/clientes/otra-empresa-sa/equipo").url.path != "/clientes/otra-empresa-sa/equipo")
+_pe = lambda t_, cli_="canal-sa": csrf_de(t_.get(f"/clientes/{cli_}/equipo").text)
+_ri = acl.post("/clientes/canal-sa/equipo", data={"username": "pcli", "email": "pcli@canalsa.com.ar", "nombre": "PM Cliente", "rol": "pm_cliente", "csrf": _pe(acl)})
+check("equipo TI: el administrador invita a un PM de cliente y se muestra la clave una vez", "Invitación creada" in _ri.text and "pcli" in _ri.text)
+pcl, _ = _login_operador("pcli", _clave_de(_ri))
+_rt2 = acl.post("/clientes/canal-sa/equipo", data={"username": "tcli2", "email": "tcli2@canalsa.com.ar", "nombre": "Tec 2", "rol": "tecnico_cliente", "csrf": _pe(acl)})
+tcl2, _ = _login_operador("tcli2", _clave_de(_rt2))
+check("equipo TI: el PM de cliente entra a Equipo de TI", pcl.get("/clientes/canal-sa/equipo").url.path == "/clientes/canal-sa/equipo")
+check("equipo TI: el técnico de cliente NO entra a Equipo de TI", tcl2.get("/clientes/canal-sa/equipo").url.path != "/clientes/canal-sa/equipo")
+pcl.post("/clientes/canal-sa/equipo", data={"username": "adm3", "email": "adm3@canalsa.com.ar", "nombre": "Adm 3", "rol": "admin_cliente", "csrf": _pe(pcl)})
+check("equipo TI: el PM de cliente NO puede invitar administradores", not _db_().execute("SELECT 1 FROM users WHERE username='adm3'").fetchone())
+pcl.post("/clientes/canal-sa/equipo", data={"username": "tec4", "email": "tec4@canalsa.com.ar", "nombre": "Tec 4", "rol": "tecnico_cliente", "csrf": _pe(pcl)})
+check("equipo TI: el PM de cliente sí invita técnicos", bool(_db_().execute("SELECT 1 FROM users WHERE username='tec4' AND scope_client_id IS NOT NULL").fetchone()))
+_uid_acli = _db_().execute("SELECT id FROM users WHERE username='acli'").fetchone()["id"]
+pcl.post(f"/clientes/canal-sa/equipo/{_uid_acli}/baja", data={"csrf": _pe(pcl)})
+check("equipo TI: el PM no puede dar de baja a un administrador", _db_().execute("SELECT disabled FROM users WHERE id=?", (_uid_acli,)).fetchone()["disabled"] == 0)
+_uid_otro = _db_().execute("SELECT id FROM users WHERE username='ttec' OR username='tecrbac'").fetchone()["id"]
+acl.post(f"/clientes/canal-sa/equipo/{_uid_otro}/baja", data={"csrf": _pe(acl)})
+check("equipo TI: no se puede gestionar a un usuario que no es de la empresa", _db_().execute("SELECT disabled FROM users WHERE id=?", (_uid_otro,)).fetchone()["disabled"] == 0)
+acl.post(f"/clientes/canal-sa/equipo/{_uid_acli}/baja", data={"csrf": _pe(acl)})
+check("equipo TI: nadie se da de baja a sí mismo", _db_().execute("SELECT disabled FROM users WHERE id=?", (_uid_acli,)).fetchone()["disabled"] == 0)
+# configuración propia: Microsoft 365 y Google
+pcl.post("/clientes/canal-sa/m365/conectar", data={"tenant": "", "csrf": csrf_de(pcl.get("/clientes/canal-sa").text)})
+check("autogestión: el PM de cliente conecta el Microsoft 365 de su empresa", _db_().execute("SELECT m365_estado FROM clients WHERE slug='canal-sa'").fetchone()["m365_estado"] == "conectado")
+check("autogestión: el PM de cliente ve los usuarios de su Microsoft 365", pcl.get("/clientes/canal-sa/m365").url.path == "/clientes/canal-sa/m365")
+pcl.post("/clientes/canal-sa/gws/cuenta-servicio", data={"clave_json": _sa_json, "csrf": csrf_de(pcl.get("/clientes/canal-sa").text)})
+_fg = _db_().execute("SELECT gws_sa FROM clients WHERE slug='canal-sa'").fetchone()["gws_sa"]
+check("autogestión: carga la cuenta de servicio de Google de su empresa, cifrada", bool(_fg) and "private_key" not in _fg)
+_fich = pcl.get("/clientes/canal-sa").text
+check("autogestión: la ficha muestra el ID de cliente y los alcances para autorizar en Google", "112233445566778899" in _fich and "admin.directory.user" in _fich and "private_key" not in _fich)
+check("autogestión: no ve nada de mantenimiento de iTiers", "Reintentar aprovisionamiento" not in _fich and "Eliminar registro" not in _fich)
+pcl.post("/clientes/canal-sa/gws/conectar", data={"admin": "admin@gdemo.com.ar", "csrf": csrf_de(pcl.get("/clientes/canal-sa").text)})
+check("autogestión: conecta el dominio de Google de su empresa", _db_().execute("SELECT gws_estado FROM clients WHERE slug='canal-sa'").fetchone()["gws_estado"] == "conectado")
+check("autogestión: no entra a lo que es solo de iTiers", all(pcl.get(x).url.path != x for x in ("/usuarios", "/m365/aplicacion", "/gws/aplicacion", "/clientes/canal-sa/instaladores", "/clientes/canal-sa/agentes", "/clientes/canal-sa/criticidad", "/clientes/canal-sa/descubrimiento")))
+pcl.post("/clientes/canal-sa/reintentar", data={"csrf": csrf_de(pcl.get("/clientes/canal-sa").text)})
+check("autogestión: no puede reintentar el aprovisionamiento ni eliminar la empresa", pcl.post("/clientes/canal-sa/eliminar", data={"csrf": csrf_de(pcl.get("/clientes/canal-sa").text)}).url.path != "/clientes" and bool(_db_().execute("SELECT 1 FROM clients WHERE slug='canal-sa'").fetchone()))
+check("autogestión: no toca la configuración de otra empresa", pcl.post("/clientes/otra-empresa-sa/m365/conectar", data={"tenant": "", "csrf": csrf_de(pcl.get("/clientes/canal-sa").text)}).url.path != "/clientes/otra-empresa-sa" or _db_().execute("SELECT m365_estado FROM clients WHERE slug='otra-empresa-sa'").fetchone()["m365_estado"] != "conectado")
+acl.post(f"/clientes/canal-sa/equipo/{_db_().execute('SELECT id FROM users WHERE username=?', ('pcli',)).fetchone()['id']}/baja", data={"csrf": _pe(acl)})
+check("equipo TI: el administrador da de baja al PM y pierde el acceso al instante", pcl.get("/clientes/canal-sa").url.path != "/clientes/canal-sa")
+_cx = _db_(); _cx.execute("UPDATE clients SET gws_sa=NULL, gws_admin=NULL, gws_estado=NULL, gws_detalle=NULL, gws_dominio=NULL, gws_conectado_at=NULL WHERE slug='canal-sa'"); _cx.commit(); _cx.close()
 
 _p = {x["email"]: dict(x) for x in _conn.execute("SELECT * FROM client_contactos WHERE client_id=? AND email IS NOT NULL", (_cid_,))}
 check("usuarios nube: se traen los que tienen licencia activa con cargo y área", "lic@clientedemo.com.ar" in _p and _p["lic@clientedemo.com.ar"]["cargo"] == "Contadora" and _p["lic@clientedemo.com.ar"]["area"] == "Finanzas"

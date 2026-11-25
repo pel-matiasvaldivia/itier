@@ -124,7 +124,21 @@ def detalle(request: Request, slug: str, user: dict = Depends(require_permiso("c
     ef = ajustes.efectiva(conn, cfg)
     return render(request, "clientes_detalle.html", cli=cli, bundle=bundle, usuarios=usuarios,
                   dominios=canales.dominios_de(conn, cli["id"]), contactos=canales.contactos_de(conn, cli["id"]),
-                  soporte_email=ef.soporte_email, wa_numero=ef.wa_numero, m365_app_ok=ef.m365_configurado)
+                  soporte_email=ef.soporte_email, wa_numero=ef.wa_numero, m365_app_ok=ef.m365_configurado,
+                  gws_info=_gws_info(ef, cli), gws_scopes=gws_scopes())
+
+
+def _gws_info(ef, cli):
+    from ..services import gws as gws_svc
+    try:
+        return gws_svc.sa_info(gws_svc.cfg_de(ef, cli))
+    except ServiceError:
+        return None
+
+
+def gws_scopes():
+    from ..adapters import gws as gws_mod
+    return gws_mod.SCOPES
 
 
 @router.post("/clientes/{slug}/portal-usuarios")
