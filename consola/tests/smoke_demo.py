@@ -1432,6 +1432,19 @@ acl.post(f"/clientes/canal-sa/equipo/{_db_().execute('SELECT id FROM users WHERE
 check("equipo TI: el administrador da de baja al PM y pierde el acceso al instante", pcl.get("/clientes/canal-sa").url.path != "/clientes/canal-sa")
 _cx = _db_(); _cx.execute("UPDATE clients SET gws_sa=NULL, gws_admin=NULL, gws_estado=NULL, gws_detalle=NULL, gws_dominio=NULL, gws_conectado_at=NULL WHERE slug='canal-sa'"); _cx.commit(); _cx.close()
 
+# Red: identificación de cada IP del barrido
+from itier_console.services import red_tipos as _rt  # noqa: E402
+_cl = lambda ip, puertos=(), dns="", snmp="", glpi=None, manual=None, conocido=None: _rt.clasificar({"ip": ip, "puertos": list(puertos), "dns": dns, "snmp": snmp}, glpi, manual, conocido)
+check("red tipos: una IP que GLPI conoce toma su nombre, tipo y fabricante", _cl("192.168.1.57", [135, 445], glpi={"nombre": "CECILIA-PC", "itemtype": "Computer", "tipo": "Notebook", "fabricante": "Lenovo"})["tipo"] == "Notebook"
+      and _cl("192.168.1.57", glpi={"nombre": "CECILIA-PC", "itemtype": "Computer", "tipo": "Notebook"})["confianza"] == "alta")
+check("red tipos: un Computer sin tipo en GLPI se deduce del nombre (SRV → Servidor)", _cl("10.0.0.5", glpi={"nombre": "SRV-ARCHIVOS", "itemtype": "Computer", "tipo": ""})["tipo"] == "Servidor")
+check("red tipos: RTSP sin más → Cámara IP; con puerto 8000/37777 → Cámara IP / NVR (no se puede distinguir)", _cl("10.0.0.30", [554, 80])["tipo"] == "Cámara IP" and _cl("10.0.0.31", [554, 8000])["tipo"] == "Cámara IP / NVR" and _cl("10.0.0.32", [37777])["tipo"] == "Cámara IP / NVR")
+check("red tipos: 9100/631 → Impresora; 445/3389 → PC Windows; .1 con web → Router", _cl("10.0.0.40", [9100])["tipo"] == "Impresora" and _cl("10.0.0.41", [445, 3389])["tipo"] == "PC Windows" and _cl("10.0.0.1", [80, 443])["tipo"] == "Router/Firewall")
+check("red tipos: el SNMP manda sobre los puertos", _cl("10.0.0.50", [80], snmp="RouterOS RB4011")["tipo"] == "Router/Firewall" and _cl("10.0.0.51", [], snmp="HP LaserJet 4015")["tipo"] == "Impresora")
+check("red tipos: el nombre DNS ayuda (cam-entrada → Cámara IP, ntb-juan → Notebook)", _cl("10.0.0.60", [80], dns="cam-entrada.lan")["tipo"] == "Cámara IP" and _cl("10.0.0.61", [445], dns="ntb-juan.lan")["tipo"] == "Notebook")
+check("red tipos: sin ninguna pista queda «Sin identificar»", _cl("10.0.0.70")["tipo"] == "Sin identificar")
+check("red tipos: lo cargado a mano gana sobre todo y se marca como manual", _cl("10.0.0.30", [554], manual={"tipo": "DVR/NVR", "nombre": "NVR planta baja", "fabricante": "Dahua"})["tipo"] == "DVR/NVR" and _cl("10.0.0.30", [554], manual={"tipo": "DVR/NVR"})["manual"])
+
 # Red y alertas: barrido de equipos activos y chequeos de conectividad
 from itier_console.services import red as _red  # noqa: E402
 from itier_console.adapters import zabbix as _zm  # noqa: E402
@@ -1443,6 +1456,14 @@ c.post("/clientes/canal-sa/red/rango", data={"nombre": "LAN oficina", "iprange":
 _pr = c.get("/clientes/canal-sa/red")
 check("red: muestra los equipos del barrido, los activos y los que no responden", "192.168.1.57" in _pr.text and "Sin respuesta" in _pr.text and "Monitoreado" in _pr.text)
 check("red: «Escanear ahora» confirma", "Barrido iniciado" in c.post("/clientes/canal-sa/red/escanear", data={"csrf": csrf_de(_pr.text)}, follow_redirects=True).text)
+check("red: la tabla identifica el tipo y el origen de cada IP", all(x in c.get("/clientes/canal-sa/red").text for x in ("Notebook", "Cámara IP / NVR", "Impresora", "Router/Firewall", "Sin identificar")))
+c.post("/clientes/canal-sa/red/dispositivo", data={"ip": "192.168.1.23", "tipo": "DVR/NVR", "nombre": "NVR planta baja", "fabricante": "Hikvision", "csrf": csrf_de(c.get("/clientes/canal-sa/red").text)})
+_rr = c.get("/clientes/canal-sa/red").text
+check("red: identificar una IP a mano queda guardado y se ve como manual", "NVR planta baja" in _rr and "Hikvision" in _rr and ">Manual<" in _rr)
+check("red: un tipo inventado se rechaza", "desconocido" in c.post("/clientes/canal-sa/red/dispositivo", data={"ip": "192.168.1.23", "tipo": "Marciano", "csrf": csrf_de(c.get("/clientes/canal-sa/red").text)}, follow_redirects=True).text)
+c.post("/clientes/canal-sa/red/dispositivo", data={"ip": "192.168.1.23", "csrf": csrf_de(c.get("/clientes/canal-sa/red").text)})
+check("red: dejarlo vacío vuelve a la identificación automática", "NVR planta baja" not in c.get("/clientes/canal-sa/red").text)
+check("red: el CSV incluye tipo y origen", "tipo,origen" in c.get("/clientes/canal-sa/red/hosts.csv").text.replace("nombre,", "") or "Cámara IP" in c.get("/clientes/canal-sa/red/hosts.csv").text)
 check("red: exporta los equipos activos a CSV", "192.168.1.57" in c.get("/clientes/canal-sa/red/hosts.csv").text and c.get("/clientes/canal-sa/red/hosts.csv").headers["content-type"].startswith("text/csv"))
 for tipo_, dest_, nom_ in (("internet", "8.8.8.8, 1.1.1.1", ""), ("gateway", "192.168.1.1", "Router sede")):
     c.post("/clientes/canal-sa/red/chequeo", data={"tipo": tipo_, "destino": dest_, "nombre": nom_, "csrf": csrf_de(c.get("/clientes/canal-sa/red").text)})

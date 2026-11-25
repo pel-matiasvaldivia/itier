@@ -215,6 +215,21 @@ def handler(request: httpx.Request) -> httpx.Response:
         if request.method == "POST":
             return httpx.Response(201, json={"id": 90})
         return httpx.Response(200, json=[{"id": "5", "name": "Crítica"}, {"id": "6", "name": "Alta"}])
+    if p.endswith("/IPAddress") and request.method == "GET":
+        return httpx.Response(200, json=[{"id": 1, "name": "192.168.1.57", "items_id": 11, "itemtype": "NetworkName"},
+                                        {"id": 2, "name": "192.168.1.60", "items_id": 12, "itemtype": "NetworkName"},
+                                        {"id": 3, "name": "10.9.9.9", "items_id": 13, "itemtype": "NetworkName"}])
+    if p.endswith("/NetworkName") and request.method == "GET":
+        return httpx.Response(200, json=[{"id": 11, "items_id": 21, "itemtype": "NetworkPort"}, {"id": 12, "items_id": 22, "itemtype": "NetworkPort"},
+                                        {"id": 13, "items_id": 23, "itemtype": "NetworkPort"}])
+    if p.endswith("/NetworkPort") and request.method == "GET":
+        return httpx.Response(200, json=[{"id": 21, "items_id": 501, "itemtype": "Computer", "entities_id": 2, "mac": "AA:BB:CC:00:00:01"},
+                                        {"id": 22, "items_id": 33, "itemtype": "Printer", "entities_id": 2, "mac": ""},
+                                        {"id": 23, "items_id": 77, "itemtype": "Computer", "entities_id": 9, "mac": ""}])
+    if p.endswith("/Printer") and request.method == "GET":
+        return httpx.Response(200, json=[{"id": 33, "name": "HP-ADM", "entities_id": 2, "manufacturers_id": 5, "printertypes_id": 0}])
+    if p.endswith(("/NetworkEquipment", "/Phone", "/Peripheral", "/Unmanaged", "/PrinterType", "/NetworkEquipmentType", "/PhoneType", "/PeripheralType")) and request.method == "GET":
+        return httpx.Response(200, json=[])
     if p.endswith("/Item_Disk") and request.method == "GET":
         return httpx.Response(200, json=[
             {"id": 1, "items_id": 501, "itemtype": "Computer", "mountpoint": "C:", "totalsize": 100000, "freesize": 8000},
@@ -436,6 +451,14 @@ put = next((x for x in captured if x["path"].endswith("/Computer/501") and x["me
 check("glpi.fijar_criticidad hace PUT con businesscriticities_id",
       put and "businesscriticities_id" in put["body"]["input"], str(put["body"]) if put else "—")
 
+# ── GLPI: qué dispositivo es cada IP (para identificar el barrido de red) ───
+captured.clear()
+with glpi_mod.cliente(cfg) as g:
+    _inv = g.inventario_por_ip(2)
+check("glpi.inventario_por_ip: cruza IPAddress → NetworkName → NetworkPort → equipo y filtra por entidad",
+      set(_inv) == {"192.168.1.57", "192.168.1.60"} and _inv["192.168.1.57"]["nombre"] == "SRV-DC01" and _inv["192.168.1.60"]["itemtype"] == "Printer" and _inv["192.168.1.60"]["nombre"] == "HP-ADM"
+      and _inv["192.168.1.57"]["mac"] == "aa:bb:cc:00:00:01", str(_inv))
+
 # ── Zabbix: barrido de red y chequeos de conectividad ───────────────────────
 captured.clear()
 with zbx_mod.cliente(cfg) as z:
@@ -450,9 +473,11 @@ with zbx_mod.cliente(cfg) as z:
 _dc = next(x for x in captured if x["body"].get("method") == "drule.create")["body"]["params"]
 check("zbx.drule: crea la regla con iprange, proxy y checks ICMP + TCP",
       _dr == "71" and _dc["iprange"] == "192.168.1.0/24" and _dc["proxyid"] == "9"
-      and {c["type"] for c in _dc["dchecks"]} == {12, 8} and "445" in [c for c in _dc["dchecks"] if c["type"] == 8][0]["ports"] and all(c["type"] not in (9, 10, 11, 13) for c in _dc["dchecks"]), str(_dc))
+      and {c["type"] for c in _dc["dchecks"]} == {12, 8, 11} and "445" in [c for c in _dc["dchecks"] if c["type"] == 8][0]["ports"] and all(c.get("key_") for c in _dc["dchecks"] if c["type"] in (9, 10, 11, 13)), str(_dc))
 check("zbx.drule: «escanear ahora» deshabilita y vuelve a habilitar la regla",
       [x["body"]["params"].get("status") for x in captured if x["body"].get("method") == "drule.update"] == [1, 0])
+check("zbx.drule: incluye puertos de cámaras/impresoras y el sysDescr por SNMP v2c",
+      all(str(x) in [c for c in _dc["dchecks"] if c["type"] == 8][0]["ports"] for x in (554, 8000, 37777, 9100, 3389)) and any(c["type"] == 11 and c["key_"] == "1.3.6.1.2.1.1.1.0" for c in _dc["dchecks"]))
 check("zbx.dhost: parsea activos/caídos, DNS y puertos TCP abiertos",
       len(_hd) == 2 and _hd[0]["ip"] == "192.168.1.5" and _hd[0]["estado"] == "up" and _hd[0]["puertos"] == [445] and _hd[1]["estado"] == "down", str(_hd))
 _hc = next(x for x in captured if x["body"].get("method") == "host.create")["body"]["params"]

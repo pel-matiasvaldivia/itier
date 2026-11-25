@@ -46,7 +46,7 @@ def ver(request: Request, slug: str, user: dict = Depends(require_permiso("red")
         return RedirectResponse("/clientes", status_code=303)
     cfg = request.app.state.cfg
     return render(request, "red.html", cli=cli, rangos=svc.rangos(conn, cli["id"]), activos=svc.hosts_activos(conn, cfg, cli),
-                  est=svc.estado(conn, cfg, cli), tipos=svc.TIPOS, tiene_proxy=bool(cli.get("zbx_proxy_id")))
+                  est=svc.estado(conn, cfg, cli), tipos=svc.TIPOS, tipos_disp=svc.red_tipos.TIPOS, tiene_proxy=bool(cli.get("zbx_proxy_id")))
 
 
 @router.post("/clientes/{slug}/red/escanear")
@@ -57,6 +57,21 @@ def escanear(request: Request, slug: str, csrf: str = Form(""), user: dict = Dep
             n = svc.escanear(conn, request.app.state.cfg, cli, user["user"])
             audit.registrar(conn, user["user"], "red.escaneo", {"cliente": cli["nombre"], "rangos": n})
             flash(request, "Barrido iniciado. Los equipos aparecen a medida que el proxy del cliente los encuentra (puede tardar un par de minutos).", "ok")
+        except ServiceError as e:
+            flash(request, e.mensaje, "error")
+    return _volver(slug, "#activos")
+
+
+@router.post("/clientes/{slug}/red/dispositivo")
+def dispositivo(request: Request, slug: str, ip: str = Form(""), nombre: str = Form(""), tipo: str = Form(""), fabricante: str = Form(""),
+                notas: str = Form(""), csrf: str = Form(""), user: dict = Depends(require_permiso("red")), conn: sqlite3.Connection = Depends(get_db)):
+    """Identificación manual de un dispositivo de la red (queda guardada; vacía = vuelve a la automática)."""
+    cli = _cli(conn, slug)
+    if cli and _csrf(request, csrf):
+        try:
+            svc.guardar_dispositivo(conn, cli["id"], user["user"], ip, nombre, tipo, fabricante, notas)
+            audit.registrar(conn, user["user"], "red.dispositivo_identificado", {"cliente": cli["nombre"], "ip": ip.strip(), "tipo": tipo})
+            flash(request, f"{ip.strip()} identificado.", "ok")
         except ServiceError as e:
             flash(request, e.mensaje, "error")
     return _volver(slug, "#activos")
@@ -120,8 +135,8 @@ def exportar(request: Request, slug: str, user: dict = Depends(require_permiso("
     a = svc.hosts_activos(conn, request.app.state.cfg, cli)
     out = io.StringIO()
     w = csv.writer(out)
-    w.writerow(["ip", "nombre_dns", "estado", "ultimo_visto_utc", "puertos_abiertos", "ya_monitoreado"])
+    w.writerow(["ip", "nombre", "tipo", "origen", "fabricante", "estado", "ultimo_visto_utc", "puertos_abiertos", "ya_monitoreado"])
     for h in a["hosts"]:
-        w.writerow([h["ip"], h.get("dns", ""), h["estado"], h.get("visto_ts", ""), " ".join(str(p) for p in h.get("puertos", [])), "si" if h["monitoreado"] else "no"])
+        w.writerow([h["ip"], h.get("nombre") or h.get("dns", ""), h["tipo"], "+".join(h["origen"]), h.get("fabricante", ""), h["estado"], h.get("visto_ts", ""), " ".join(str(p) for p in h.get("puertos", [])), "si" if h["monitoreado"] else "no"])
     return Response(out.getvalue(), media_type="text/csv; charset=utf-8",
                     headers={"Content-Disposition": f'attachment; filename="red-{cli["slug"]}.csv"'})

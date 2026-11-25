@@ -53,11 +53,14 @@ _DEMO_USUARIOS: dict[str, dict] = {}
 # ── Demo: descubrimiento de red y chequeos de conectividad (en memoria del proceso) ─────────────────────────
 _DEMO_RED: dict = {"drules": {}, "hosts": {}, "items": {}, "triggers": {}, "n": 0}
 _DEMO_DESCUBIERTOS = [
-    {"ip": "192.168.1.1", "dns": "router.lan", "estado": "up", "ultimo_up": "1764085000", "ultimo_down": "0"},
-    {"ip": "192.168.1.10", "dns": "srv-dc01.lan", "estado": "up", "ultimo_up": "1764085000", "ultimo_down": "0"},
-    {"ip": "192.168.1.23", "dns": "", "estado": "up", "ultimo_up": "1764085000", "ultimo_down": "0"},
-    {"ip": "192.168.1.57", "dns": "cecilia-pc.lan", "estado": "up", "ultimo_up": "1764084000", "ultimo_down": "0"},
-    {"ip": "192.168.1.88", "dns": "", "estado": "down", "ultimo_up": "1763900000", "ultimo_down": "1764000000"},
+    {"ip": "192.168.1.1", "dns": "router.lan", "estado": "up", "ultimo_up": "1764085000", "ultimo_down": "0", "puertos": [80, 443], "snmp": "RouterOS RB4011"},
+    {"ip": "192.168.1.10", "dns": "srv-dc01.lan", "estado": "up", "ultimo_up": "1764085000", "ultimo_down": "0", "puertos": [135, 139, 445, 3389], "snmp": ""},
+    {"ip": "192.168.1.23", "dns": "", "estado": "up", "ultimo_up": "1764085000", "ultimo_down": "0", "puertos": [554, 8000, 80], "snmp": ""},
+    {"ip": "192.168.1.30", "dns": "", "estado": "up", "ultimo_up": "1764085000", "ultimo_down": "0", "puertos": [554, 80], "snmp": ""},
+    {"ip": "192.168.1.57", "dns": "cecilia-pc.lan", "estado": "up", "ultimo_up": "1764084000", "ultimo_down": "0", "puertos": [135, 445], "snmp": ""},
+    {"ip": "192.168.1.60", "dns": "", "estado": "up", "ultimo_up": "1764084000", "ultimo_down": "0", "puertos": [9100, 80, 631], "snmp": ""},
+    {"ip": "192.168.1.77", "dns": "", "estado": "up", "ultimo_up": "1764084000", "ultimo_down": "0", "puertos": [], "snmp": ""},
+    {"ip": "192.168.1.88", "dns": "", "estado": "down", "ultimo_up": "1763900000", "ultimo_down": "1764000000", "puertos": [], "snmp": ""},
 ]
 
 
@@ -370,7 +373,7 @@ class ZabbixClient:
 
     # Tipos de check de descubrimiento de Zabbix: 12 = ICMP ping · 8 = TCP (el 9 es «agente Zabbix» y exige clave).
     # Pings (ICMP) + puertos típicos: muchos equipos Windows no contestan ping, pero sí tienen abierto SMB/RDP/135.
-    PUERTOS_ESCANEO = "22,80,135,139,443,445,3389"
+    PUERTOS_ESCANEO = "21,22,23,80,135,139,443,445,515,554,631,3389,5060,5900,8000,8080,8443,9100,34567,37777"
 
     def asegurar_regla_descubrimiento(self, nombre: str, iprange: str, proxyid: str | None, delay: str = "1h") -> str:
         """Crea (o actualiza) la regla de descubrimiento de red del cliente. Devuelve el druleid."""
@@ -383,7 +386,9 @@ class ZabbixClient:
             _DEMO_RED["drules"][rid] = {"name": nombre, "iprange": iprange, "status": "0"}
             return rid
         checks = [{"type": 12, "uniq": 0, "host_source": 1, "name_source": 0},
-                  {"type": 8, "ports": self.PUERTOS_ESCANEO, "uniq": 0, "host_source": 1, "name_source": 0}]
+                  {"type": 8, "ports": self.PUERTOS_ESCANEO, "uniq": 0, "host_source": 1, "name_source": 0},
+                  # sysDescr por SNMP v2c (community «public»): identifica routers, switches, impresoras, NAS, NVR… que lo tengan abierto
+                  {"type": 11, "key_": "1.3.6.1.2.1.1.1.0", "snmp_community": "public", "ports": "161", "uniq": 0, "host_source": 1, "name_source": 0}]
         existentes = self._rpc("drule.get", {"filter": {"name": nombre}, "output": ["druleid"]})
         params = {"name": nombre, "iprange": iprange, "delay": delay, "status": 0, "dchecks": checks}
         if proxyid:
@@ -412,16 +417,17 @@ class ZabbixClient:
         if not druleids:
             return []
         if self.demo:
-            return [dict(d, puertos=[]) for d in _DEMO_DESCUBIERTOS]
+            return [dict(d) for d in _DEMO_DESCUBIERTOS]
         res = self._rpc("dhost.get", {"druleids": druleids, "output": ["dhostid", "status", "lastup", "lastdown"],
-                                       "selectDServices": ["ip", "dns", "port", "type", "status"]})
+                                       "selectDServices": ["ip", "dns", "port", "type", "status", "value"]})
         salida = []
         for h in res:
             sv = h.get("dservices") or []
             if not sv:
                 continue
             puertos = sorted({int(x["port"]) for x in sv if x.get("type") == "8" and x.get("status") == "0" and str(x.get("port", "")).isdigit()})
-            salida.append({"ip": sv[0].get("ip", ""), "dns": next((x.get("dns") for x in sv if x.get("dns")), ""),
+            snmp = next((x.get("value", "") for x in sv if x.get("type") == "11" and x.get("value")), "")
+            salida.append({"ip": sv[0].get("ip", ""), "dns": next((x.get("dns") for x in sv if x.get("dns")), ""), "snmp": snmp,
                            "estado": "up" if h.get("status") == "0" else "down",
                            "ultimo_up": h.get("lastup", "0"), "ultimo_down": h.get("lastdown", "0"), "puertos": puertos})
         return salida

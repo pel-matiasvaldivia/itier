@@ -88,6 +88,18 @@ CREATE TABLE IF NOT EXISTS red_rangos (
     created_at  TEXT    NOT NULL,
     created_by  TEXT
 );
+CREATE TABLE IF NOT EXISTS red_dispositivos (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    client_id   INTEGER NOT NULL,
+    ip          TEXT    NOT NULL,
+    nombre      TEXT,
+    tipo        TEXT,
+    fabricante  TEXT,
+    notas       TEXT,
+    updated_at  TEXT,
+    updated_by  TEXT,
+    UNIQUE(client_id, ip)
+);
 CREATE TABLE IF NOT EXISTS red_chequeos (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
     client_id   INTEGER NOT NULL,

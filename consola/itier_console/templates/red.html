@@ -94,23 +94,44 @@
     {% endif %}
 
     {% if activos.hosts %}
-    <div class="rfilt"><input class="u-search" type="search" id="r-buscar" placeholder="Buscar IP o nombre…" aria-label="Buscar equipo">
-      <span id="r-chips"><button type="button" class="u-b on" data-f="">Todos</button><button type="button" class="u-b" data-f="up">Activos</button><button type="button" class="u-b" data-f="down">Sin respuesta</button><button type="button" class="u-b" data-f="nomon">Sin monitorear</button></span></div>
+    <div class="rtipos" id="r-tipos">
+      {% for t, n in activos.tipos %}<button type="button" class="rtipo" data-t="{{ t }}">{{ t }} <b>{{ n }}</b></button>{% endfor %}
+    </div>
+    <div class="rfilt"><input class="u-search" type="search" id="r-buscar" placeholder="Buscar IP, nombre o tipo…" aria-label="Buscar equipo">
+      <span id="r-chips"><button type="button" class="u-b on" data-f="">Todos</button><button type="button" class="u-b" data-f="up">Activos</button><button type="button" class="u-b" data-f="down">Sin respuesta</button><button type="button" class="u-b" data-f="nomon">Sin monitorear</button><button type="button" class="u-b" data-f="sinid">Sin identificar</button></span></div>
     <div class="tscroll"><table class="tabla" id="r-tabla">
-      <thead><tr><th>IP</th><th>Nombre</th><th>Estado</th><th>Puertos</th><th>Zabbix</th><th>Último visto</th></tr></thead>
+      <thead><tr><th>Tipo</th><th>Nombre</th><th>IP</th><th>Estado</th><th>Origen del dato</th><th>Puertos</th><th>Zabbix</th><th>Visto</th><th></th></tr></thead>
       <tbody>
       {% for h in activos.hosts %}
-      <tr data-q="{{ (h.ip ~ ' ' ~ h.dns)|lower }}" data-e="{{ h.estado }}" data-m="{{ 1 if h.monitoreado else 0 }}">
-        <td><b>{{ h.ip }}</b></td><td>{{ h.dns or '—' }}</td>
+      <tr class="rfila" data-q="{{ (h.ip ~ ' ' ~ (h.nombre or '') ~ ' ' ~ h.dns ~ ' ' ~ h.tipo)|lower }}" data-e="{{ h.estado }}" data-m="{{ 1 if h.monitoreado else 0 }}" data-t="{{ h.tipo }}" data-i="{{ 1 if h.tipo == 'Sin identificar' else 0 }}">
+        <td><span class="rtipo-l" title="{{ h.motivo }}">{{ h.icono }} {{ h.tipo }}</span>{% if h.confianza in ('baja', 'media') and not h.manual %}<br><small class="l-mut">probable</small>{% endif %}</td>
+        <td><b>{{ h.nombre or '—' }}</b>{% if h.fabricante %}<br><small class="l-mut">{{ h.fabricante }}</small>{% endif %}{% if h.notas %}<br><small class="l-mut">{{ h.notas }}</small>{% endif %}</td>
+        <td>{{ h.ip }}</td>
         <td>{% if h.estado == 'up' %}<span class="l-pill ok"><i></i>Activo</span>{% else %}<span class="l-pill warn"><i></i>Sin respuesta</span>{% endif %}</td>
+        <td>{% for o in h.origen %}<span class="l-pill {{ 'ok' if o in ('GLPI', 'Mesh', 'Manual') else 'off' }}">{{ o }}</span> {% else %}<span class="l-mut">solo red</span>{% endfor %}</td>
         <td class="l-mut">{{ h.puertos|join(', ') if h.puertos else '—' }}</td>
         <td>{% if h.monitoreado %}<span class="l-pill ok">Monitoreado</span>{% else %}<span class="l-pill off">No</span>{% endif %}</td>
         <td class="l-mut">{{ h.visto }}</td>
+        <td>{% if puede('red') %}<button type="button" class="u-b r-edit" data-ip="{{ h.ip }}">Identificar</button>{% endif %}</td>
       </tr>
+      {% if puede('red') %}
+      <tr class="rform" data-ip="{{ h.ip }}" hidden><td colspan="9">
+        <form method="post" action="/clientes/{{ cli.slug }}/red/dispositivo" class="form cols">
+          <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="ip" value="{{ h.ip }}">
+          <label>Tipo <select name="tipo"><option value="">(automático)</option>{% for t in tipos_disp %}<option value="{{ t }}" {{ 'selected' if h.manual and h.tipo == t }}>{{ t }}</option>{% endfor %}</select></label>
+          <label>Nombre <input type="text" name="nombre" maxlength="80" value="{{ h.nombre if h.manual else '' }}" placeholder="Cámara entrada"></label>
+          <label>Fabricante <input type="text" name="fabricante" maxlength="60" value="{{ h.fabricante if h.manual else '' }}" placeholder="Hikvision"></label>
+          <label>Notas <input type="text" name="notas" maxlength="200" value="{{ h.notas }}"></label>
+          <button class="u-b" type="submit">Guardar</button>
+        </form>
+        <p class="l-mut" style="margin:.2rem 0 0">Vacío = vuelve a la identificación automática. {% if h.motivo %}Detectado por: {{ h.motivo }}.{% endif %}</p>
+      </td></tr>
+      {% endif %}
       {% endfor %}
       </tbody>
     </table></div>
     <div class="l-empty" id="r-vacio" hidden>Ningún equipo coincide.</div>
+    <p class="muted small">La identificación sale de lo que ya reportan el agente de GLPI y Mesh, del SNMP, de los puertos abiertos y del nombre. Las cámaras, DVR/NVR e impresoras sin SNMP son «probables»: corregilas una vez con «Identificar» y quedan guardadas.</p>
     {% elif rangos %}<p class="muted">Todavía no hay resultados. Tocá «Escanear ahora» y esperá un par de minutos.</p>{% endif %}
   </section>
 
@@ -133,12 +154,14 @@
         };
         t.addEventListener('change', f);
       }
-      var q = document.getElementById('r-buscar'), filtro = '';
+      var q = document.getElementById('r-buscar'), filtro = '', tipo = '';
       function aplicar() {
         var x = q ? q.value.trim().toLowerCase() : '', n = 0;
-        document.querySelectorAll('#r-tabla tbody tr').forEach(function (r) {
-          var ok = (!x || r.getAttribute('data-q').indexOf(x) >= 0) && (!filtro || (filtro === 'nomon' ? r.getAttribute('data-m') === '0' : r.getAttribute('data-e') === filtro));
+        document.querySelectorAll('#r-tabla tbody tr.rfila').forEach(function (r) {
+          var ok = (!x || r.getAttribute('data-q').indexOf(x) >= 0) && (!tipo || r.getAttribute('data-t') === tipo) &&
+            (!filtro || (filtro === 'nomon' ? r.getAttribute('data-m') === '0' : filtro === 'sinid' ? r.getAttribute('data-i') === '1' : r.getAttribute('data-e') === filtro));
           r.hidden = !ok; if (ok) n++;
+          var f = r.nextElementSibling; if (f && f.classList.contains('rform') && !ok) f.hidden = true;
         });
         var v = document.getElementById('r-vacio'); if (v) v.hidden = n > 0;
       }
@@ -148,6 +171,18 @@
           filtro = b.getAttribute('data-f');
           document.querySelectorAll('#r-chips button').forEach(function (x) { x.classList.toggle('on', x === b); });
           aplicar();
+        });
+      });
+      document.querySelectorAll('#r-tipos .rtipo').forEach(function (b) {
+        b.addEventListener('click', function () {
+          var t = b.getAttribute('data-t'); tipo = (tipo === t) ? '' : t;
+          document.querySelectorAll('#r-tipos .rtipo').forEach(function (x) { x.classList.toggle('on', x.getAttribute('data-t') === tipo); });
+          aplicar();
+        });
+      });
+      document.querySelectorAll('.r-edit').forEach(function (b) {
+        b.addEventListener('click', function () {
+          var tr = document.querySelector('tr.rform[data-ip="' + b.getAttribute('data-ip') + '"]'); if (tr) tr.hidden = !tr.hidden;
         });
       });
     })();

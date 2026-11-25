@@ -30,6 +30,13 @@ _DEMO_ENTIDADES = [
     {"id": 3, "name": "Estudio Contable Paz", "completename": "Raíz > Estudio Contable Paz"},
 ]
 
+# IP → dispositivo que GLPI conoce (demo)
+_DEMO_INV_IP = {
+    "192.168.1.1": {"nombre": "RB-SEDE", "itemtype": "NetworkEquipment", "tipo": "Router", "fabricante": "MikroTik", "mac": "", "id": "31"},
+    "192.168.1.57": {"nombre": "CECILIA-PC", "itemtype": "Computer", "tipo": "Notebook", "fabricante": "Lenovo", "mac": "", "id": "902"},
+    "192.168.1.60": {"nombre": "HP-LASER-ADM", "itemtype": "Printer", "tipo": "", "fabricante": "HP", "mac": "", "id": "12"},
+}
+
 _DEMO_TICKETS = [
     {"id": 1042, "name": "No anda el correo en recepción", "status": 2, "priority": 4,
      "entities_id": 2, "date": "2026-11-11 09:14", "users_id_recipient": "mesa"},
@@ -417,6 +424,57 @@ class GLPIClient:
                 "ultimo_inventario": str(c.get("last_inventory_update") or c.get("date_mod") or "")[:19],
                 "usuario": c.get("contact") or "", "por_agente": bool(int(c.get("is_dynamic") or 0)),
             })
+        return salida
+
+    # Tipos de GLPI que pueden tener IP (el agente inventaría computadoras; el descubrimiento SNMP trae red, impresoras y «no administrados»).
+    _TIPOS_RED = (("Computer", "ComputerType", "computertypes_id"), ("NetworkEquipment", "NetworkEquipmentType", "networkequipmenttypes_id"),
+                  ("Printer", "PrinterType", "printertypes_id"), ("Phone", "PhoneType", "phonetypes_id"),
+                  ("Peripheral", "PeripheralType", "peripheraltypes_id"), ("Unmanaged", None, None))
+
+    def inventario_por_ip(self, entity_id) -> dict[str, dict]:
+        """Lo que GLPI sabe de cada IP de la entidad: {ip: {nombre, itemtype, tipo, fabricante, mac, id}}.
+
+        Cruza IPAddress → NetworkName → NetworkPort → equipo (todas las listas en bloque, cacheadas). Cubre lo que reportan
+        el GLPI Agent (computadoras) y su descubrimiento de red (equipos de red, impresoras, «Unmanaged»).
+        ⚠ Los itemtypes de red pueden variar con la versión/plugin de GLPI: si alguno no responde se ignora."""
+        if self.demo:
+            return {k: dict(v) for k, v in _DEMO_INV_IP.items()}
+        if entity_id in (None, ""):
+            return {}
+
+        def listar(clase: str) -> list[dict]:
+            try:
+                r = self._get_cacheado(f"/{clase}", params={"range": "0-4999"})
+            except AdapterError:
+                return []
+            return [x for x in r if isinstance(x, dict)] if isinstance(r, list) else []
+
+        redes = {str(n.get("id")): n for n in listar("NetworkName")}
+        puertos = {str(p.get("id")): p for p in listar("NetworkPort")}
+        ips: dict[str, tuple] = {}
+        for a in listar("IPAddress"):
+            ip = (a.get("name") or "").strip()
+            nn = redes.get(str(a.get("items_id")))
+            pt = puertos.get(str(nn.get("items_id"))) if nn else None
+            if ip and pt and str(pt.get("entities_id", entity_id)) == str(entity_id):
+                ips[ip] = (pt.get("itemtype"), str(pt.get("items_id")), (pt.get("mac") or "").lower())
+        if not ips:
+            return {}
+        fab = self._nombres("Manufacturer")
+        items: dict[tuple, dict] = {}
+        for clase, tipo_cls, campo in self._TIPOS_RED:
+            tipos = self._nombres(tipo_cls) if tipo_cls else {}
+            for x in listar(clase):
+                if int(x.get("is_template") or 0) or int(x.get("is_deleted") or 0):
+                    continue
+                tipo = tipos.get(str(x.get(campo)), "") if campo else (x.get("item_type") or x.get("itemtype") or "")
+                items[(clase, str(x.get("id")))] = {"nombre": x.get("name") or "", "itemtype": clase, "tipo": tipo,
+                                                     "fabricante": fab.get(str(x.get("manufacturers_id")), ""), "id": str(x.get("id"))}
+        salida = {}
+        for ip, (it, iid, mac) in ips.items():
+            d = items.get((it, iid))
+            if d:
+                salida[ip] = dict(d, mac=mac)
         return salida
 
     # -- usuarios de plataforma (técnicos / PM / administradores) ---------------

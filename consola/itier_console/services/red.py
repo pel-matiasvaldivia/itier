@@ -16,8 +16,8 @@ import sqlite3
 import threading
 from datetime import datetime, timezone
 
-from ..adapters import AdapterError, zabbix as zbx_mod
-from . import ServiceError
+from ..adapters import AdapterError, glpi as glpi_mod, zabbix as zbx_mod
+from . import ServiceError, red_tipos
 
 log = logging.getLogger("itier.red")
 
@@ -156,11 +156,52 @@ def _ip_clave(ip: str):
         return 0
 
 
+def dispositivos_manuales(conn: sqlite3.Connection, cid: int) -> dict[str, dict]:
+    return {r["ip"]: dict(r) for r in conn.execute("SELECT * FROM red_dispositivos WHERE client_id = ?", (cid,))}
+
+
+def guardar_dispositivo(conn, cid: int, actor: str, ip: str, nombre: str, tipo: str, fabricante: str, notas: str = "") -> None:
+    try:
+        ipaddress.IPv4Address((ip or "").strip())
+    except ipaddress.AddressValueError:
+        raise ServiceError("IP inválida.")
+    if tipo and tipo not in red_tipos.TIPOS:
+        raise ServiceError("Tipo de dispositivo desconocido.")
+    nombre, fabricante, notas = (nombre or "").strip()[:80], (fabricante or "").strip()[:60], (notas or "").strip()[:200]
+    if not (nombre or tipo or fabricante or notas):            # todo vacío = volver a la identificación automática
+        conn.execute("DELETE FROM red_dispositivos WHERE client_id=? AND ip=?", (cid, ip.strip()))
+    else:
+        conn.execute("INSERT INTO red_dispositivos(client_id, ip, nombre, tipo, fabricante, notas, updated_at, updated_by) VALUES (?,?,?,?,?,?,?,?) "
+                     "ON CONFLICT(client_id, ip) DO UPDATE SET nombre=excluded.nombre, tipo=excluded.tipo, fabricante=excluded.fabricante, "
+                     "notas=excluded.notas, updated_at=excluded.updated_at, updated_by=excluded.updated_by",
+                     (cid, ip.strip(), nombre, tipo, fabricante, notas, _ahora(), actor))
+    conn.commit()
+
+
+def _conocidos(cfg, cli: dict) -> tuple[dict, dict]:
+    """(ip→dispositivo de GLPI, nombre en mayúsculas→equipo con agente/Mesh/Zabbix). Mejor esfuerzo: si algo falla, sigue sin eso."""
+    glpi_ip, por_nombre = {}, {}
+    if cfg.glpi_configurado and cli.get("glpi_entity_id"):
+        try:
+            with glpi_mod.cliente(cfg) as g:
+                glpi_ip = g.inventario_por_ip(cli["glpi_entity_id"])
+        except AdapterError:
+            pass
+    try:
+        from . import equipos as equipos_svc
+        for e in equipos_svc.listar(cfg, cli)["equipos"]:
+            por_nombre[e["nombre"].upper()] = {"nombre": e["nombre"], "en_glpi": e.get("en_glpi"), "en_mesh": e.get("en_mesh"), "zbx": e.get("zbx") not in (None, "0")}
+    except Exception:  # noqa: BLE001
+        pass
+    return glpi_ip, por_nombre
+
+
 def hosts_activos(conn, cfg, cli: dict) -> dict:
-    """{hosts: [...], nota, resumen}. Cada host: ip, dns, estado, visto, puertos, monitoreado."""
+    """{hosts, nota, resumen, tipos}. Cada host: ip, dns, estado, visto, puertos, monitoreado + tipo/nombre/origen (ver red_tipos)."""
     rs = [r["drule_id"] for r in rangos(conn, cli["id"]) if r.get("drule_id")]
+    vacio = {"hosts": [], "nota": "", "resumen": {"total": 0, "up": 0, "down": 0, "sin_identificar": 0}, "tipos": []}
     if not rs:
-        return {"hosts": [], "nota": "", "resumen": {"total": 0, "up": 0, "down": 0}}
+        return vacio
     nota, lista, monitoreadas = "", [], set()
     try:
         with zbx_mod.cliente(cfg) as z:
@@ -168,13 +209,25 @@ def hosts_activos(conn, cfg, cli: dict) -> dict:
             monitoreadas = z.ips_monitoreadas(cli.get("zbx_hostgroup_id"))
     except AdapterError as e:
         nota = f"Zabbix no respondió: {e.detalle[:120]}"
+    glpi_ip, por_nombre = _conocidos(cfg, cli)
+    manuales = dispositivos_manuales(conn, cli["id"])
     for h in lista:
         h["monitoreado"] = h["ip"] in monitoreadas
         h["visto"] = _ts(h.get("ultimo_up")) if h["estado"] == "down" else "ahora"
         h["visto_ts"] = _ts(h.get("ultimo_up"))
+        corto = (h.get("dns") or "").split(".")[0].upper()
+        conocido = por_nombre.get(corto) or por_nombre.get(((glpi_ip.get(h["ip"]) or {}).get("nombre") or "").upper())
+        h.update(red_tipos.clasificar(h, glpi_ip.get(h["ip"]), manuales.get(h["ip"]), conocido))
+        h["notas"] = (manuales.get(h["ip"]) or {}).get("notas", "")
+        h["icono"] = red_tipos.ICONOS.get(h["tipo"], "❔")
     lista.sort(key=lambda h: _ip_clave(h["ip"]))
     up = sum(1 for h in lista if h["estado"] == "up")
-    return {"hosts": lista, "nota": nota, "resumen": {"total": len(lista), "up": up, "down": len(lista) - up}}
+    cuenta: dict[str, int] = {}
+    for h in lista:
+        cuenta[h["tipo"]] = cuenta.get(h["tipo"], 0) + 1
+    return {"hosts": lista, "nota": nota,
+            "resumen": {"total": len(lista), "up": up, "down": len(lista) - up, "sin_identificar": cuenta.get("Sin identificar", 0)},
+            "tipos": sorted(cuenta.items(), key=lambda kv: (-kv[1], kv[0]))}
 
 
 # ── chequeos de conectividad ────────────────────────────────────────────────────────────────────
