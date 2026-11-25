@@ -270,7 +270,7 @@ def handler(request: httpx.Request) -> httpx.Response:
         if m == "dhost.get":
             return _rpc(body, [{"dhostid": "1", "status": "0", "lastup": "1764085000", "lastdown": "0",
                                 "dservices": [{"ip": "192.168.1.5", "dns": "pc5.lan", "port": "0", "type": "12", "status": "0"},
-                                              {"ip": "192.168.1.5", "dns": "pc5.lan", "port": "445", "type": "9", "status": "0"}]},
+                                              {"ip": "192.168.1.5", "dns": "pc5.lan", "port": "445", "type": "8", "status": "0"}]},
                                {"dhostid": "2", "status": "1", "lastup": "1763900000", "lastdown": "1764000000",
                                 "dservices": [{"ip": "192.168.1.9", "dns": "", "port": "0", "type": "12", "status": "1"}]}])
         if m == "host.get" and (params.get("filter") or {}).get("host", "").startswith("itier-red-"):
@@ -450,7 +450,7 @@ with zbx_mod.cliente(cfg) as z:
 _dc = next(x for x in captured if x["body"].get("method") == "drule.create")["body"]["params"]
 check("zbx.drule: crea la regla con iprange, proxy y checks ICMP + TCP",
       _dr == "71" and _dc["iprange"] == "192.168.1.0/24" and _dc["proxyid"] == "9"
-      and {c["type"] for c in _dc["dchecks"]} == {12, 9} and "445" in [c for c in _dc["dchecks"] if c["type"] == 9][0]["ports"], str(_dc))
+      and {c["type"] for c in _dc["dchecks"]} == {12, 8} and "445" in [c for c in _dc["dchecks"] if c["type"] == 8][0]["ports"] and all(c["type"] not in (9, 10, 11, 13) for c in _dc["dchecks"]), str(_dc))
 check("zbx.drule: «escanear ahora» deshabilita y vuelve a habilitar la regla",
       [x["body"]["params"].get("status") for x in captured if x["body"].get("method") == "drule.update"] == [1, 0])
 check("zbx.dhost: parsea activos/caídos, DNS y puertos TCP abiertos",

@@ -368,6 +368,7 @@ class ZabbixClient:
 
     # -- descubrimiento de red (regla de Zabbix que corre el PROXY del cliente) ----------------------
 
+    # Tipos de check de descubrimiento de Zabbix: 12 = ICMP ping · 8 = TCP (el 9 es «agente Zabbix» y exige clave).
     # Pings (ICMP) + puertos típicos: muchos equipos Windows no contestan ping, pero sí tienen abierto SMB/RDP/135.
     PUERTOS_ESCANEO = "22,80,135,139,443,445,3389"
 
@@ -382,7 +383,7 @@ class ZabbixClient:
             _DEMO_RED["drules"][rid] = {"name": nombre, "iprange": iprange, "status": "0"}
             return rid
         checks = [{"type": 12, "uniq": 0, "host_source": 1, "name_source": 0},
-                  {"type": 9, "ports": self.PUERTOS_ESCANEO, "uniq": 0, "host_source": 1, "name_source": 0}]
+                  {"type": 8, "ports": self.PUERTOS_ESCANEO, "uniq": 0, "host_source": 1, "name_source": 0}]
         existentes = self._rpc("drule.get", {"filter": {"name": nombre}, "output": ["druleid"]})
         params = {"name": nombre, "iprange": iprange, "delay": delay, "status": 0, "dchecks": checks}
         if proxyid:
@@ -419,7 +420,7 @@ class ZabbixClient:
             sv = h.get("dservices") or []
             if not sv:
                 continue
-            puertos = sorted({int(x["port"]) for x in sv if x.get("type") == "9" and x.get("status") == "0" and str(x.get("port", "")).isdigit()})
+            puertos = sorted({int(x["port"]) for x in sv if x.get("type") == "8" and x.get("status") == "0" and str(x.get("port", "")).isdigit()})
             salida.append({"ip": sv[0].get("ip", ""), "dns": next((x.get("dns") for x in sv if x.get("dns")), ""),
                            "estado": "up" if h.get("status") == "0" else "down",
                            "ultimo_up": h.get("lastup", "0"), "ultimo_down": h.get("lastdown", "0"), "puertos": puertos})
