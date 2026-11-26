@@ -255,6 +255,7 @@ MODOS_REMOTO = {"escritorio": 11, "terminal": 12, "archivos": 13}
 
 
 def url_remoto(cfg, nodeid: str, modo: str = "escritorio") -> str:
-    """Enlace a una vista del equipo en MeshCentral (escritorio, terminal o archivos), sin su marco: solo esa vista."""
+    """Enlace a una vista del equipo en MeshCentral (escritorio, terminal o archivos), sin su marco: solo esa vista.
+    `mobile=0` fuerza la versión de escritorio: la página móvil de Mesh ignora viewmode/gotonode y muestra la lista de grupos."""
     vm = MODOS_REMOTO.get(modo, MODOS_REMOTO["escritorio"])
-    return f"{cfg.mesh_url}/?viewmode={vm}&gotonode={quote(nodeid, safe='@$')}&hide={HIDE_SOLO_PANTALLA}"
+    return f"{cfg.mesh_url}/?viewmode={vm}&gotonode={quote(nodeid, safe='@$')}&mobile=0&hide={HIDE_SOLO_PANTALLA}"
