@@ -336,6 +336,16 @@ el control remoto de MeshCentral dentro del panel (iframe).
 > `lockAgentDownload` en MeshCentral). El enlace lleva el id del grupo del cliente, que no es un secreto fuerte: solo
 > permite instalar un agente en ese grupo. Para revocarlo, borrá el grupo.
 
+### Demora en escritorio, terminal y archivos
+La demora (la barra de Mesh muestra los ms) es la ida y vuelta técnico → Cloudflare → VPS → equipo. Para bajarla:
+1. **WebRTC** (activo por defecto, `MESH_WEBRTC=true`): el navegador y el agente se conectan directo cuando la red lo permite y el
+   tráfico de pantalla no pasa por el VPS. Después de actualizar: `docker compose pull meshcentral && docker compose up -d meshcentral`
+   y en el log debe verse `webrtc=true`. En el escritorio, Opciones… → **Usar WebRTC** tiene que estar marcado; la barra pasa a
+   indicar la conexión directa. Si el NAT de alguno de los dos lados es estricto (4G/CGNAT, firewall sin UDP), Mesh usa el servidor.
+2. **Opciones del escritorio** (se guardan por navegador): calidad de compresión 50–60 %, escala 50–60 %, límite de cuadros 5–10.
+3. **Ubicación del VPS**: cuanto más cerca de Argentina (p. ej. São Paulo) menos latencia en el camino por servidor.
+4. **cloudflared**: protocolo `quic` (por defecto) y versión al día; si el VPS tiene poco CPU, el cifrado de video lo nota.
+
 ## Canales de entrada: correo y WhatsApp → tickets
 
 > **Todo se configura desde la consola, en _Canales_ (solo administrador):** la cuenta IMAP (servidor, puerto, cifrado,

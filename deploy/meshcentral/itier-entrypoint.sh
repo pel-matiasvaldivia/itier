@@ -22,6 +22,12 @@ if ! [[ "$TLS" =~ ^[0-9A-Fa-f.:/,]+$ ]]; then
 fi
 TLS_JSON="[\"${TLS//,/\",\"}\"]"
 
+# WebRTC: el navegador del técnico y el agente se conectan DIRECTO (P2P) cuando la red lo permite, sin pasar por el VPS ni
+# Cloudflare: baja mucho la demora del escritorio/terminal cuando el equipo está lejos del servidor. Si no hay camino
+# directo (NAT estricto, 4G), Mesh cae solo al relé por el servidor. MESH_WEBRTC=false lo apaga.
+WEBRTC="${MESH_WEBRTC:-true}"
+case "${WEBRTC,,}" in true|false) WEBRTC="${WEBRTC,,}" ;; *) WEBRTC=true ;; esac
+
 # Orígenes que pueden EMBEBER MeshCentral en un iframe (la consola de iTiers): lista separada por
 # comas o espacios, solo https://host[:puerto]. Vacío = no se permite embeber (X-Frame-Options).
 FRAME_JSON=""
@@ -50,7 +56,7 @@ cat > "$CONFIG_FILE" <<JSON
     "agentPing": 60,
     "SelfUpdate": false,
     "AllowFraming": false,
-    "WebRTC": false,
+    "WebRTC": $WEBRTC,
     $FRAME_LINE
     "plugins": { "enabled": false }
   },
@@ -64,7 +70,7 @@ cat > "$CONFIG_FILE" <<JSON
   }
 }
 JSON
-echo "[iTiers] config escrita: host=$HOST puerto=4430 (público 443, TLS lo termina Cloudflare) cuentasNuevas=$NUEVAS embeber=${FRAME_JSON:-no}"
+echo "[iTiers] config escrita: host=$HOST puerto=4430 (público 443, TLS lo termina Cloudflare) cuentasNuevas=$NUEVAS webrtc=$WEBRTC embeber=${FRAME_JSON:-no}"
 
 export DYNAMIC_CONFIG=false   # el entrypoint oficial deja esta config tal cual
 exec /bin/bash /opt/meshcentral/entrypoint.sh "$@"

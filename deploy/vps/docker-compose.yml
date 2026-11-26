@@ -156,6 +156,8 @@ services:
       MESH_NEW_ACCOUNTS: ${MESH_NEW_ACCOUNTS:-false}
       # Redes de las que confía en el X-Forwarded-* (el túnel llega por Docker/loopback).
       MESH_TLS_OFFLOAD: ${MESH_TLS_OFFLOAD:-172.16.0.0/12,127.0.0.1}
+      # WebRTC (conexión directa navegador↔agente, menos demora en escritorio/terminal). false = todo por el servidor.
+      MESH_WEBRTC: ${MESH_WEBRTC:-true}
       # Orígenes que pueden embeber Mesh en un iframe: la consola (conexión remota dentro del panel).
       MESH_FRAME_ORIGINS: ${MESH_FRAME_ORIGINS:-${ITIER_CONSOLE_PUBLIC_URL:-}}
       TZ: ${TZ:-America/Argentina/Buenos_Aires}
