@@ -20,7 +20,7 @@ from __future__ import annotations
 import base64
 import json
 import time
-from urllib.parse import quote
+from urllib.parse import quote, urlsplit
 
 from .. import perf
 from . import AdapterError
@@ -257,4 +257,8 @@ MODOS_REMOTO = {"escritorio": 11, "terminal": 12, "archivos": 13}
 def url_remoto(cfg, nodeid: str, modo: str = "escritorio") -> str:
     """Enlace a una vista del equipo en MeshCentral (escritorio, terminal o archivos), sin su marco: solo esa vista."""
     vm = MODOS_REMOTO.get(modo, MODOS_REMOTO["escritorio"])
-    return f"{cfg.mesh_url}/?viewmode={vm}&gotonode={quote(nodeid, safe='@$')}&hide={HIDE_SOLO_PANTALLA}"
+    # MeshCentral indexa los equipos por su id completo («node/<dominio>/<id>»; dominio vacío en el servidor principal):
+    # con el id corto no encuentra el equipo y deja la lista de grupos.
+    dominio = urlsplit(cfg.mesh_url).path.strip("/").split("/")[0]
+    completo = nodeid if "/" in nodeid else f"node/{dominio}/{nodeid}"
+    return f"{cfg.mesh_url}/?viewmode={vm}&gotonode={quote(completo, safe='@$/')}&hide={HIDE_SOLO_PANTALLA}"

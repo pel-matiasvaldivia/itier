@@ -294,7 +294,7 @@ check("equipos: filtro «solo con alertas» oculta los equipos sanos",
       "PC-OK" not in c.get("/equipos?alertas=1").text and "PC-VENTAS-01" in c.get("/equipos?alertas=1").text)
 rr = c.get("/equipos/prueba-srl/NODO-DEMO%40abc%24123/remoto?n=PC-VENTAS-01")
 check("remoto: embebe MeshCentral en un iframe dentro del panel",
-      rr.status_code == 200 and "<iframe" in rr.text and "gotonode=NODO-DEMO@abc$123" in rr.text.replace("&amp;", "&")
+      rr.status_code == 200 and "<iframe" in rr.text and "gotonode=node//NODO-DEMO@abc$123" in rr.text.replace("&amp;", "&")
       and "viewmode=11" in rr.text, rr.text[-300:])
 check("remoto: pestañas Escritorio, Terminal y Archivos", all(x in rr.text for x in ("🖥 Escritorio", "⌨️ Terminal", "📁 Archivos")) and "modo=terminal" in rr.text)
 _rt_ = c.get("/equipos/prueba-srl/NODO-DEMO%40abc%24123/remoto?n=PC-VENTAS-01&modo=terminal")
@@ -1345,7 +1345,7 @@ _row = dict(_db.connect(os.environ["ITIER_CONSOLE_DB"]).execute("SELECT * FROM c
 check("mesh propio: se guarda la dirección sin barra final y la clave cifrada", _row["mesh_url"] == "https://remoto.ejemplo.com/thevines" and "clave-mesh-1" not in (_row["mesh_pass"] or "") and _mp.externo(_row), _row.get("mesh_url"))
 _cm = _mp.cfg_de(app.state.cfg, _row)
 check("mesh propio: cfg_de usa el servidor y la clave del cliente", _cm.mesh_url == "https://remoto.ejemplo.com/thevines" and _cm.mesh_user == "itiers" and _cm.mesh_password == "clave-mesh-1")
-check("mesh propio: el enlace remoto conserva el dominio de Mesh", _mm.url_remoto(_cm, "ABC123@xyz", "terminal").startswith("https://remoto.ejemplo.com/thevines/?viewmode=12&gotonode=ABC123@xyz"))
+check("mesh propio: el enlace remoto conserva el dominio de Mesh", _mm.url_remoto(_cm, "ABC123@xyz", "terminal").startswith("https://remoto.ejemplo.com/thevines/?viewmode=12&gotonode=node/thevines/ABC123@xyz"))
 check("mesh propio: un cliente sin servidor propio usa el general", _mp.cfg_de(app.state.cfg, {"mesh_url": None}) is app.state.cfg)
 c.post("/clientes/canal-sa/mesh/quitar", data={"csrf": csrf_de(c.get("/clientes/canal-sa").text)})
 check("mesh propio: quitar vuelve al Mesh de iTiers", not _mp.externo(dict(_db.connect(os.environ["ITIER_CONSOLE_DB"]).execute("SELECT * FROM clients WHERE slug='canal-sa'").fetchone())))
