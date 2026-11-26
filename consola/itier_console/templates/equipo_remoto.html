@@ -30,9 +30,9 @@
   <script>
     (function () {
       var caja = document.getElementById('remoto'), b = document.getElementById('btn-full');
-      // Mesh arma su pantalla de escritorio para ~1100 px: en el celular se recortaba (sin barra de teclado/mouse).
+      // Mesh arma su pantalla de escritorio para ~1100 px (terminal/archivos, ~560 px): en el celular se recortaba (sin barra de teclado/mouse).
       // Se le da ese ancho y se achica el marco con scale() para que entre completo; el toque sigue funcionando.
-      var vista = document.getElementById('vista'), marco = document.getElementById('marco'), BASE = 1100;
+      var vista = document.getElementById('vista'), marco = document.getElementById('marco'), BASE = {{ 1100 if modo == 'escritorio' else 560 }};  // terminal y archivos son angostos: casi sin achicar, para que se lean
       function ajustar() {
         var w = vista.clientWidth, full = !!document.fullscreenElement;
         if (w >= BASE) { marco.style.cssText = ''; vista.style.height = ''; return; }
