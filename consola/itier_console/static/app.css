@@ -567,3 +567,7 @@ tr.rform td{background:#f8faff}
 .g-act{display:flex;flex-wrap:wrap;gap:.45rem;margin-top:.6rem}
 .g-act .u-btn,.g-act .u-b{flex:1 1 auto;text-align:center;text-decoration:none;display:inline-flex;align-items:center;justify-content:center}
 .g-act form{flex:1 1 auto;display:flex}.g-act form button{flex:1}
+
+/* Conexión remota: el marco de Mesh se achica a escala en pantallas angostas (ver equipo_remoto.html) */
+.l-vista{position:relative;overflow:hidden;min-width:0}
+.l-remote:fullscreen .l-vista{flex:1;min-height:0}

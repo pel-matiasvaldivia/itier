@@ -23,11 +23,26 @@
         <a class="u-b" href="{{ src }}" target="_blank" rel="noopener" style="text-decoration:none">↗ Otra pestaña</a>
       </span>
     </div>
-    <iframe id="marco" src="{{ src }}" title="{{ {'escritorio': 'Escritorio', 'terminal': 'Terminal', 'archivos': 'Archivos'}[modo] }} de {{ nombre }}" allow="clipboard-read; clipboard-write; fullscreen"></iframe>
+    <div id="vista" class="l-vista">
+      <iframe id="marco" src="{{ src }}" title="{{ {'escritorio': 'Escritorio', 'terminal': 'Terminal', 'archivos': 'Archivos'}[modo] }} de {{ nombre }}" allow="clipboard-read; clipboard-write; fullscreen"></iframe>
+    </div>
   </div>
   <script>
     (function () {
       var caja = document.getElementById('remoto'), b = document.getElementById('btn-full');
+      // Mesh arma su pantalla de escritorio para ~1100 px: en el celular se recortaba (sin barra de teclado/mouse).
+      // Se le da ese ancho y se achica el marco con scale() para que entre completo; el toque sigue funcionando.
+      var vista = document.getElementById('vista'), marco = document.getElementById('marco'), BASE = 1100;
+      function ajustar() {
+        var w = vista.clientWidth, full = !!document.fullscreenElement;
+        if (w >= BASE) { marco.style.cssText = ''; vista.style.height = ''; return; }
+        var k = w / BASE, h = full ? vista.clientHeight : Math.max(480, window.innerHeight - 200);
+        if (!full) { vista.style.height = h + 'px'; } else { vista.style.height = ''; }
+        marco.style.cssText = 'width:' + BASE + 'px;height:' + (h / k) + 'px;flex:none;transform:scale(' + k + ');transform-origin:0 0';
+      }
+      window.addEventListener('resize', ajustar);
+      document.addEventListener('fullscreenchange', function () { setTimeout(ajustar, 60); });
+      ajustar();
       b.addEventListener('click', function () {
         if (document.fullscreenElement) { document.exitFullscreen(); } else if (caja.requestFullscreen) { caja.requestFullscreen(); }
       });
