@@ -246,8 +246,9 @@ def nodo_valido(nodeid: str) -> bool:
 
 
 # Bits del parámetro `hide` de MeshCentral: 1 barra superior (logo) · 2 pestañas · 4 pie · 8 títulos de pestaña ·
-# 16 menú lateral · 32 botón «volver». Con todos ocultos queda solo la pantalla remota y sus controles.
-HIDE_SOLO_PANTALLA = 1 | 2 | 4 | 8 | 16 | 32
+# 16 menú lateral · 32 botón «volver». Se ocultan solo el marco (logo, pestañas, pie, volver); NO los títulos ni el
+# menú del equipo, porque con todo oculto (63) algunos servidores dejaban el panel remoto en blanco.
+HIDE_SOLO_PANTALLA = 1 | 2 | 4 | 32
 
 
 # Vistas del equipo en MeshCentral (parámetro viewmode): escritorio remoto, terminal y administrador de archivos.
