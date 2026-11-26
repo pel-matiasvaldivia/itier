@@ -20,7 +20,7 @@ from __future__ import annotations
 import base64
 import json
 import time
-from urllib.parse import quote, urlsplit
+from urllib.parse import quote
 
 from .. import perf
 from . import AdapterError
@@ -246,9 +246,8 @@ def nodo_valido(nodeid: str) -> bool:
 
 
 # Bits del parámetro `hide` de MeshCentral: 1 barra superior (logo) · 2 pestañas · 4 pie · 8 títulos de pestaña ·
-# 16 menú lateral · 32 botón «volver». Se ocultan solo el marco (logo, pestañas, pie, volver); NO los títulos ni el
-# menú del equipo, porque con todo oculto (63) algunos servidores dejaban el panel remoto en blanco.
-HIDE_SOLO_PANTALLA = 1 | 2 | 4 | 32
+# 16 menú lateral · 32 botón «volver». Con todos ocultos queda solo la pantalla remota y sus controles.
+HIDE_SOLO_PANTALLA = 1 | 2 | 4 | 8 | 16 | 32
 
 
 # Vistas del equipo en MeshCentral (parámetro viewmode): escritorio remoto, terminal y administrador de archivos.
@@ -258,8 +257,4 @@ MODOS_REMOTO = {"escritorio": 11, "terminal": 12, "archivos": 13}
 def url_remoto(cfg, nodeid: str, modo: str = "escritorio") -> str:
     """Enlace a una vista del equipo en MeshCentral (escritorio, terminal o archivos), sin su marco: solo esa vista."""
     vm = MODOS_REMOTO.get(modo, MODOS_REMOTO["escritorio"])
-    # MeshCentral indexa los equipos por su id completo («node/<dominio>/<id>»; dominio vacío en el servidor principal):
-    # con el id corto no encuentra el equipo y deja la lista de grupos.
-    dominio = urlsplit(cfg.mesh_url).path.strip("/").split("/")[0]
-    completo = nodeid if "/" in nodeid else f"node/{dominio}/{nodeid}"
-    return f"{cfg.mesh_url}/?viewmode={vm}&gotonode={quote(completo, safe='@$/')}&hide={HIDE_SOLO_PANTALLA}"
+    return f"{cfg.mesh_url}/?viewmode={vm}&gotonode={quote(nodeid, safe='@$')}&hide={HIDE_SOLO_PANTALLA}"
