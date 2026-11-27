@@ -457,3 +457,32 @@ este VPS, sin exponer IP ni puerto (ADR-0010). Se configura una vez:
 
 Desde ahí, cada instalador de appliance que genere la consola ya trae el túnel
 configurado. El nodo de malla `zabbix-proxy-gw` deja de ser necesario.
+
+
+## Producción en `itiers.io`
+
+El mismo stack se publica también con el dominio propio, sin levantar nada nuevo: son reglas extra
+del túnel (ver `cloudflared/config.example.yml`) hacia los mismos puertos locales.
+
+| Hostname | Servicio local |
+|---|---|
+| `itiers.io`, `www.itiers.io` | `http://localhost:8082` (landing) |
+| `app.itiers.io` | `http://localhost:8083` (consola) |
+| `itsm.itiers.io` | `http://localhost:8884` (GLPI) |
+| `zabbix.itiers.io` | `http://localhost:8885` (Zabbix web) |
+| `mesh.itiers.io` | `http://localhost:8886` (alias de MeshCentral) |
+| `zbx.itiers.io` | `tcp://localhost:10051` |
+
+Cada hostname necesita su registro DNS `CNAME` → `<UUID-del-túnel>.cfargotunnel.com` (proxied).
+
+Para pasar la consola a `app.itiers.io` en el `.env`:
+
+```
+ITIER_CONSOLE_PUBLIC_URL=https://app.itiers.io
+ITIER_PUBLIC_GLPI_URL=https://itsm.itiers.io
+ITIER_ZBX_PUBLIC_URL=https://zabbix.itiers.io
+MESH_FRAME_ORIGINS=https://app.itiers.io https://itierconsole.pymesenlinea.com.ar
+```
+
+Mantené los hostnames `pymesenlinea.com.ar` (sobre todo `itier-mesh`, `itier-itsm`, `itier-zbx`): los agentes
+instalados están atados a ellos. Tras el cambio, reinstalá la PWA y reactivá las notificaciones en el dominio nuevo.

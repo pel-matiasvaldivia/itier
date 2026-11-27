@@ -50,6 +50,25 @@ ingress:
   - hostname: itier-zabbix.pymesenlinea.com.ar
     service: http://localhost:8885
 
+  # ── PRODUCCIÓN: dominio itiers.io (mismos puertos locales que arriba) ──────
+  # Universal SSL cubre itiers.io y *.itiers.io (un nivel). Los hostnames
+  # pymesenlinea.com.ar de arriba se MANTIENEN: los agentes ya instalados
+  # (Mesh, glpi-agent, zabbix-proxy) están atados a esos nombres.
+  - hostname: itiers.io          # landing
+    service: http://localhost:8082
+  - hostname: www.itiers.io      # landing
+    service: http://localhost:8082
+  - hostname: app.itiers.io      # consola
+    service: http://localhost:8083
+  - hostname: itsm.itiers.io     # GLPI
+    service: http://localhost:8884
+  - hostname: zabbix.itiers.io   # Zabbix web
+    service: http://localhost:8885
+  - hostname: mesh.itiers.io     # MeshCentral (alias; los agentes usan itier-mesh.pymesenlinea.com.ar)
+    service: http://localhost:8886
+  - hostname: zbx.itiers.io      # Zabbix server (TCP, vía Cloudflare Access/WARP)
+    service: tcp://localhost:10051
+
   # Regla final obligatoria: todo lo demás, 404.
   - service: http_status:404
 
